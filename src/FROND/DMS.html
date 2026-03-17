@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla del DM - La Libreta del Escriba</title>
+    <link rel="stylesheet" href="/src/CSS/DMS.css">
+    <link rel="stylesheet" href="/src/CSS/sidebar.css">
+    <link rel="stylesheet" href="/src/css/tutorial.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar (SIEMPRE visible, incluso para jugadores) -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo">
+                <i class="fas fa-book-open"></i>
+                <span>El Escriba</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="sidebar-item">
+                <a href="/src/FROND/hoja.html" class="sidebar-link" id="nav-hoja">
+                    <i class="fas fa-scroll"></i>
+                    <span>Hoja - PJ</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/Cartas.html" class="sidebar-link" id="nav-cartas">
+                    <i class="fas fa-crown"></i>
+                    <span>Cartas</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/DMS.html" class="sidebar-link active" id="nav-bestias">
+                    <i class="fas fa-dragon"></i>
+                    <span>DM Screen</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/mapa.html" class="sidebar-link" id="nav-mapa">
+                    <i class="fas fa-map"></i>
+                    <span>Mapa</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/dados.html" class="sidebar-link" id="nav-dados">
+                    <i class="fas fa-dice-d20"></i>
+                    <span>Lanzar Dados</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/admin.html" class="sidebar-link" id="nav-ajustes">
+                    <i class="fas fa-cog"></i>
+                    <span>Ajustes</span>
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- TODO EL CONTENIDO DE DMS ENVUELTO EN dm-only -->
+    <div class="dm-only">
+        <!-- Menu superior estático -->
+        <div class="static-top-menu">
+            <button class="static-menu-btn active" data-section="initiative">
+                <i class="fas fa-swords"></i>
+                <span>Iniciativa</span>
+            </button>
+            <button class="static-menu-btn" data-section="manual">
+                <i class="fas fa-book"></i>
+                <span>Manual</span>
+            </button>
+            <button class="static-menu-btn" data-section="bestiary">
+                <i class="fas fa-dragon"></i>
+                <span>Bestiario</span>
+            </button>
+            <button class="static-menu-btn" data-section="campaign">
+                <i class="fas fa-scroll"></i>
+                <span>Campaña</span>
+            </button>
+            <button class="static-menu-btn" data-section="notes">
+                <i class="fas fa-feather-alt"></i>
+                <span>Notas</span>
+            </button>
+            <button class="static-menu-btn" data-section="tools">
+                <i class="fas fa-tools"></i>
+                <span>Herramientas</span>
+            </button>
+        </div>
+
+        <!-- Contenido principal -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="dm-header">
+                <div class="header-left">
+                    <h1><i class="fas fa-crown"></i> PANTALLA DEL DUNGEON MASTER</h1>
+                    <div class="session-info">
+                        <span id="sessionName">Sesión Actual</span>
+                        <span class="session-status" id="combatStatus">Exploración</span>
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <button class="dm-btn" id="newSessionBtn">
+                        <i class="fas fa-plus"></i> Nueva
+                    </button>
+                    <button class="dm-btn" id="saveSessionBtn">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                    <button class="dm-btn" id="loadSessionBtn">
+                        <i class="fas fa-folder-open"></i> Cargar
+                    </button>
+                    <button class="dm-btn combat-btn" id="toggleCombatBtn">
+                        <i class="fas fa-fist-raised"></i> Combate
+                    </button>
+                </div>
+            </header>
+
+            <!-- Contenedor principal -->
+            <div class="dm-container">
+                <!-- Sección de Iniciativa -->
+                <section class="dm-section initiative-section active" id="initiativeSection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-swords"></i> GESTIÓN DE INICIATIVA</h2>
+                        <div class="section-controls">
+                            <button class="section-btn" id="rollAllInitiative">
+                                <i class="fas fa-dice"></i> Tirar Enemigos
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="initiative-content">
+                        <!-- Panel de control -->
+                        <div class="control-panel">
+                            <div class="control-group">
+                                <h3><i class="fas fa-users"></i> Jugadores</h3>
+                                <div class="quick-add">
+                                    <input type="text" id="playerNameInput" placeholder="Nombre">
+                                    <input type="number" id="playerInitiativeInput" placeholder="Iniciativa" min="1" max="30">
+                                    <input type="number" id="playerCAInput" placeholder="CA" min="1" max="30">
+                                    <input type="number" id="playerHPInput" placeholder="Vida" min="1" max="999">
+                                    <button class="control-btn small" id="addPlayerBtn">
+                                        <i class="fas fa-plus"></i> Añadir
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="control-group">
+                                <h3><i class="fas fa-skull-crossbones"></i> Enemigos</h3>
+                                <div class="quick-add">
+                                    <input type="text" id="enemyNameInput" placeholder="Nombre">
+                                    <input type="text" id="enemyRaceInput" placeholder="Raza">
+                                    <input type="number" id="enemyCAInput" placeholder="CA" min="1" max="30">
+                                    <input type="number" id="enemyHPInput" placeholder="Vida" min="1" max="999">
+                                    <button class="control-btn small" id="addEnemyBtn">
+                                        <i class="fas fa-plus"></i> Añadir
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="round-counter">
+                                <div class="counter-item">
+                                    <span class="counter-label">Ronda</span>
+                                    <span class="counter-value" id="currentRound">1</span>
+                                </div>
+                                <div class="counter-item">
+                                    <span class="counter-label">Turno</span>
+                                    <span class="counter-value" id="currentTurn">1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Entidades -->
+                        <div class="entities-container">
+                            <div class="entities-column">
+                                <h3 class="column-title"><i class="fas fa-users"></i> Jugadores <span class="badge" id="playerBadge">0</span></h3>
+                                <div class="entities-list" id="playersList">
+                                    <!-- Jugadores generados dinámicamente -->
+                                </div>
+                            </div>
+
+                            <div class="entities-column">
+                                <h3 class="column-title"><i class="fas fa-skull-crossbones"></i> Enemigos <span class="badge" id="enemyBadge">0</span></h3>
+                                <div class="entities-list" id="enemiesList">
+                                    <!-- Enemigos generados dinámicamente -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Orden de Iniciativa -->
+                        <div class="initiative-order">
+                            <div class="order-header">
+                                <h3><i class="fas fa-list-ol"></i> ORDEN DE INICIATIVA</h3>
+                                <div class="order-controls">
+                                    <button class="order-btn" id="sortInitiative">
+                                        <i class="fas fa-sort-amount-down"></i> Ordenar
+                                    </button>
+                                    <button class="order-btn" id="clearOrder">
+                                        <i class="fas fa-trash"></i> Limpiar
+                                    </button>
+                                    <button class="order-btn" id="nextTurnBtn">
+                                        <i class="fas fa-forward"></i> Siguiente
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="order-list" id="initiativeOrder">
+                                <!-- Orden generado dinámicamente -->
+                                <div class="empty-order">
+                                    <i class="fas fa-list"></i>
+                                    <p>No hay entidades en el orden de iniciativa</p>
+                                    <small>Añade jugadores/enemigos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección del Manual -->
+                <section class="dm-section manual-section" id="manualSection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-book"></i> MANUAL DEL DM</h2>
+                        <div class="section-controls">
+                            <input type="file" id="manualUpload" accept=".pdf" style="display: none;">
+                            <button class="section-btn" id="loadManualBtn">
+                                <i class="fas fa-file-upload"></i> Cargar PDF
+                            </button>
+                            <button class="section-btn" id="clearManualBtn">
+                                <i class="fas fa-trash"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="pdf-container">
+                        <div class="pdf-toolbar">
+                            <div class="pdf-info">
+                                <span id="manualTitle">No hay PDF cargado</span>
+                                <div class="page-input-group">
+                                    <span class="page-info">Página: </span>
+                                    <input type="number" id="manualPageInput" class="page-input" min="1" value="1" disabled>
+                                    <span class="page-info">/ <span id="manualTotalPages">-</span></span>
+                                </div>
+                            </div>
+                            <div class="pdf-controls">
+                                <button class="pdf-control-btn" id="prevPageBtn" disabled>
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button class="pdf-control-btn" id="nextPageBtn" disabled>
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                                <div class="zoom-controls">
+                                    <button class="pdf-control-btn" id="manualZoomOutBtn" disabled>
+                                        <i class="fas fa-search-minus"></i>
+                                    </button>
+                                    <span class="zoom-level" id="manualZoomLevel">100%</span>
+                                    <button class="pdf-control-btn" id="manualZoomInBtn" disabled>
+                                        <i class="fas fa-search-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pdf-viewer" id="manualViewer">
+                            <div class="pdf-placeholder">
+                                <i class="fas fa-book-open"></i>
+                                <h3>Manual del Dungeon Master</h3>
+                                <p>Carga un archivo PDF para comenzar</p>
+                                <button class="upload-btn" id="uploadManualBtn">
+                                    <i class="fas fa-cloud-upload-alt"></i> Seleccionar PDF
+                                </button>
+                                <p class="placeholder-hint">Formatos soportados: .pdf</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección del Bestiario -->
+                <section class="dm-section bestiary-section" id="bestiarySection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-dragon"></i> BESTIARIO</h2>
+                        <div class="section-controls" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="file" id="bestiaryJsonUpload" accept=".json" style="display: none;">
+                            <button class="section-btn" id="loadBestiaryJsonBtn" title="Cargar tu propio bestiario JSON" style="background: var(--accent-teal);">
+                                <i class="fas fa-file-upload"></i> Cargar JSON
+                            </button>
+                            <button class="section-btn" id="resetBestiaryJsonBtn" title="Restaurar bestiario original" style="background: var(--accent-purple);">
+                                <i class="fas fa-undo-alt"></i> Restaurar
+                            </button>
+                            <input type="file" id="bestiaryUpload" accept=".pdf" style="display: none;">
+                            <button class="section-btn" id="loadBestiaryBtn">
+                                <i class="fas fa-file-pdf"></i> Cargar PDF
+                            </button>
+                            <button class="section-btn" id="clearBestiaryBtn">
+                                <i class="fas fa-trash"></i> Limpiar PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="pdf-container">
+                        <div class="pdf-toolbar">
+                            <div class="pdf-info">
+                                <span id="bestiaryTitle">No hay PDF cargado</span>
+                                <div class="page-input-group">
+                                    <span class="page-info">Página: </span>
+                                    <input type="number" id="bestiaryPageInput" class="page-input" min="1" value="1" disabled>
+                                    <span class="page-info">/ <span id="bestiaryTotalPages">-</span></span>
+                                </div>
+                            </div>
+                            <div class="pdf-controls">
+                                <button class="pdf-control-btn" id="bestiaryPrevBtn" disabled>
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button class="pdf-control-btn" id="bestiaryNextBtn" disabled>
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                                <div class="zoom-controls">
+                                    <button class="pdf-control-btn" id="bestiaryZoomOutBtn" disabled>
+                                        <i class="fas fa-search-minus"></i>
+                                    </button>
+                                    <span class="zoom-level" id="bestiaryZoomLevel">100%</span>
+                                    <button class="pdf-control-btn" id="bestiaryZoomInBtn" disabled>
+                                        <i class="fas fa-search-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pdf-viewer" id="bestiaryViewer">
+                            <div class="pdf-placeholder">
+                                <i class="fas fa-dragon"></i>
+                                <h3>Bestiario de Criaturas</h3>
+                                <p>Carga un archivo PDF para comenzar</p>
+                                <button class="upload-btn" id="uploadBestiaryBtn">
+                                    <i class="fas fa-cloud-upload-alt"></i> Seleccionar PDF
+                                </button>
+                                <p class="placeholder-hint">Formatos soportados: .pdf</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección de Campaña -->
+                <section class="dm-section campaign-section" id="campaignSection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-scroll"></i> CAMPAÑA</h2>
+                        <div class="section-controls">
+                            <input type="file" id="campaignUpload" accept=".pdf" style="display: none;">
+                            <button class="section-btn" id="loadCampaignBtn">
+                                <i class="fas fa-file-upload"></i> Cargar PDF
+                            </button>
+                            <button class="section-btn" id="clearCampaignBtn">
+                                <i class="fas fa-trash"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="pdf-container">
+                        <div class="pdf-toolbar">
+                            <div class="pdf-info">
+                                <span id="campaignTitle">No hay PDF cargado</span>
+                                <div class="page-input-group">
+                                    <span class="page-info">Página: </span>
+                                    <input type="number" id="campaignPageInput" class="page-input" min="1" value="1" disabled>
+                                    <span class="page-info">/ <span id="campaignTotalPages">-</span></span>
+                                </div>
+                            </div>
+                            <div class="pdf-controls">
+                                <button class="pdf-control-btn" id="campaignPrevBtn" disabled>
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button class="pdf-control-btn" id="campaignNextBtn" disabled>
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                                <div class="zoom-controls">
+                                    <button class="pdf-control-btn" id="campaignZoomOutBtn" disabled>
+                                        <i class="fas fa-search-minus"></i>
+                                    </button>
+                                    <span class="zoom-level" id="campaignZoomLevel">100%</span>
+                                    <button class="pdf-control-btn" id="campaignZoomInBtn" disabled>
+                                        <i class="fas fa-search-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pdf-viewer" id="campaignViewer">
+                            <div class="pdf-placeholder">
+                                <i class="fas fa-scroll"></i>
+                                <h3>Documentos de Campaña</h3>
+                                <p>Carga un archivo PDF para comenzar</p>
+                                <button class="upload-btn" id="uploadCampaignBtn">
+                                    <i class="fas fa-cloud-upload-alt"></i> Seleccionar PDF
+                                </button>
+                                <p class="placeholder-hint">Formatos soportados: .pdf</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección de Notas -->
+                <section class="dm-section notes-section" id="notesSection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-feather-alt"></i> NOTAS DEL DM</h2>
+                    </div>
+
+                    <div class="notes-container">
+                        <div class="notes-tabs">
+                            <button class="notes-tab active" data-tab="session">
+                                <i class="fas fa-scroll"></i> Sesión
+                            </button>
+                            <button class="notes-tab" data-tab="plot">
+                                <i class="fas fa-brain"></i> Trama
+                            </button>
+                            <button class="notes-tab" data-tab="npcs">
+                                <i class="fas fa-users"></i> NPCs
+                            </button>
+                            <button class="notes-tab" data-tab="locations">
+                                <i class="fas fa-map-marked-alt"></i> Locaciones
+                            </button>
+                        </div>
+
+                        <div class="notes-toolbar">
+                            <button class="format-btn" id="formatBold" title="Negrita (Ctrl+B)">
+                                <i class="fas fa-bold"></i>
+                            </button>
+                            <button class="format-btn" id="formatItalic" title="Cursiva (Ctrl+I)">
+                                <i class="fas fa-italic"></i>
+                            </button>
+                            <button class="format-btn" id="formatUnderline" title="Subrayado (Ctrl+U)">
+                                <i class="fas fa-underline"></i>
+                            </button>
+                            <span class="toolbar-divider"></span>
+                            <button class="format-btn" id="formatH1" title="Título principal">
+                                H1
+                            </button>
+                            <button class="format-btn" id="formatH2" title="Subtítulo">
+                                H2
+                            </button>
+                            <button class="format-btn" id="formatH3" title="Sub-subtítulo">
+                                H3
+                            </button>
+                        </div>
+
+                        <div class="notes-content">
+                            <div class="notes-editor" id="dmNotesEditor" contenteditable="true" 
+                                placeholder="Escribe aquí tus notas para la sesión..."></div>
+                            
+                            <div class="notes-stats">
+                                <span id="notesCharCount">0 caracteres</span>
+                                <span id="notesWordCount">0 palabras</span>
+                                <span id="notesLastSaved">No guardado</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección de Herramientas -->
+                <section class="dm-section tools-section" id="toolsSection">
+                    <div class="section-header">
+                        <h2><i class="fas fa-tools"></i> HERRAMIENTAS DEL DM</h2>
+                    </div>
+
+                    <div class="tools-grid">
+                        <div class="tool-card">
+                            <div class="tool-icon">
+                                <i class="fas fa-dice"></i>
+                            </div>
+                            <h3>Lanzador de Dados</h3>
+                            <div class="dice-selector">
+                                <select id="diceType">
+                                    <option value="d4">d4</option>
+                                    <option value="d6">d6</option>
+                                    <option value="d8">d8</option>
+                                    <option value="d10">d10</option>
+                                    <option value="d12">d12</option>
+                                    <option value="d20">d20</option>
+                                    <option value="d100">d100</option>
+                                </select>
+                                <button class="tool-btn" id="rollDiceBtn">
+                                    <i class="fas fa-dice-d20"></i> Lanzar
+                                </button>
+                            </div>
+                            <div class="dice-result" id="diceResult">
+                                <span class="result-label">Resultado:</span>
+                                <span class="result-value">-</span>
+                            </div>
+                        </div>
+
+                        <div class="tool-card">
+                            <div class="tool-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <h3>Temporizador</h3>
+                            <div class="timer-display" id="timerDisplay">
+                                00:00
+                            </div>
+                            <div class="timer-controls">
+                                <button class="tool-btn small" id="startTimerBtn">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="tool-btn small" id="pauseTimerBtn">
+                                    <i class="fas fa-pause"></i>
+                                </button>
+                                <button class="tool-btn small" id="resetTimerBtn">
+                                    <i class="fas fa-stop"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="tool-card">
+                            <div class="tool-icon">
+                                <i class="fas fa-paint-brush"></i>
+                            </div>
+                            <h3>Pizarra de Dibujo</h3>
+                            <div class="canvas-container" style="display: flex; flex-direction: column; gap: 10px;">
+                                <canvas id="dmCanvas" width="300" height="200" style="border: 2px solid var(--accent-gold); border-radius: 6px; background: white; cursor: crosshair; width: 100%; height: auto;"></canvas>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                                    <button class="tool-btn small" id="canvasColorBtn" style="background: var(--accent-blue);">
+                                        <i class="fas fa-palette"></i> Color
+                                    </button>
+                                    <button class="tool-btn small" id="canvasClearBtn" style="background: var(--accent-red);">
+                                        <i class="fas fa-eraser"></i> Limpiar
+                                    </button>
+                                    <button class="tool-btn small" id="canvasSaveBtn" style="background: var(--accent-teal);">
+                                        <i class="fas fa-save"></i> Guardar PNG
+                                    </button>
+                                    <input type="color" id="canvasColorPicker" value="#000000" style="width: 40px; height: 36px; border: 2px solid var(--accent-gold); border-radius: 4px;">
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                                    <span style="color: var(--ink-light); font-size: 0.9rem;">
+                                        <i class="fas fa-pencil-alt"></i> Dibuja haciendo clic y arrastrando
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Footer -->
+            <footer class="dm-footer">
+                <div class="footer-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Jugadores:</span>
+                        <span class="stat-value" id="footerPlayers">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Enemigos:</span>
+                        <span class="stat-value" id="footerEnemies">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Ronda:</span>
+                        <span class="stat-value" id="footerRound">1</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Hora:</span>
+                        <span class="stat-value" id="currentTime">00:00</span>
+                    </div>
+                </div>
+                <div class="footer-info">
+                    <span>La Libreta del Escriba • DM Screen v2.0</span>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Scripts en el orden correcto -->
+    <script src="/src/JS/auth.js"></script>
+    <script src="/src/JS/config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="/src/JS/tutorial.js"></script>
+    <script src="/src/JS/sidebar.js"></script>
+    <script src="/src/JS/DMS.js"></script>
+</body>
+</html>

@@ -1,0 +1,1288 @@
+[
+  {
+    "nombre": "VENGAMOSCA",
+    "descripcion": "La Vengamoscas es un insecto volador territorial y agresivo, conocido por su habilidad para realizar ataques rápidos y certeros. A menudo habita en áreas abiertas o cerca de nidos, donde patrulla incansablemente. Aunque no es particularmente resistente, su velocidad y capacidad para atacar en grupo la convierten en un enemigo peligroso para aventureros desprevenidos. Recompensa: 1 Alma, 8 PX. Al derrotarla, puede dejar como botín opcional un 'Fragmento de Ala Frágil' (un objeto que incrementa la velocidad en +1 casilla durante un combate; se rompe después de un uso).",
+    "estadisticas": {
+      "tipo": "Bestia Mediana, no alineada",
+      "ca": "0",
+      "pg": "6",
+      "velocidad": "6 casillas, volar",
+      "desafio": "8",
+      "atributos_especiales": [
+        {
+          "nombre": "Ataque Enjambre",
+          "descripcion": "Si hay más de una Vengamoscas en combate, cada Vengamoscas obtiene +1 a sus tiradas de ataque debido a su coordinación natural."
+        },
+        {
+          "nombre": "Evasión Aérea",
+          "descripcion": "Los ataques cuerpo a cuerpo contra la Vengamoscas tienen desventaja, debido a su constante movimiento en el aire."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Picotazo Veloz",
+          "descripcion": "Ataque con arma cuerpo a cuerpo: +5 a impactar, alcance 5 pies, un objetivo. Impacto: 4 (1d6 + 2) de daño perforante. El objetivo debe superar una tirada de salvación de Destreza CD 12 o quedar desbalanceado, perdiendo 1 casilla de movimiento en su próximo turno."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "REY VENGAMOSCA",
+    "descripcion": "El Rey Vengamoscas lidera desde el frente a sus congéneres, utilizando su Carga Devastadora para atacar líneas de enemigos y reposicionarse rápidamente. Su rugido inspira a sus aliados y aterroriza a sus enemigos. Recompensa: 5 Almas, 25 PX. Al derrotarlo, puede dejar como botín opcional la 'Garra Real': Un arma ligera que otorga +1 a los ataques cuerpo a cuerpo y permite un ataque adicional si el portador se ha movido más de 3 casillas en su turno.",
+    "estadisticas": {
+      "tipo": "Bestia Grande, no alineada",
+      "ca": "1",
+      "pg": "8",
+      "velocidad": "6 casillas, volar",
+      "desafio": "25",
+      "atributos_especiales": [
+        {
+          "nombre": "Furia Enjambre",
+          "descripcion": "Todas las Vengamoscas aliadas ganan +1 a sus tiradas de ataque mientras el Rey Vengamoscas esté presente en combate."
+        },
+        {
+          "nombre": "Veloz y Letal",
+          "descripcion": "El Rey Vengamoscas tiene ventaja en todas las tiradas de ataque si se ha movido más de 4 casillas antes de atacar."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Carga Devastadora",
+          "descripcion": "Ataque en línea recta hasta 4 casillas, dañando a todos los enemigos en su camino. Cada objetivo debe realizar una tirada de salvación de Destreza CD 14 o recibir 1d8 de daño y ser empujado 1 casilla."
+        },
+        {
+          "nombre": "Rugido del Rey",
+          "descripcion": "Emite un poderoso rugido. Los aliados a 7 casillas recuperan 1d4 de PG y ganan ventaja en su próximo ataque. Los enemigos deben realizar una tirada de salvación de Fuerza de Voluntad CD 13 o sufrir desventaja en su próximo ataque. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MOSQUITO BLINDADO",
+    "descripcion": "Más resistente que otros de su especie, este mosquito ha desarrollado un exoesqueleto endurecido que lo protege del peligro. Sin embargo, su peso extra no lo hace menos letal. Recompensa: 1 Alma, 8 PX. Al derrotarlo, puede dejar como botín opcional un 'Fragmento de Ala Frágil' (un objeto que incrementa la velocidad en +1 casilla durante un combate; se rompe después de un uso).",
+    "estadisticas": {
+      "tipo": "Bestia Mediana, no alineada",
+      "ca": "1",
+      "pg": "14",
+      "velocidad": "5 casillas, volar",
+      "desafio": "8",
+      "atributos_especiales": [
+        {
+          "nombre": "Blindaje Natural",
+          "descripcion": "Reduce en 1 punto el daño recibido de ataques físicos no perforantes."
+        },
+        {
+          "nombre": "Vuelo Controlado",
+          "descripcion": "No sufre penalizaciones al moverse a través de terreno difícil o peligroso."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Picotazo Perforante",
+          "descripcion": "Ataque con arma cuerpo a cuerpo: +5 a impactar, alcance 5 pies, un objetivo. Impacto: 4 (1d6 + 2) de daño perforante. El objetivo debe superar una tirada de salvación de Fuerza CD 15 o quedar debilitado (desventaja en su próximo ataque)."
+        },
+        {
+          "nombre": "Carga Aérea",
+          "descripcion": "Se mueve en línea recta hasta 6 casillas y ataca al primer enemigo en su camino. Si impacta, inflige 1d8 de daño y el objetivo es empujado 1 casilla hacia atrás. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "LUMÉLULA ELÉCTRICA",
+    "descripcion": "Las Lumélulas Eléctricas flotan en patrones impredecibles, descargando su energía en cualquiera que se acerque demasiado. No son criaturas agresivas por naturaleza, pero reaccionarán con violencia si se sienten amenazadas. Recompensa: 3 Almas, 20 PX. Al derrotarla, puede dejar como botín opcional la 'Esfera Electroestática': Un componente que puede usarse para mejorar armas con afinidad eléctrica (+1 de daño eléctrico en ataques a distancia).",
+    "estadisticas": {
+      "tipo": "Elemental Pequeño, no alineada",
+      "ca": "1",
+      "pg": "14",
+      "velocidad": "5 casillas, volar",
+      "desafio": "20",
+      "atributos_especiales": [
+        {
+          "nombre": "Brillo Cegador",
+          "descripcion": "Los ataques a distancia contra la Lumélula tienen desventaja debido a su resplandor intermitente."
+        },
+        {
+          "nombre": "Sobrecarga",
+          "descripcion": "Al morir, la Lumélula explota en un estallido eléctrico, infligiendo 1d6 de daño a todas las criaturas en un radio de 2 casillas."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Descarga Radial",
+          "descripcion": "Libera una explosión eléctrica en un radio de 2 casillas. Todas las criaturas en el área deben hacer una tirada de salvación de Destreza CD 14. Si fallan, reciben 1d6 de daño eléctrico y quedan aturdidas hasta el final de su siguiente turno."
+        },
+        {
+          "nombre": "Rayo Dirigido",
+          "descripcion": "Lanza un relámpago a un enemigo dentro de 6 casillas. Si impacta, inflige 1d8 de daño eléctrico y el objetivo debe superar una tirada de salvación de Fuerza CD 13 o quedar paralizado hasta el final de su próximo turno. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "GRUZZER",
+    "descripcion": "Los Gruzers son pequeñas criaturas voladoras de comportamiento errático que atacan en grupo, utilizando su velocidad y movimientos impredecibles para abrumar a sus enemigos. Recompensa: 1 Alma, 5 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Diminuta, no alineada",
+      "ca": "0",
+      "pg": "4",
+      "velocidad": "5 casillas, volar",
+      "desafio": "5",
+      "atributos_especiales": [
+        {
+          "nombre": "Vuelo Errático",
+          "descripcion": "Los ataques a distancia contra los Gruzers tienen desventaja debido a su movimiento impredecible."
+        },
+        {
+          "nombre": "Ataque Coordinado",
+          "descripcion": "Por cada Gruzer adicional dentro de 3 casillas del objetivo, el daño del ataque aumenta en +1 (máximo +3)."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Carga Simple",
+          "descripcion": "El Gruzer realiza un ataque cuerpo a cuerpo contra un enemigo adyacente, moviéndose hasta 3 casillas para alcanzarlo. Si el ataque impacta, inflige 1d4 de daño."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MADRE GRUZ",
+    "descripcion": "La Madre Gruz es una versión masiva y feroz de su especie, actuando como líder. Con su fuerza bruta y habilidad para convocar Gruzers, representa un desafío significativo, capaz de dominar el campo de batalla con ataques aéreos y oleadas de aliados. Recompensa: 6 Almas, 50 PX. Al derrotarla, puede dejar como botín opcional la 'Esquilla de Caparazón': Otorga +2 a CA durante un combate. Requiere una acción secundaria para activarse.",
+    "estadisticas": {
+      "tipo": "Bestia Grande, no alineada",
+      "ca": "2",
+      "pg": "28",
+      "velocidad": "4 casillas, volar",
+      "desafio": "50",
+      "atributos_especiales": [
+        {
+          "nombre": "Última Defensa",
+          "descripcion": "Al morir, la Madre Gruz explota, liberando 2d4 Gruzers que atacan inmediatamente en la siguiente ronda."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Embestida Aérea",
+          "descripcion": "La Madre Gruz se lanza en línea recta hasta 5 casillas, golpeando a todos los enemigos en su camino. Cada objetivo debe realizar una tirada de salvación de Destreza CD 14 o recibir 1d8 de daño y ser derribado (pierde su próxima acción secundaria)."
+        },
+        {
+          "nombre": "Golpe Descomunal",
+          "descripcion": "Realiza un ataque cuerpo a cuerpo con un alcance de 2 casillas, infligiendo 1d6 de daño. Si impacta, el objetivo debe superar una tirada de salvación de Fuerza CD 13 o quedar desorientado (desventaja en su próximo ataque)."
+        },
+        {
+          "nombre": "Rugido Protector",
+          "descripcion": "La Madre Gruz emite un rugido que convoca 1d4 Gruzers. Estos actúan al final de su turno en la misma ronda. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "ASPID HUNTER",
+    "descripcion": "Los Aspid son una familia de criaturas insectoides que destacan por su velocidad, adaptabilidad y patrones de ataque basados en proyectiles. Habitan principalmente en áreas boscosas y cavernosas. El Aspid Hunter se mantiene a distancia y prioriza atacar desde lugares seguros. Recompensa: 2 Almas, 3 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Pequeña, no alineada",
+      "ca": "1",
+      "pg": "8",
+      "velocidad": "5 casillas",
+      "desafio": "3",
+      "atributos_especiales": [
+        {
+          "nombre": "Evasión Ágil",
+          "descripcion": "Tiene ventaja en tiradas para esquivar ataques a distancia."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Disparo Tóxico",
+          "descripcion": "Lanza un proyectil a un enemigo dentro de 6 casillas. El objetivo debe superar una tirada de salvación de Destreza CD 12 o recibir 1d6 de daño perforante y queda envenenado (1d4 de daño al inicio de su turno durante 1 turno)."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "ASPID MOTHER",
+    "descripcion": "Una versión más resistente del Aspid, la Aspid Mother prioriza mantenerse a distancia, protegiéndose con su mayor defensa. Al morir, libera crías que continúan el ataque. Recompensa: 4 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Mediana, no alineada",
+      "ca": "2",
+      "pg": "12",
+      "velocidad": "4 casillas",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Crias Venenosas",
+          "descripcion": "Al morir, genera 2 Aspid Hunters menores con PG: 4 y Daño Base: 1d4. Estas crías actúan en la siguiente ronda."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Disparo Tóxico",
+          "descripcion": "Lanza un proyectil venenoso a un enemigo dentro de 5 casillas. El objetivo debe superar una tirada de salvación de Destreza CD 12 o recibir 1d6 de daño perforante y queda envenenado (1d4 por turno durante 2 turnos)."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "ASPID PRIMIGENIO",
+    "descripcion": "Una forma antigua y poderosa de Aspid. Prefiere atacar desde posiciones estratégicas, utilizando su Disparo Triple para presionar a varios enemigos a la vez. Al ser herido, sus ataques se vuelven tóxicos. Recompensa: 3 Almas, 8 PX. Al derrotarlo, puede dejar como botín opcional el 'Fragmento de Coraza' (incrementa +1 CA cuando está equipado; requiere un descanso largo para instalarse).",
+    "estadisticas": {
+      "tipo": "Bestia Grande, no alineada",
+      "ca": "2",
+      "pg": "14",
+      "velocidad": "5 casillas",
+      "desafio": "8",
+      "atributos_especiales": [
+        {
+          "nombre": "Coraza Primigenia",
+          "descripcion": "Reduce en 1 punto el daño recibido por ataques a distancia."
+        },
+        {
+          "nombre": "Furia Tóxica",
+          "descripcion": "Cuando el Aspid Primigenio cae por debajo del 50% de su PG, sus proyectiles ganan la propiedad de veneno. Los enemigos golpeados deben realizar una tirada de salvación de Fuerza CD 13 o recibir 1d4 de daño adicional por turno durante 2 turnos."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Disparo Triple",
+          "descripcion": "Lanza tres proyectiles en un cono de 3 casillas frente a él. Cada criatura en el área debe realizar una tirada de salvación de Destreza CD 14. Si falla, recibe 1d8 de daño perforante."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "GOAM",
+    "descripcion": "El Goam es una criatura fija y defensiva que habita paredes y techos de las cavernas. Aunque no se mueve, es una amenaza constante debido a su habilidad para atacar con su cabeza retráctil, golpeando a los enemigos cercanos con velocidad y precisión. Recompensa: 40 PX. Al derrotarlo, puede dejar como botín opcional el 'Fragmento de Caparazón Rígido' (+1 CA cuando se equipa). Esta criatura no otorga Alma.",
+    "estadisticas": {
+      "tipo": "Monstruosidad Grande, no alineada",
+      "ca": "5",
+      "pg": "35",
+      "velocidad": "0 (inmóvil)",
+      "desafio": "40",
+      "atributos_especiales": [
+        {
+          "nombre": "Puntos Vulnerables",
+          "descripcion": "Si los jugadores investigan detenidamente (Tirada de Investigación o Percepción CD 14), pueden identificar un punto débil en el cuerpo del Goam, reduciendo su CA a 2 al atacarlo desde esa posición específica."
+        },
+        {
+          "nombre": "Resistencia Abismal",
+          "descripcion": "Es inmune a veneno, fuego y ataques mágicos de área."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Mordida Relámpago",
+          "descripcion": "Reacción. Cuando una criatura entra en una casilla adyacente al Goam, este lanza un ataque inmediato con su mandíbula. El objetivo debe realizar una tirada de salvación de Destreza CD 15. Si falla recibe 1d8 de daño contundente, si pasa es empujado 5 casillas hacia atrás y evita el daño."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MOSQUITO",
+    "descripcion": "Los Mosquitos son criaturas voladoras rápidas y agresivas que atacan en picada. Aunque no son particularmente resistentes, su velocidad y comportamiento insistente los convierten en una amenaza en grupo. Recompensa: 1 Alma, 6 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Diminuta, no alineada",
+      "ca": "0",
+      "pg": "5",
+      "velocidad": "6 casillas, volar",
+      "desafio": "6",
+      "atributos_especiales": [
+        {
+          "nombre": "Evasión Natural",
+          "descripcion": "Los ataques cuerpo a cuerpo tienen desventaja contra el Mosquito debido a su tamaño pequeño y movimientos rápidos."
+        },
+        {
+          "nombre": "Ataque Coordinado",
+          "descripcion": "Si hay al menos dos Mosquitos en combate, cada uno obtiene +1 a sus tiradas de ataque debido a su táctica de hostigamiento."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Picada Veloz",
+          "descripcion": "Realiza un ataque cuerpo a cuerpo contra un enemigo adyacente. Si el ataque impacta, inflige 1d6 de daño perforante y permite al Mosquito moverse 2 casillas sin provocar ataques de oportunidad."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "OBLE",
+    "descripcion": "Los Oble son criaturas flotantes de aspecto esférico que patrullan su territorio con movimientos erráticos. Su ataque principal consiste en lanzar proyectiles en patrones impredecibles, lo que los convierte en un peligro constante en combate. Recompensa: 2 Almas, 12 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Aberración Pequeña, no alineada",
+      "ca": "1",
+      "pg": "10",
+      "velocidad": "4 casillas, flotante",
+      "desafio": "12",
+      "atributos_especiales": [
+        {
+          "nombre": "Movimiento Errático",
+          "descripcion": "Los ataques a distancia contra el Oble tienen desventaja debido a su patrón de movimiento impredecible."
+        },
+        {
+          "nombre": "Zona de Exclusión",
+          "descripcion": "Cualquier enemigo que inicie su turno dentro de un radio de 2 casillas alrededor del Oble debe superar una tirada de salvación de Fuerza de Voluntad CD 12 o sufrir desventaja en su próximo ataque."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión de Proyectiles",
+          "descripcion": "Lanza dos proyectiles en direcciones opuestas, alcanzando hasta 3 casillas de distancia. Cada criatura en su camino debe realizar una tirada de salvación de Destreza CD 13 o recibir 1d6 de daño por impacto."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "HWURMP",
+    "descripcion": "Un ser flotante de apariencia bulbosa y curiosa que habita en zonas tranquilas y oscuras. No son agresivos por naturaleza, pero si se sienten amenazados, su cuerpo se infla como un pez globo y se tornan extremadamente peligrosos. Recompensa: 10 PX. No suele dejar botín. Esta criatura no otorga Alma.",
+    "estadisticas": {
+      "tipo": "Aberración Pequeña, no alineada",
+      "ca": "2",
+      "pg": "12",
+      "velocidad": "4 casillas, flotante",
+      "desafio": "10",
+      "atributos_especiales": [],
+      "acciones": [
+        {
+          "nombre": "Inflarse",
+          "descripcion": "Cuando recibe daño, se infla, duplicando su tamaño (ocupando un área de 3x3 casillas). Esto provoca una explosión de energía que empuja a todos los enemigos dentro del área 2 casillas hacia atrás y les inflige 1d6 de daño. Los jugadores deben realizar una tirada de salvación de Destreza CD 14. Si fallan, reciben el daño completo y quedan derribados. Si tienen éxito, solo son empujados."
+        },
+        {
+          "nombre": "Embestida Inflada",
+          "descripcion": "Puede lanzarse en línea recta hasta 4 casillas de su tamaño, infligiendo 2d6 de daño contundente a todos los objetivos en su camino."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MASKFLY",
+    "descripcion": "Una mosca con una máscara que vuela erráticamente, hostigando a los aventureros con su molesto zumbido que interfiere con la concentración mágica. Recompensa: 1 Alma, 10 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Diminuta, no alineada",
+      "ca": "1",
+      "pg": "5",
+      "velocidad": "6 casillas, volar",
+      "desafio": "10",
+      "atributos_especiales": [
+        {
+          "nombre": "Zumbido Incesante",
+          "descripcion": "Las Moscas Máscara cercanas generan ruido molesto. Cualquier tirada de habilidad o ataque basada en Alma dentro de 5 casillas tiene un -4 de penalización."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Ataque cuerpo a cuerpo",
+          "descripcion": "La Mosca Máscara se lanza hacia el objetivo con velocidad, infligiendo 1d4 de daño perforante."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MUSGOAGRESOR",
+    "descripcion": "Los Musgoagresores son criaturas cubiertas de vegetación que acechan en las áreas más densas de Sendero Verde. Estos enemigos son feroces y territoriales, atacando a cualquier intruso con cargas rápidas y devastadoras. Recompensa: 3 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Planta Mediana, no alineada",
+      "ca": "2",
+      "pg": "14",
+      "velocidad": "4 casillas",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Camuflaje Natural",
+          "descripcion": "El Musgoagresor tiene ventaja en su primera tirada de ataque contra enemigos que no lo hayan detectado. Los jugadores deben superar una tirada de Percepción CD 13 para notar su presencia."
+        },
+        {
+          "nombre": "Terreno Difícil",
+          "descripcion": "Las casillas adyacentes al Musgoagresor se consideran terreno difícil debido a las raíces y el musgo que lo rodean."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Embestida Salvaje",
+          "descripcion": "El Musgoagresor realiza una carga en línea recta de hasta 6 casillas, golpeando al primer enemigo en su camino. El objetivo debe realizar una tirada de salvación de Destreza CD 14. Si falla recibe 1d8 de daño contundente y es empujado 2 casillas hacia atrás; si pasa recibe la mitad del daño y no es empujado."
+        },
+        {
+          "nombre": "Rugido Territorial",
+          "descripcion": "Emite un rugido que afecta a todos los enemigos en un radio de 3 casillas. Cada objetivo debe realizar una tirada de salvación de Fuerza de Voluntad CD 13 o quedar aturdido hasta el final de su próximo turno. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "BARRÍLULA",
+    "descripcion": "La Barrílula es una criatura flotante y voluminosa que patrulla lentamente las áreas subterráneas. Aunque no es particularmente agresiva, su capacidad para explotar al ser derrotada la convierte en una amenaza significativa en combate. Recompensa: 1 Alma, 8 PX. Al derrotarla, puede dejar como botín opcional la 'Esquirla Volátil': Un componente que puede ser utilizado para crear trampas explosivas o mejorar habilidades mágicas ofensivas.",
+    "estadisticas": {
+      "tipo": "Elemental Pequeño, no alineada",
+      "ca": "0",
+      "pg": "8",
+      "velocidad": "3 casillas, flotante",
+      "desafio": "8",
+      "atributos_especiales": [
+        {
+          "nombre": "Explosión Final",
+          "descripcion": "Al ser derrotada, la Barrilula explota en un radio de 2 casillas, infligiendo 2d6 de daño a todas las criaturas en el área. Los objetivos pueden realizar una tirada de salvación de Destreza CD 14 para reducir el daño a la mitad."
+        },
+        {
+          "nombre": "Patrulla Silenciosa",
+          "descripcion": "La Barrilula no es detectada automáticamente. Requiere una tirada de Percepción CD 15 para identificar su presencia antes de que se acerquen a su rango de explosión."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Empujón Lento",
+          "descripcion": "La Barrilula avanza 2 casillas hacia la criatura más cercana. Si choca con un enemigo, ambos reciben 1d4 de daño contundente."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "ERROR",
+    "descripcion": "El Error es una criatura inquietante que parece un experimento fallido o una aberración causada por la corrupción del Vacío. Su cuerpo amorfo y sus movimientos erráticos lo hacen impredecible y aterrador. Recompensa: 3 Almas, 20 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Aberración Mediana, caótica",
+      "ca": "1",
+      "pg": "12",
+      "velocidad": "4 casillas",
+      "desafio": "20",
+      "atributos_especiales": [
+        {
+          "nombre": "Presencia Inestable",
+          "descripcion": "Al inicio de cada turno del Error, lanza una descarga de energía en un radio de 1 casilla. Todas las criaturas adyacentes deben superar una tirada de salvación de Fuerza de Voluntad CD 13 o sufrir desventaja en su próximo ataque."
+        },
+        {
+          "nombre": "Forma Amorfa",
+          "descripcion": "Tiene resistencia a los ataques físicos no mágicos (recibe la mitad del daño)."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Descomposición Tóxica",
+          "descripcion": "Lanza un chorro de materia corrupta en un radio de 2 casillas. Cada criatura en el área debe realizar una tirada de salvación de Destreza CD 14. Si falla recibe 1d6 de daño y queda envenenado (1d4 de daño al inicio de cada turno durante 2 turnos). Si pasa, solo la mitad."
+        },
+        {
+          "nombre": "Fragmentación del Vacío",
+          "descripcion": "El Error explota parcialmente, infligiendo 2d6 de daño a todas las criaturas en un radio de 3 casillas. Después de este ataque, pierde 4 PG automáticamente. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FOLLY",
+    "descripcion": "Las Folly son criaturas espectrales que flotan silenciosamente por los antiguos pasillos y ruinas. Estas almas inquietas están rodeadas de espinas afiladas, que las convierten en amenazas móviles tanto para los descuidados como para los aventureros. Recompensa: 2 Almas, 10 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "No muerto Pequeño, caótica",
+      "ca": "1",
+      "pg": "6",
+      "velocidad": "5 casillas, flotante",
+      "desafio": "10",
+      "atributos_especiales": [
+        {
+          "nombre": "Espinas Errantes",
+          "descripcion": "Cualquier criatura que ataque a la Folly en combate cuerpo a cuerpo recibe automáticamente 1d4 de daño perforante a menos que supere una tirada de salvación de Destreza CD 13."
+        },
+        {
+          "nombre": "Espectro Intangible",
+          "descripcion": "Tiene resistencia a ataques físicos no mágicos (recibe la mitad del daño)."
+        },
+        {
+          "nombre": "Patrón Errático",
+          "descripcion": "La Folly se mueve en trayectorias impredecibles, ganando ventaja en tiradas para esquivar ataques a distancia."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Vórtice de Espinas",
+          "descripcion": "La Folly hace girar sus espinas en un radio de 2 casillas, infligiendo 1d6 de daño perforante a todas las criaturas en el área. Los objetivos pueden realizar una tirada de salvación de Destreza CD 14 para reducir el daño a la mitad."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "TUERCEALMAS",
+    "descripcion": "Criaturas mágicas que residen en áreas repletas de energía espiritual. Los Tuercealmas son hostiles y atacan con potentes proyectiles de energía, además de poseer una gran agilidad para evitar ataques. Recompensa: 15 PX. No suele dejar botín. Esta criatura no otorga Alma.",
+    "estadisticas": {
+      "tipo": "Elemental Mediano, no alineada",
+      "ca": "1",
+      "pg": "8",
+      "velocidad": "6 casillas, flotante",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Movimiento Evasivo",
+          "descripcion": "Cada vez que el Tuercealmas esquiva un ataque con éxito, puede moverse hasta 5 casillas sin provocar ataques de oportunidad."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Proyectil de Alma",
+          "descripcion": "Lanza una ráfaga de energía mágica hacia un objetivo a 6 casillas de distancia. Si impacta produce 1d8 puntos de daño, y el objetivo tiene desventaja en la siguiente tirada de salvación de Destreza que realice."
+        },
+        {
+          "nombre": "Explosión de Alma",
+          "descripcion": "Detona una explosión de energía en un radio de 2 casillas a su alrededor que produce 2d6 de daño a todos los objetivos en el área. (1 vez por combate)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MAESTRO DE LAS LLAMAS",
+    "descripcion": "Poderoso ser capaz de manipular las llamas a su antojo. Es un enemigo formidable que requiere de toda la atención del grupo para ser derrotado. Recompensa: 150 PX, 50-100 Geo. Al derrotarlo, puede dejar como botín opcional el 'Artefacto Mágico: Núcleo del Maestro' (Permite al portador lanzar 'Explosión de Alma' como una acción adicional una vez por descanso largo). Esta criatura no otorga Alma.",
+    "estadisticas": {
+      "tipo": "Elemental Grande, caótico",
+      "ca": "3",
+      "pg": "120",
+      "velocidad": "8 casillas, flotante",
+      "desafio": "150",
+      "atributos_especiales": [],
+      "acciones": [
+        {
+          "nombre": "Proyectil de Llama",
+          "descripcion": "Lanza un poderoso proyectil hacia un objetivo a 8 casillas que produce 2d6 de daño de fuego. Si impacta, el objetivo debe superar una tirada de salvación de Fuerza de Voluntad CD 12 o quedar aturdido hasta el inicio de su próximo turno."
+        },
+        {
+          "nombre": "Explosión de Llama",
+          "descripcion": "Acumulando poder durante un turno, en su próximo turno podrá generar una explosión de energía en un radio de 3 casillas a su alrededor que produce 2d8 a todos los objetivos en el área. Los enemigos que fallen la tirada son empujados 3 casillas."
+        },
+        {
+          "nombre": "Teletransporte",
+          "descripcion": "El Maestro de las Llamas se teletransporta a cualquier casilla dentro de 8 casillas de su posición actual, ignorando obstáculos. Puede realizar un ataque adicional después de teletransportarse."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "CAVASUELOS",
+    "descripcion": "Los Cavasuelos son criaturas insectoides que habitan en túneles y terrenos blandos, donde utilizan sus habilidades de excavación para emboscar a los desprevenidos. Recompensa: 2 Almas, 12 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Mediana, no alineada",
+      "ca": "1",
+      "pg": "10",
+      "velocidad": "5 casillas (2 bajo tierra, 3 en superficie)",
+      "desafio": "12",
+      "atributos_especiales": [
+        {
+          "nombre": "Emboscador Natural",
+          "descripcion": "Si el Cavasuelos ataca desde una posición oculta, obtiene un bono de +2 a la tirada de ataque."
+        },
+        {
+          "nombre": "Movilidad en Terreno Difícil",
+          "descripcion": "Ignora las penalizaciones de movimiento en terrenos difíciles."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Ataque Sorpresa",
+          "descripcion": "Surge del suelo y realiza un ataque cuerpo a cuerpo con ventaja contra una criatura adyacente. Si impacta, inflige 1d6 de daño cortante y el objetivo debe realizar una tirada de salvación de Destreza CD 13 o quedar desbalanceado (pierde su acción secundaria en el próximo turno)."
+        },
+        {
+          "nombre": "Excavación Rápida",
+          "descripcion": "El Cavasuelos se sumerge en el suelo, moviéndose hasta 4 casillas bajo tierra sin ser detectado. Puede reaparecer en cualquier casilla adyacente a un enemigo al inicio de su próximo turno."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "NECROCAZADOR",
+    "descripcion": "El Necrozacador es una criatura voladora espectral que patrulla las áreas más oscuras y olvidadas. Con su apariencia fantasmal y ataques rápidos, representa una amenaza letal, especialmente en combate prolongado. Recompensa: 3 Almas, 18 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "No muerto Mediano, caótico",
+      "ca": "1",
+      "pg": "16",
+      "velocidad": "6 casillas, volar",
+      "desafio": "18",
+      "atributos_especiales": [
+        {
+          "nombre": "Sombras Movedizas",
+          "descripcion": "Los ataques a distancia contra el Necrozacador tienen desventaja, debido a su movimiento errático y su naturaleza espectral."
+        },
+        {
+          "nombre": "Evasión Fantasmal",
+          "descripcion": "Tiene resistencia a los ataques físicos no mágicos (recibe la mitad del daño)."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Proyectil Espectral",
+          "descripcion": "Lanza un proyectil etéreo a un objetivo dentro de 8 casillas. El objetivo debe realizar una tirada de salvación de Destreza CD 14. Si falla, recibe 1d8 de daño necrótico; si pasa, la mitad."
+        },
+        {
+          "nombre": "Rugido Intimidador",
+          "descripcion": "Emite un rugido espectral que afecta a todos los enemigos en un radio de 3 casillas. Cada objetivo debe realizar una tirada de salvación de Fuerza de Voluntad CD 13 o quedar aturdido hasta el final de su próximo turno. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MINITEJEDORA",
+    "descripcion": "Las Minitejedoras son pequeñas arañas que trabajan en conjunto para proteger los pasajes de las zonas más ocultas del reino. Aunque son débiles por sí solas, su naturaleza colaborativa y su capacidad para tejer redes rápidamente las convierten en amenazas tácticas. Recompensa: 1 Alma, 5 PX. Al derrotarla, puede dejar como botín opcional el 'Hilo Enmarañado': Un material útil para crear trampas o armas que restrinjan el movimiento de los enemigos.",
+    "estadisticas": {
+      "tipo": "Bestia Diminuta, no alineada",
+      "ca": "0",
+      "pg": "4",
+      "velocidad": "5 casillas",
+      "desafio": "5",
+      "atributos_especiales": [
+        {
+          "nombre": "Tejido Coordinado",
+          "descripcion": "Si hay al menos 2 Minitejedoras adyacentes, pueden usar una acción conjunta para crear un área de terreno difícil de 2x2 casillas con redes pegajosas. Los jugadores que se muevan dentro de esta área deben superar una tirada de salvación de Destreza CD 13 o terminar su movimiento."
+        },
+        {
+          "nombre": "Hostigamiento Enjambre",
+          "descripcion": "Cada Minitejedora adicional atacando al mismo objetivo otorga +1 al daño base de todas las Minitejedoras involucradas."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Red Pegajosa",
+          "descripcion": "Lanza una red a un enemigo dentro de 4 casillas. El objetivo debe realizar una tirada de salvación de Fuerza CD 12 o quedar ralentizado, reduciendo su velocidad en 2 casillas durante 2 turnos."
+        },
+        {
+          "nombre": "Mordida",
+          "descripcion": "Ataque cuerpo a cuerpo: +2 a impactar, alcance 5 pies, un objetivo. Impacto: 1d4 de daño perforante."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "DEVOTO ACECHADOR",
+    "descripcion": "El Devoto Acechador es una abominación corpulenta que guarda los pasillos y cámaras sagradas. Estas criaturas son extremadamente agresivas y resistentes, con una tenacidad aterradora. Recompensa: 6 Almas, 40 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Aberración Grande, caótica",
+      "ca": "3",
+      "pg": "30",
+      "velocidad": "4 casillas",
+      "desafio": "40",
+      "atributos_especiales": [
+        {
+          "nombre": "Escudo Viviente",
+          "descripcion": "Reduce en 2 puntos el daño de todos los ataques a distancia."
+        },
+        {
+          "nombre": "Frenesí Oscuro",
+          "descripcion": "Cuando su PG cae por debajo del 50%, gana un ataque adicional en cada turno como acción secundaria, infligiendo 1d8 de daño con su garra."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Carga Bestial",
+          "descripcion": "El Devoto Acechador se lanza hacia adelante en línea recta hasta 6 casillas, infligiendo 2d6 de daño contundente a todas las criaturas en su camino. Los objetivos deben realizar una tirada de salvación de Destreza CD 15 o ser empujados 2 casillas y derribados."
+        },
+        {
+          "nombre": "Rugido Intimidante",
+          "descripcion": "El Devoto Acechador emite un rugido ensordecedor, forzando a todas las criaturas en un radio de 4 casillas a realizar una tirada de salvación de Fuerza de Voluntad CD 14. Si fallan, sufren desventaja en sus próximos ataques y tiradas de salvación hasta el final de su siguiente turno. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MAWLEK INFERIOR",
+    "descripcion": "Los Mawlek Inferiores son aberraciones grotescas que combinan fuerza bruta y corrupción. Atacan con ferocidad y hostilidad ciega, lanzando proyectiles tóxicos. Recompensa: 4 Almas, 25 PX. Al derrotarlo, puede dejar como botín opcional la 'Garra del Incubador': Una mejora para armas que añade daño tóxico (1d4) durante un ataque crítico.",
+    "estadisticas": {
+      "tipo": "Aberración Mediana, caótica",
+      "ca": "2",
+      "pg": "20",
+      "velocidad": "4 casillas",
+      "desafio": "25",
+      "atributos_especiales": [
+        {
+          "nombre": "Regeneración Corrupta",
+          "descripcion": "Recupera 1d6 de PG al inicio de su turno mientras su PG esté por debajo del 50%. Este efecto se desactiva si recibe daño de ataques mágicos."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión Tóxica",
+          "descripcion": "Lanza una ráfaga de proyectiles en un área de cono de 3 casillas. Todas las criaturas en el área deben realizar una tirada de salvación de Destreza CD 14. Si falla reciben 1d8 de daño y quedan envenenadas (1d4 de daño al inicio de cada turno durante 2 turnos); si pasa recibe la mitad del daño y no queda envenenado."
+        },
+        {
+          "nombre": "Rugido Desgarrador",
+          "descripcion": "Emite un rugido que afecta a todas las criaturas en un radio de 3 casillas. Los objetivos deben realizar una tirada de salvación de Fuerza de Voluntad CD 13. Si fallan, sufren desventaja en su próxima tirada de ataque o salvación. (Recarga 3 turnos)"
+        },
+        {
+          "nombre": "Mordida Salvaje",
+          "descripcion": "Ataque cuerpo a cuerpo adicional que inflige 1d6 de daño perforante y, si impacta, obliga al objetivo a realizar una tirada de salvación de Fuerza CD 12 o quedar inmovilizado hasta el final de su próximo turno. (Acción Secundaria)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "MAWLEK INCUBADOR",
+    "descripcion": "Una versión más grande y peligrosa del Mawlek, capaz de invocar a sus congéneres menores para abrumar a sus enemigos. Recompensa: 8 Almas, 60 PX. Al derrotarlo, puede dejar como botín opcional el 'Corazón Corrupto': Un artefacto oscuro que otorga +1 al daño mágico, pero inflige 1d4 de daño al portador al inicio de cada combate.",
+    "estadisticas": {
+      "tipo": "Aberración Grande, caótica",
+      "ca": "3",
+      "pg": "45",
+      "velocidad": "5 casillas",
+      "desafio": "60",
+      "atributos_especiales": [
+        {
+          "nombre": "Regeneración Corrupta",
+          "descripcion": "Recupera 1d8 de PG al inicio de su turno mientras su PG esté por debajo del 50%. Este efecto se desactiva si recibe daño mágico."
+        },
+        {
+          "nombre": "Furia del Vacío",
+          "descripcion": "Cuando el Mawlek Incubador cae por debajo del 25% de su PG, realiza un ataque adicional en cada turno como acción secundaria, infligiendo 1d10 de daño con un golpe brutal de sus garras."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Descarga Corrupta",
+          "descripcion": "Lanza una ráfaga de proyectiles tóxicos en un área de cono de 4 casillas. Todas las criaturas en el área deben realizar una tirada de salvación de Destreza CD 15. Si falla, recibe 1d8 de daño y quedan envenenadas (1d6 al inicio de cada turno durante 3 turnos). Si pasa, solo la mitad."
+        },
+        {
+          "nombre": "Invocar Mawleks Menores",
+          "descripcion": "Invoca 1d4 Mawlek inferiores en casillas adyacentes. Estos actúan al final del turno del Mawlek Incubador. (Recarga 3 turnos)"
+        },
+        {
+          "nombre": "Rugido Desgarrador",
+          "descripcion": "Emite un rugido que afecta a todas las criaturas en un radio de 5 casillas. Los objetivos deben realizar una tirada de salvación de Fuerza de Voluntad CD 15. Si fallan, sufren desventaja en todas sus tiradas hasta el final de su siguiente turno. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "GRAN SALTAMONTES",
+    "descripcion": "El Gran Saltamontes es una criatura ágil y letal, conocida por su velocidad extrema y ataques feroces. Habita en áreas remotas y peligrosas, protegiendo su territorio con embestidas rápidas y saltos sorprendentes. Recompensa: 3 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Grande, no alineada",
+      "ca": "2",
+      "pg": "14",
+      "velocidad": "6 casillas, salto",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Reposicionamiento Ágil",
+          "descripcion": "Después de realizar un ataque, el Gran Saltamontes puede moverse 2 casillas sin provocar ataques de oportunidad."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Embestida Relámpago",
+          "descripcion": "Salta hasta 4 casillas hacia un enemigo y realiza un ataque cuerpo a cuerpo. Si impacta, inflige 1d8 de daño cortante y el objetivo debe realizar una tirada de salvación de Destreza CD 14 o quedar desbalanceado (pierde su acción secundaria en el próximo turno)."
+        },
+        {
+          "nombre": "Ataque Saltarín",
+          "descripcion": "Realiza un segundo salto de hasta 3 casillas y golpea a un enemigo cercano. Este ataque inflige 1d6 de daño cortante. (Acción Secundaria)"
+        },
+        {
+          "nombre": "Salto Intimidante",
+          "descripcion": "El Gran Saltamontes salta hacia el aire y aterriza en un área de 2x2 casillas dentro de 6 casillas. Todas las criaturas en esa área deben realizar una tirada de salvación de Destreza CD 15. Si falla recibe 1d6 de daño y quedan aturdidas hasta el final de su próximo turno (si tiene éxito solo queda aturdido). (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "BRILLOMO",
+    "descripcion": "Su brillo engañoso oculta su verdadera naturaleza depredadora. No sigas la luz si no quieres perderte en la oscuridad. Esta criatura no otorga recompensa de Almas ni PX, ni suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Elemental Pequeño, no alineada",
+      "ca": "1",
+      "pg": "10",
+      "velocidad": "5 casillas (2 bajo tierra, 3 en superficie)",
+      "desafio": "0",
+      "atributos_especiales": [
+        {
+          "nombre": "Atracción Ilusoria",
+          "descripcion": "Crea un brillo hipnótico que confunde a los enemigos. Las criaturas que comiencen su turno a 4 casillas o menos del Brillomo deben superar una tirada de salvación de Voluntad CD 12 o moverse 1 casilla en dirección al Brillomo involuntariamente."
+        },
+        {
+          "nombre": "Descarga Final",
+          "descripcion": "Al ser derrotado, emite una última explosión de energía en un radio de 2 casillas, infligiendo 1d6 de daño a todas las criaturas en el área."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión de Luz",
+          "descripcion": "Emite un destello cegador en un radio de 3 casillas. Todas las criaturas en el área deben superar una tirada de salvación de Destreza CD 13 o quedar cegadas hasta el final de su siguiente turno."
+        },
+        {
+          "nombre": "Corriente Luminosa",
+          "descripcion": "Lanza una descarga de energía a un enemigo dentro de 5 casillas. Si impacta, inflige 1d6 de daño eléctrico. (Acción Secundaria)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "BUBÉLULA",
+    "descripcion": "A simple vista, parecen inofensivas burbujas flotantes, pero su frágil cuerpo esconde una trampa mortal. Cuando son perturbadas, estallan en una lluvia de ácido y liberan pequeñas réplicas de sí mismas. Recompensa: 1 Alma, 10 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Elemental Diminuto, no alineada",
+      "ca": "0",
+      "pg": "8",
+      "velocidad": "4 casillas, volar",
+      "desafio": "10",
+      "atributos_especiales": [
+        {
+          "nombre": "Fragmentación",
+          "descripcion": "Al ser derrotada, libera 1d4 Mini-Bubelulas en casillas adyacentes. Estas tienen PG: 3, Velocidad: 5 casillas (flotante), Daño Base: 1d4 (impacto ácido)."
+        },
+        {
+          "nombre": "Desplazamiento Errático",
+          "descripcion": "Los ataques a distancia contra la Bubélula tienen desventaja debido a su movimiento impredecible."
+        },
+        {
+          "nombre": "Vulnerabilidad al Frio",
+          "descripcion": "Recibe doble daño de ataques de hielo o basados en cristalización."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión Ácida",
+          "descripcion": "Al atacar, la Bubélula explota en un radio de 2 casillas. Todas las criaturas en el área deben superar una tirada de salvación de Destreza CD 13 o recibir 1d6 de daño ácido. La Bubélula es destruida tras este ataque."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "CAZADOR DE CRISTAL",
+    "descripcion": "Un antiguo cazador, transformado por la corrupción cristalina. Sus flechas relucientes perforan la oscuridad con una precisión letal. Recompensa: 5 Almas, 30 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Monstruosidad Mediana, caótica",
+      "ca": "2",
+      "pg": "22",
+      "velocidad": "5 casillas (2 bajo tierra, 3 en superficie)",
+      "desafio": "30",
+      "atributos_especiales": [
+        {
+          "nombre": "Reflejo Rápido",
+          "descripcion": "Tiene ventaja en las tiradas de salvación contra efectos que lo inmovilicen o restrinjan su movimiento."
+        },
+        {
+          "nombre": "Energía Cristalina",
+          "descripcion": "Recibe la mitad del daño de ataques eléctricos, pero el doble de daño de ataques contundentes."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Disparo Perforante",
+          "descripcion": "Dispara un proyectil de cristal a un enemigo dentro de 7 casillas. Si impacta, inflige 1d8 de daño perforante y el objetivo debe superar una tirada de salvación de Fuerza CD 13 o quedar empujado 1 casilla."
+        },
+        {
+          "nombre": "Lluvia de Cristales",
+          "descripcion": "Dispara 3 flechas en un cono de 5 casillas. Todas las criaturas en el área deben hacer una tirada de salvación de Destreza CD 14. Si fallan, reciben 1d6 de daño cortante. (Recarga 3 turnos)"
+        },
+        {
+          "nombre": "Campo de Cristal",
+          "descripcion": "Marca un área de 3x3 casillas que se llena de cristales afilados. Cualquier criatura que termine su turno dentro sufre 1d6 de daño cortante. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "DURANDA",
+    "descripcion": "Un imponente guerrero acorazado, con un aguijón letal y una voluntad inquebrantable. Se mueve con la seguridad de quien nunca ha sido derrotado. Recompensa: 4 Almas, 25 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Monstruosidad Mediana, no alineada",
+      "ca": "3",
+      "pg": "28",
+      "velocidad": "4 casillas, volar",
+      "desafio": "25",
+      "atributos_especiales": [
+        {
+          "nombre": "Defensa Aislante",
+          "descripcion": "Recibe -2 de daño de ataques a distancia y tiene ventaja en salvaciones contra efectos de aturdimiento o empuje."
+        },
+        {
+          "nombre": "Furia del Sobreviviente",
+          "descripcion": "Cuando su PG cae por debajo del 50%, obtiene un ataque adicional con Estocada Implacable en cada turno."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Estocada Implacable",
+          "descripcion": "Ataca a un enemigo en una casilla adyacente con su aguijón. Si impacta, inflige 1d8 de daño perforante y el objetivo debe superar una tirada de salvación de Fuerza CD 14 o quedar derribado."
+        },
+        {
+          "nombre": "Carga Punzante",
+          "descripcion": "Se mueve en línea recta hasta 5 casillas y ataca a todos los enemigos en su camino. Cada uno debe realizar una tirada de salvación de Destreza CD 14. Si fallan, reciben 1d6 de daño perforante y quedan derribados. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "DURANDOO",
+    "descripcion": "Más grande y resistente que su contraparte menor, este coloso blindado es una muralla viviente. No se detendrá hasta aplastar todo lo que se cruce en su camino. Esta criatura no otorga recompensa de Almas ni PX, ni suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Monstruosidad Grande, no alineada",
+      "ca": "4",
+      "pg": "36",
+      "velocidad": "3 casillas",
+      "desafio": "0",
+      "atributos_especiales": [
+        {
+          "nombre": "Muralla Viviente",
+          "descripcion": "No puede ser empujado ni derribado por efectos de combate. Además, cualquier aliado adyacente recibe +1 de CA."
+        },
+        {
+          "nombre": "Fuerza Imparable",
+          "descripcion": "Cuando su PG cae por debajo del 50%, su Embestida Brutal gana un bono de +2 al daño."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Embestida Brutal",
+          "descripcion": "Ataca con su enorme aguijón a un enemigo adyacente. Si impacta, inflige 1d10 de daño perforante y el objetivo debe superar una tirada de salvación de Fuerza CD 15 o quedar derribado."
+        },
+        {
+          "nombre": "Carga Devastadora",
+          "descripcion": "Se mueve en línea recta hasta 6 casillas, embistiendo a todos los enemigos en su camino. Cada uno debe hacer una tirada de salvación de Destreza CD 14. Si fallan, reciben 2d8 de daño contundente y quedan aturdidos hasta el final de su siguiente turno. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "ECLOSIONADOR CAVADOR",
+    "descripcion": "Bajo la tierra, donde pocos se atreven a mirar, acecha esta criatura voraz. Protege sus crías con fiereza, emergiendo de golpe para devorar a cualquier intruso. Recompensa: 4 Almas, 30 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Grande, no alineada",
+      "ca": "2",
+      "pg": "30",
+      "velocidad": "4 casillas, excavación",
+      "desafio": "30",
+      "atributos_especiales": [
+        {
+          "nombre": "Crias Furiosas",
+          "descripcion": "Al recibir daño por primera vez en combate, libera 1d4 Cavadores Menores (PG: 6, Velocidad: 5 casillas, Daño Base: 1d4) en casillas adyacentes."
+        },
+        {
+          "nombre": "Defensor del Nido",
+          "descripcion": "Si está dentro de 3 casillas de una de sus crías, gana resistencia al daño (reduce todo el daño recibido en 2 puntos)."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Mordida Voraz",
+          "descripcion": "Ataca a un enemigo adyacente con sus poderosas mandíbulas. Si impacta, inflige 1d8 de daño perforante y el objetivo debe hacer una tirada de salvación de Fuerza CD 14 o quedar agarrado (no puede moverse hasta que escape con una acción secundaria, superando una tirada de Fuerza CD 14)."
+        },
+        {
+          "nombre": "Emerger Letal",
+          "descripcion": "Se sumerge bajo tierra y reaparece hasta 5 casillas de distancia en cualquier casilla libre, realizando un ataque inmediato contra un enemigo adyacente con ventaja. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FUNGUERRERO",
+    "descripcion": "Los habitantes fúngicos del reino no son meras criaturas indefensas. Algunos han tomado las armas, defendiendo su territorio con una mezcla de ferocidad y esporas tóxicas. Recompensa: 3 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Planta Mediana, no alineada",
+      "ca": "1",
+      "pg": "8",
+      "velocidad": "4 casillas",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Crecimiento Regenerativo",
+          "descripcion": "Al inicio de su turno, si el Fungiguerrero no ha recibido daño en la ronda anterior, recupera 1d4 PG."
+        },
+        {
+          "nombre": "Tolerancia Natural",
+          "descripcion": "Es inmune a venenos y enfermedades, pero recibe el doble de daño de ataques de fuego."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Golpe Esporado",
+          "descripcion": "Ataca con sus extremidades endurecidas. Si impacta, inflige 1d6 de daño contundente y el objetivo debe hacer una tirada de salvación de Fuerza de Voluntad CD 13 o quedar envenenado (1d4 de daño por turno durante 2 turnos)."
+        },
+        {
+          "nombre": "Explosión de Esporas",
+          "descripcion": "Libera una nube de esporas en un radio de 3 casillas. Todas las criaturas en el área deben hacer una tirada de salvación de Destreza CD 13. Si fallan, quedan envenenadas y ralentizadas (velocidad reducida a la mitad) por 2 turnos. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FUNGICRÍA",
+    "descripcion": "Criatura fúngica diminuta que deambula sin rumbo. Su frágil apariencia es engañosa, pues libera esporas tóxicas al sentirse amenazada. Recompensa: 1 Alma, 6 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Planta Diminuta, no alineada",
+      "ca": "0",
+      "pg": "6",
+      "velocidad": "4 casillas",
+      "desafio": "6",
+      "atributos_especiales": [
+        {
+          "nombre": "Defensa Fúngica",
+          "descripcion": "Si la Fungicría recibe daño cuerpo a cuerpo, su atacante debe superar una tirada de salvación de Destreza CD 12 o quedar afectado por su veneno (1d4 de daño por turno durante 2 turnos)."
+        },
+        {
+          "nombre": "Movimientos Erráticos",
+          "descripcion": "Los ataques a distancia contra la Fungicría tienen desventaja debido a su patrón de movimiento impredecible."
+        },
+        {
+          "nombre": "Fragilidad Natural",
+          "descripcion": "Recibe el doble de daño de ataques de fuego."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión de Esporas",
+          "descripcion": "La Fungicría libera una nube de esporas tóxicas en un radio de 2 casillas. Todas las criaturas en el área deben superar una tirada de salvación de Fuerza de Voluntad CD 12 o quedar envenenadas (reciben 1d4 de daño al inicio de cada turno durante 2 turnos)."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FUNGIOGRO",
+    "descripcion": "Una masa imponente de crecimiento fúngico, lenta pero resistente. Su tamaño y fuerza bruta lo convierten en un enemigo formidable, capaz de sacudir el suelo con cada paso. Recompensa: 4 Almas, 25 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Planta Grande, no alineada",
+      "ca": "2",
+      "pg": "28",
+      "velocidad": "3 casillas",
+      "desafio": "25",
+      "atributos_especiales": [
+        {
+          "nombre": "Crecimiento Inmenso",
+          "descripcion": "Reduce en 2 puntos todo el daño que no sea de fuego o mágico debido a su densa estructura fúngica."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Golpe Aplastante",
+          "descripcion": "Ataca con un golpe pesado a un enemigo adyacente. Si impacta, inflige 1d8 de daño contundente y el objetivo debe hacer una tirada de salvación de Fuerza CD 14 o quedar derribado."
+        },
+        {
+          "nombre": "Erupción de Esporas",
+          "descripcion": "Libera una nube de esporas en un radio de 3 casillas. Todas las criaturas en el área deben hacer una tirada de salvación de Fuerza de Voluntad CD 14. Si fallan, quedan envenenadas (1d4 de daño al inicio de cada turno durante 2 turnos) y ralentizadas (velocidad reducida a la mitad). (Recarga 3 turnos)"
+        },
+        {
+          "nombre": "Temblor del Suelo",
+          "descripcion": "Golpea el suelo con gran fuerza, afectando a todas las criaturas en un radio de 2 casillas. Los enemigos deben superar una tirada de salvación de Destreza CD 13 o perder su próxima acción secundaria. (Acción Secundaria)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FUNGLOBO",
+    "descripcion": "Criatura flotante repleta de esporas tóxicas. Parece inofensiva, pero su explosión al morir puede convertir el aire en una trampa mortal. Recompensa: 2 Almas, 10 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Planta Pequeña, no alineada",
+      "ca": "0",
+      "pg": "20",
+      "velocidad": "4 casillas",
+      "desafio": "10",
+      "atributos_especiales": [
+        {
+          "nombre": "Explosión de Esporas",
+          "descripcion": "Al ser derrotado, el Funglobo libera una nube de esporas en un radio de 3 casillas. Todas las criaturas en el área deben hacer una tirada de salvación de Fuerza de Voluntad CD 14. Si fallan, quedan envenenadas (1d4 de daño al inicio de cada turno durante 3 turnos)."
+        },
+        {
+          "nombre": "Vuelo Errático",
+          "descripcion": "Los ataques a distancia contra el Funglobo tienen desventaja debido a su movimiento impredecible."
+        },
+        {
+          "nombre": "Vulnerabilidad al Fuego",
+          "descripcion": "Recibe el doble de daño de ataques de fuego."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Desplazamiento Ligero",
+          "descripcion": "Puede moverse 2 casillas sin provocar ataques de oportunidad. (Acción Secundaria)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "JOVEN MANTIS",
+    "descripcion": "Ágil y disciplinada, esta mantis aún no ha alcanzado la maestría de sus mayores, pero su velocidad y destreza ya la convierten en una oponente temible. Recompensa: 3 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Monstruosidad Mediana, legal malvada",
+      "ca": "1",
+      "pg": "16",
+      "velocidad": "6 casillas",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Reflejos de Combate",
+          "descripcion": "Tiene ventaja en tiradas de salvación contra efectos que la inmovilicen o ralenticen."
+        },
+        {
+          "nombre": "Disciplina del Clan",
+          "descripcion": "Si hay otra Joven Mantis en un radio de 2 casillas, ambas ganan +1 a sus tiradas de ataque."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Doble Tajada",
+          "descripcion": "La Joven Mantis realiza dos ataques rápidos contra un enemigo adyacente. Cada golpe inflige 1d6 de daño cortante."
+        },
+        {
+          "nombre": "Salto Ágil",
+          "descripcion": "Se mueve hasta 4 casillas en cualquier dirección y realiza un ataque gratuito contra un enemigo adyacente. (Recarga 2 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "GUARDIÁN DE LA COLMENA",
+    "descripcion": "El Guardián de la Colmena es un defensor implacable y leal de la Colmena. Esta criatura masiva está cubierta de un caparazón endurecido y está equipada con una fuerza brutal. Recompensa: 6 Almas, 50 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Monstruosidad Grande, legal neutral",
+      "ca": "4",
+      "pg": "40",
+      "velocidad": "4 casillas",
+      "desafio": "50",
+      "atributos_especiales": [
+        {
+          "nombre": "Resistencia de la Colmena",
+          "descripcion": "Reduce en 2 puntos todo daño recibido que no sea crítico o de fuente mágica."
+        },
+        {
+          "nombre": "Furia del Guardián",
+          "descripcion": "Cuando su PG cae por debajo del 25%, gana un ataque adicional como acción secundaria en cada turno, infligiendo 1d8 de daño con un golpe cuerpo a cuerpo."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Carga Aplastante",
+          "descripcion": "El Guardián avanza en línea recta hasta 6 casillas, infligiendo 2d8 de daño contundente a todas las criaturas en su camino. Los objetivos deben realizar una tirada de salvación de Destreza CD 15. Si falla recibe el daño completo y quedan derribados (pierden su próxima acción secundaria); si pasan solo quedan derribados."
+        },
+        {
+          "nombre": "Aullido de la Colmena",
+          "descripcion": "Emite un rugido resonante que inspira a todos los aliados dentro de un radio de 4 casillas. Aliados: Recuperan 1d6 de PG y obtienen +1 a sus tiradas de ataque hasta el final de su siguiente turno. Enemigos: Deben realizar una tirada de salvación de Fuerza de Voluntad CD 14 o sufrir desventaja en su próximo ataque. (Recarga 3 turnos)"
+        },
+        {
+          "nombre": "Impacto Devastador",
+          "descripcion": "Golpea el suelo en un área de 2x2 casillas adyacente a él, infligiendo 1d10 de daño contundente a todas las criaturas dentro del área. Las criaturas deben realizar una tirada de salvación de Destreza CD 14 o quedar aturdidas hasta el final de su siguiente turno. (Acción Secundaria)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "CÁSCARA DE COLMENA",
+    "descripcion": "Una cáscara vacía animada por la voluntad de la Colmena. Su función es proteger a los miembros más débiles, actuando como un escudo viviente. Recompensa: 2 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Autómata Grande, no alineada",
+      "ca": "3",
+      "pg": "20",
+      "velocidad": "3 casillas",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Regeneración de Miel",
+          "descripcion": "Al final de su turno, la Cáscara de Colmena recupera 1d6 de PG. Este efecto se desactiva si recibe daño de fuentes mágicas o de fuego en ese turno."
+        },
+        {
+          "nombre": "Muro Viviente",
+          "descripcion": "La cáscara de Colmena ocupa 2 casillas y cuenta como cobertura parcial para cualquier enemigo detrás de ella."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Golpe Retumbante",
+          "descripcion": "Realiza un ataque cuerpo a cuerpo contra un enemigo adyacente, infligiendo 1d6 de daño contundente y empujando al objetivo 1 casilla hacia atrás si falla una tirada de salvación de Fuerza CD 13."
+        },
+        {
+          "nombre": "Explosión de Miel",
+          "descripcion": "Al recibir daño crítico o ser derrotada, la Cáscara libera una explosión de miel en un radio de 2 casillas. Todas las criaturas en el área deben realizar una tirada de salvación de Destreza CD 14. Si fallan, quedan ralentizadas (velocidad reducida a la mitad) durante 2 turnos. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "TREMARCRIA",
+    "descripcion": "Pequeñas criaturas explosivas que habitan en enjambres. Su única estrategia es lanzarse contra el enemigo más cercano y estallar, buscando causar el mayor daño posible. Recompensa: 2 Almas, 15 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Bestia Diminuta, no alineada",
+      "ca": "0",
+      "pg": "8",
+      "velocidad": "5 casillas",
+      "desafio": "15",
+      "atributos_especiales": [
+        {
+          "nombre": "Vuelo Errático",
+          "descripcion": "La Tremacrias tiene un movimiento impredecible, lo que dificulta los ataques a distancia en su contra. Los ataques a distancia tienen desventaja al intentar golpearla."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión Ácida",
+          "descripcion": "La Tremacrias se lanza contra el enemigo más cercano y explota, infligiendo 1d6 de daño en un área de 2 casillas alrededor del impacto. Al explotar, la Tremacrias muere automáticamente."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FLUKEMON",
+    "descripcion": "Vermes corruptos que habitan en las zonas más putrefactas. Su saliva es corrosiva y al ser golpeados liberan ácido. Recompensa: 3 Almas, 12 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Aberración Pequeña, caótica",
+      "ca": "0",
+      "pg": "12",
+      "velocidad": "3 casillas, terrestre",
+      "desafio": "12",
+      "atributos_especiales": [
+        {
+          "nombre": "Salpicadura Ácida",
+          "descripcion": "Al ser golpeado por un ataque cuerpo a cuerpo, el Flukemon genera una pequeña explosión de ácido, infligiendo 1d4 de daño ácido a todos los enemigos adyacentes."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Mordida Contaminada",
+          "descripcion": "Ataque cuerpo a cuerpo: +3 a impactar, alcance 5 pies, un objetivo. Impacto: 1d6 de daño perforante. El objetivo debe realizar una tirada de salvación de Fuerza de Voluntad CD 12 o sufrir -1 CA durante su próximo turno debido al efecto corrosivo."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "FLUKCG",
+    "descripcion": "Diminuta larva de Flukemon. Es débil por sí sola, pero al morir explota liberando ácido. Recompensa: 1 Alma, 1 PX. No suele dejar botín.",
+    "estadisticas": {
+      "tipo": "Aberración Diminuta, caótica",
+      "ca": "0",
+      "pg": "2",
+      "velocidad": "2 casillas, terrestre",
+      "desafio": "1",
+      "atributos_especiales": [
+        {
+          "nombre": "Explosión Ácida",
+          "descripcion": "Al morir, la Larva Fluke explota, infligiendo 1d6 de daño ácido a todos los enemigos en un radio de 1 casilla."
+        },
+        {
+          "nombre": "Instinto de Supervivencia",
+          "descripcion": "Si recibe daño y no muere, su velocidad aumenta en +1 casilla hasta el final de su próximo turno."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Mordida Menor",
+          "descripcion": "Ataque cuerpo a cuerpo: +2 a impactar, alcance 5 pies, un objetivo. Impacto: 1d4 de daño perforante."
+        }
+      ]
+    }
+  },
+  {
+    "nombre": "TREMARTITA REINA",
+    "descripcion": "La Reina de las Tremacrias. Una criatura masiva y corrupta que no solo lucha con una fuerza terrible, sino que también invoca a sus crías para que la asistan en combate. Recompensa: 10 Almas, 10 PX, 30-50 Geo. Al derrotarla, puede dejar como botín opcional 'Escama Ácida: Material único para crafteo', 'Amuleto: Ira de las Crías' o 'Cristal Verde: Otorga +1 RA permanente al personaje que lo recoja'.",
+    "estadisticas": {
+      "tipo": "Aberración Grande, caótica",
+      "ca": "2",
+      "pg": "50",
+      "velocidad": "4 casillas",
+      "desafio": "10",
+      "atributos_especiales": [
+        {
+          "nombre": "Cáscara Reforzada",
+          "descripcion": "La Tremartita recibe mitad de daño de ataques a distancia, pero los ataques cuerpo a cuerpo ignoran 1 punto de su defensa."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Explosión de Crías",
+          "descripcion": "La Reina invoca 2 Tremacrias cada 2 turnos. Estas crías explotan al acercarse a los jugadores."
+        },
+        {
+          "nombre": "Embestida Ácida",
+          "descripcion": "La Reina se lanza hacia adelante en línea recta hasta 6 casillas, infligiendo 2d6 de daño ácido a cualquier enemigo en su camino y empujándolos 2 casillas. (Recarga 2 turnos)"
+        },
+        {
+          "nombre": "Explosión Ácida Masiva",
+          "descripcion": "La Reina libera una explosión ácida que afecta un área de 3 casillas a su alrededor, infligiendo 3d6 de daño ácido y reduciendo la movilidad de los afectados en 1 casilla durante su próximo turno. (Recarga 3 turnos)"
+        }
+      ]
+    }
+  }
+]

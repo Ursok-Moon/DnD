@@ -1,0 +1,328 @@
+/* sidebar.css - Navegación estilo medieval */
+:root {
+    --accent-gold: #d4af37;
+    --accent-purple: #6a0dad;
+    --parchment-light: #f5e6d3;
+}
+
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 70px;
+    background: linear-gradient(180deg, #2c1810 0%, #1a0f0a 100%);
+    border-right: 3px solid var(--accent-gold);
+    z-index: 2000;
+    transition: width 0.3s ease;
+    overflow: hidden;
+    box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Hover para expandir */
+.sidebar:hover {
+    width: 220px;
+}
+
+/* Cuando está expandido por hover */
+.sidebar:hover .sidebar-logo span,
+.sidebar:hover .sidebar-link span,
+.sidebar:hover .tutorial-toggle-label span {
+    opacity: 1;
+    visibility: visible;
+}
+
+.sidebar-header {
+    padding: 20px 15px;
+    border-bottom: 2px solid var(--accent-gold);
+    margin-bottom: 20px;
+}
+
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: var(--parchment-light);
+    text-decoration: none;
+}
+
+.sidebar-logo i {
+    font-size: 2rem;
+    color: var(--accent-gold);
+    min-width: 40px;
+    text-align: center;
+}
+
+.sidebar-logo span {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 1.2rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-nav {
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 120px);
+}
+
+.sidebar-item {
+    margin-bottom: 10px;
+}
+
+.sidebar-link, 
+.tutorial-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    color: var(--parchment-light);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    width: 100%;
+    margin: 0;
+    border: none;
+    background: transparent;
+    font-family: 'Cinzel', serif;
+    font-size: 0.9rem;
+}
+
+.sidebar-link:hover,
+.tutorial-toggle-label:hover {
+    background: rgba(212, 175, 55, 0.2);
+    transform: translateX(5px);
+}
+
+.sidebar-link.active {
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.3), transparent);
+    border-left: 3px solid var(--accent-gold);
+}
+
+.sidebar-link i,
+.tutorial-toggle-label i {
+    font-size: 1.3rem;
+    color: var(--accent-gold);
+    min-width: 40px;
+    text-align: center;
+}
+
+.sidebar-link span,
+.tutorial-toggle-label span {
+    font-family: 'Cinzel', serif;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    flex: 1;
+}
+
+.sidebar-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.sidebar-link:hover::before {
+    left: 100%;
+}
+
+/* Estilos para el toggle de tutorial */
+.tutorial-item {
+    margin-top: auto;
+    padding-top: 15px;
+    border-top: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+/* Switch estilo */
+.tutorial-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.tutorial-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.tutorial-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.tutorial-switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .tutorial-switch-slider {
+    background: linear-gradient(90deg, var(--accent-gold), var(--accent-purple));
+}
+
+input:checked + .tutorial-switch-slider:before {
+    transform: translateX(26px);
+}
+
+/* Eliminar estilos antiguos del toggle */
+.sidebar-toggle {
+    display: none;
+}
+
+/* Ajuste del contenido principal cuando hay sidebar */
+body.with-sidebar {
+    padding-left: 70px;
+    transition: padding-left 0.3s ease;
+}
+
+body.with-sidebar .parchment {
+    margin-left: 0;
+}
+
+/* Estilos del modal tutorial */
+.tutorial-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+}
+
+.tutorial-modal.active {
+    display: flex;
+}
+
+.tutorial-modal-content {
+    background: linear-gradient(135deg, #2c1810, #1a0f0a);
+    border: 3px solid var(--accent-gold);
+    border-radius: 15px;
+    padding: 25px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    color: var(--parchment-light);
+}
+
+.tutorial-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: var(--accent-gold);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.tutorial-close-btn:hover {
+    transform: rotate(90deg);
+}
+
+.tutorial-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--accent-gold);
+    padding-bottom: 15px;
+}
+
+.tutorial-modal-header i {
+    font-size: 2rem;
+    color: var(--accent-gold);
+}
+
+.tutorial-modal-header h2 {
+    font-family: 'MedievalSharp', cursive;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+.tutorial-modal-body h3 {
+    color: var(--accent-gold);
+    margin-bottom: 15px;
+}
+
+.tutorial-modal-body ul {
+    list-style: none;
+    padding: 0;
+}
+
+.tutorial-modal-body li {
+    margin-bottom: 10px;
+    padding-left: 25px;
+    position: relative;
+}
+
+.tutorial-modal-body li i {
+    position: absolute;
+    left: 0;
+    color: var(--accent-gold);
+}
+
+.tutorial-tip {
+    background: rgba(212, 175, 55, 0.1);
+    border-left: 4px solid var(--accent-gold);
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.tutorial-tip i {
+    color: var(--accent-gold);
+    margin-right: 10px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 0;
+    }
+    
+    .sidebar:hover {
+        width: 220px;
+    }
+    
+    body.with-sidebar {
+        padding-left: 0;
+    }
+}

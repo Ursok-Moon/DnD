@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mazo D&D - La Libreta del Escriba</title>
+    <link rel="stylesheet" href="/src/CSS/sidebar.css">
+    <link rel="stylesheet" href="/src/CSS/Styles.css">
+    <link rel="stylesheet" href="/src/CSS/tutorial.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&family=Uncial+Antiqua&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<body>
+<!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo">
+                <i class="fas fa-book-open"></i>
+                <span>El Escriba</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="sidebar-item">
+                <a href="/src/FROND/hoja.html" class="sidebar-link" id="nav-hoja">
+                    <i class="fas fa-scroll"></i>
+                    <span>Hoja - PJ</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/Cartas.html" class="sidebar-link active" id="nav-cartas">
+                    <i class="fas fa-crown"></i>
+                    <span>Cartas</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/DMS.html" class="sidebar-link" id="nav-bestias">
+                    <i class="fas fa-dragon"></i>
+                    <span>DM Screen</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/mapa.html" class="sidebar-link" id="nav-mapa">
+                    <i class="fas fa-map"></i>
+                    <span>Mapa</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/dados.html" class="sidebar-link" id="nav-dados">
+                    <i class="fas fa-dice-d20"></i>
+                    <span>Lanzar Dados</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="#" class="sidebar-link" id="nav-ajustes">
+                    <i class="fas fa-cog"></i>
+                    <span>Ajustes</span>
+                </a>
+            </div>
+            <div class="tutorial-toggle-wrapper">
+            <label class="tutorial-toggle-label">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Modo Tutorial</span>
+                <div class="tutorial-switch">
+                    <input type="checkbox" id="tutorialSwitch">
+                    <span class="tutorial-switch-slider"></span>
+                </div>
+            </label>
+        </div>
+        </nav>
+        
+        <button class="sidebar-toggle" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+    </aside>
+
+    <!-- Modal de descripción de carta -->
+    <div class="card-description-modal" id="cardDescriptionModal">
+        <div class="card-description-content">
+            <button class="close-description" id="closeDescription">&times;</button>
+            <div class="card-description-header">
+                <img id="descriptionImage" src="" alt="" class="card-description-image">
+                <div class="card-description-title">
+                    <div id="descriptionName" class="card-description-name"></div>
+                    <div id="descriptionType" class="card-description-type"></div>
+                </div>
+            </div>
+            <div id="descriptionText" class="card-description-text"></div>
+        </div>
+    </div>
+
+    <header class="main-header"> 
+        <h1>La Taberna de los Dioses</h1>
+        <p class="subtitle">Barajea tu destino en la mesa del aventurero</p>
+    </header>
+    <main class="main-content">
+        <!-- Mazo del Rey (Aciertos Críticos) -->
+        <section class="deck-section">
+            <div class="deck-title-section">
+                <h2 class="deck-title">Mazo del Rey</h2>
+                <div class="deck-subtitle">Aciertos Críticos</div>
+            </div>
+            
+            <div class="deck-controls">
+                <div class="deck-counter">
+                    <span class="counter-label">Cartas disponibles:</span>
+                    <span id="deckCount" class="counter-value">0</span>
+                </div>
+                <button id="shuffleBtn" class="deck-button shuffle-btn">Barajar Mazo</button>
+                <button id="resetBtn" class="deck-button reset-btn">Reiniciar Mazo</button>
+            </div>
+            
+            <div class="card-play-area">
+                <div class="deck-pile" id="deckContainer">
+                    <!-- Mazo aparecerá aquí -->
+                </div>
+                
+                <div class="drawn-cards-container">
+                    <h3>Cartas Sacadas</h3>
+                    <div class="drawn-cards" id="drawnCards">
+                        <!-- Cartas sacadas aparecerán aquí -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Mazo del Abismo (Fallos Críticos) -->
+        <section class="deck-section">
+            <div class="deck-title-section">
+                <h2 class="deck-title dark">Mazo del Abismo</h2>
+                <div class="deck-subtitle">Fallos Críticos</div>
+            </div>
+            
+            <div class="deck-controls">
+                <div class="deck-counter">
+                    <span class="counter-label">Cartas disponibles:</span>
+                    <span id="deckCount2" class="counter-value">0</span>
+                </div>
+                <button id="shuffleBtn2" class="deck-button shuffle-btn dark">Barajar Mazo</button>
+                <button id="resetBtn2" class="deck-button reset-btn dark">Reiniciar Mazo</button>
+            </div>
+            
+            <div class="card-play-area">
+                <div class="deck-pile dark" id="deckContainer2">
+                    <!-- Mazo 2 aparecerá aquí -->
+                </div>
+                
+                <div class="drawn-cards-container">
+                    <h3>Cartas Sacadas</h3>
+                    <div class="drawn-cards" id="drawnCards2">
+                        <!-- Cartas sacadas del mazo 2 aparecerán aquí -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <footer class="main-footer">
+        <p>La Libreta del Escriba - Sistema de Cartas D&D</p>
+        <p class="version">Versión 1.0</p>
+    </footer>
+    <script src="/src/JS/config.js"></script>
+    <script src="/src/JS/sidebar.js"></script>
+    <script src="/src/JS/tutorial.js"></script>
+    <script src="/src/JS/Logica.js"></script>
+</body>
+</html>

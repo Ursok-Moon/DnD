@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración - La Libreta del Escriba</title>
+    <link rel="stylesheet" href="/src/CSS/admin.css">
+    <link rel="stylesheet" href="/src/CSS/sidebar.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar (igual que en las otras páginas) -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo">
+                <i class="fas fa-book-open"></i>
+                <span>El Escriba</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="sidebar-item">
+                <a href="/src/FROND/hoja.html" class="sidebar-link">
+                    <i class="fas fa-scroll"></i>
+                    <span>Hoja - PJ</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/Cartas.html" class="sidebar-link">
+                    <i class="fas fa-crown"></i>
+                    <span>Cartas</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/DMS.html" class="sidebar-link">
+                    <i class="fas fa-dragon"></i>
+                    <span>DM Screen</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/mapa.html" class="sidebar-link">
+                    <i class="fas fa-map"></i>
+                    <span>Mapa</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/dados.html" class="sidebar-link">
+                    <i class="fas fa-dice-d20"></i>
+                    <span>Lanzar Dados</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/admin.html" class="sidebar-link active">
+                    <i class="fas fa-cog"></i>
+                    <span>Ajustes</span>
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Contenido principal -->
+    <div class="main-content">
+        <header class="page-header">
+            <h1><i class="fas fa-cog"></i> ADMINISTRACIÓN DE DATOS</h1>
+            <div class="header-info">
+                <span class="dm-badge" id="userBadge">
+                    <i class="fas fa-crown"></i> Dungeon Master
+                </span>
+            </div>
+        </header>
+
+        <div class="admin-container">
+            <!-- Panel de estadísticas -->
+            <div class="stats-grid">
+                <div class="stat-card" id="bestiaryStat">
+                    <i class="fas fa-dragon"></i>
+                    <div class="stat-info">
+                        <span class="stat-label">Bestiario</span>
+                        <span class="stat-value" id="bestiaryCount">0</span>
+                        <span class="stat-sub">criaturas</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card" id="playersStat">
+                    <i class="fas fa-users"></i>
+                    <div class="stat-info">
+                        <span class="stat-label">Personajes</span>
+                        <span class="stat-value" id="playersCount">0</span>
+                        <span class="stat-sub">jugadores</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card" id="sessionsStat">
+                    <i class="fas fa-scroll"></i>
+                    <div class="stat-info">
+                        <span class="stat-label">Sesiones</span>
+                        <span class="stat-value" id="sessionsCount">0</span>
+                        <span class="stat-sub">guardadas</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card" id="totalSizeStat">
+                    <i class="fas fa-hdd"></i>
+                    <div class="stat-info">
+                        <span class="stat-label">Espacio usado</span>
+                        <span class="stat-value" id="totalSize">0 KB</span>
+                        <span class="stat-sub">total</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gestor de archivos JSON -->
+            <div class="admin-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-file-code"></i> Archivos JSON</h2>
+                    <div class="panel-actions">
+                        <button class="admin-btn" id="refreshFilesBtn">
+                            <i class="fas fa-sync-alt"></i> Refrescar
+                        </button>
+                        <button class="admin-btn primary" id="uploadJsonBtn">
+                            <i class="fas fa-cloud-upload-alt"></i> Subir JSON
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="file-list-container">
+                    <table class="file-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tamaño</th>
+                                <th>Modificado</th>
+                                <th>Tipo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jsonFileList">
+                            <tr class="loading-row">
+                                <td colspan="5">
+                                    <i class="fas fa-spinner fa-spin"></i> Cargando archivos...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+                    <!-- Añadir después del panel de archivos JSON, antes del editor -->
+
+<!-- Gestor de imágenes -->
+<div class="admin-panel">
+    <div class="panel-header">
+        <h2><i class="fas fa-images"></i> Imágenes de Personajes</h2>
+        <div class="panel-actions">
+            <button class="admin-btn" id="refreshImagesBtn">
+                <i class="fas fa-sync-alt"></i> Refrescar
+            </button>
+            <button class="admin-btn primary" id="uploadImageBtn">
+                <i class="fas fa-cloud-upload-alt"></i> Subir imagen
+            </button>
+        </div>
+    </div>
+    
+    <div class="image-gallery" id="imageGallery">
+        <!-- Gallery generada dinámicamente -->
+        <div class="loading-images">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Cargando imágenes...</p>
+        </div>
+    </div>
+    
+    <!-- Estadísticas de imágenes -->
+    <div class="image-stats" id="imageStats">
+        <!-- Stats generadas dinámicamente -->
+    </div>
+</div>
+
+<!-- Modal para previsualizar imagen (nuevo) -->
+<div class="image-modal" id="imageModal">
+    <div class="image-modal-content">
+        <span class="close-modal">&times;</span>
+        <img id="previewImage" src="" alt="Preview">
+        <div class="image-modal-info">
+            <h3 id="previewFilename"></h3>
+            <p id="previewDetails"></p>
+            <div class="image-modal-actions">
+                <button class="admin-btn" id="downloadPreviewBtn">
+                    <i class="fas fa-download"></i> Descargar
+                </button>
+                <button class="admin-btn danger" id="deletePreviewBtn">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+            <!-- Editor JSON -->
+            <div class="admin-panel" id="editorPanel" style="display: none;">
+                <div class="panel-header">
+                    <h2><i class="fas fa-edit"></i> Editando: <span id="currentFileName"></span></h2>
+                </div>
+                
+                <div class="editor-container">
+                    <textarea id="jsonEditor" class="json-editor" spellcheck="false"></textarea>
+                    
+                    <div class="editor-toolbar">
+                        <button class="admin-btn" id="saveJsonBtn">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="admin-btn" id="formatJsonBtn">
+                            <i class="fas fa-code"></i> Formatear
+                        </button>
+                        <button class="admin-btn" id="validateJsonBtn">
+                            <i class="fas fa-check-circle"></i> Validar
+                        </button>
+                        <button class="admin-btn danger" id="closeEditorBtn">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+                    
+                    <div class="editor-status" id="editorStatus"></div>
+                </div>
+            </div>
+
+            <!-- Acciones de mantenimiento -->
+            <div class="admin-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-tools"></i> Mantenimiento</h2>
+                </div>
+                
+                <div class="maintenance-grid">
+                    <div class="maintenance-card">
+                        <i class="fas fa-broom"></i>
+                        <h3>Limpiar Base de Datos</h3>
+                        <p>Elimina todos los archivos JSON de la carpeta /data</p>
+                        <button class="admin-btn danger" id="cleanDatabaseBtn">
+                            <i class="fas fa-exclamation-triangle"></i> Limpiar todo
+                        </button>
+                    </div>
+                    
+                    <div class="maintenance-card">
+                        <i class="fas fa-undo-alt"></i>
+                        <h3>Restaurar Bestiario</h3>
+                        <p>Vuelve al bestiario original por defecto</p>
+                        <button class="admin-btn warning" id="restoreBestiaryBtn">
+                            <i class="fas fa-dragon"></i> Restaurar
+                        </button>
+                    </div>
+                    
+                    <div class="maintenance-card">
+                        <i class="fas fa-file-export"></i>
+                        <h3>Exportar Todo</h3>
+                        <p>Crea una copia de seguridad de todos los datos</p>
+                        <button class="admin-btn success" id="exportAllBtn">
+                            <i class="fas fa-download"></i> Exportar ZIP
+                        </button>
+                    </div>
+                    
+                    <div class="maintenance-card">
+                        <i class="fas fa-chart-line"></i>
+                        <h3>Estadísticas</h3>
+                        <p>Ver uso detallado de la base de datos</p>
+                        <button class="admin-btn info" id="showStatsBtn">
+                            <i class="fas fa-chart-bar"></i> Ver detalles
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log de operaciones -->
+            <div class="admin-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-history"></i> Historial de operaciones</h2>
+                    <button class="admin-btn small" id="clearLogBtn">
+                        <i class="fas fa-eraser"></i> Limpiar
+                    </button>
+                </div>
+                
+                <div class="log-container" id="operationLog">
+                    <!-- Log generado dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/src/JS/auth.js"></script>
+    <script src="/src/JS/config.js"></script>
+    <script src="/src/JS/sidebar.js"></script>
+    <script src="/src/JS/admin.js"></script>
+</body>
+</html>

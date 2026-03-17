@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Libreta del Escriba - Hoja de Personaje</title>
+    <link rel="stylesheet" href="/src/CSS/hoja.css">
+    <link rel="stylesheet" href="/src/CSS/sidebar.css">
+    <link rel="stylesheet" href="/src/CSS/tutorial.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="/node_modules/gridstack/dist/gridstack.min.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&family=Uncial+Antiqua&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo">
+                <i class="fas fa-book-open"></i>
+                <span>El Escriba</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="sidebar-item">
+                <a href="/src/FROND/hoja.html" class="sidebar-link active" id="nav-hoja">
+                    <i class="fas fa-scroll"></i>
+                    <span>Hoja - PJ</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/Cartas.html" class="sidebar-link" id="nav-cartas">
+                    <i class="fas fa-crown"></i>
+                    <span>Cartas</span>
+                </a>
+            </div>
+            
+            <div class="/src/FROND/Cartas.html">
+                <a href="/src/FROND/DMS.html" class="sidebar-link" id="nav-bestias">
+                    <i class="fas fa-dragon"></i>
+                    <span>DM Screen</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/mapa.html" class="sidebar-link" id="nav-mapa">
+                    <i class="fas fa-map"></i>
+                    <span>Mapa</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/dados.html" class="sidebar-link" id="nav-dados">
+                    <i class="fas fa-dice-d20"></i>
+                    <span>Lanzar Dados</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="#" class="sidebar-link" id="nav-ajustes">
+                    <i class="fas fa-cog"></i>
+                    <span>Ajustes</span>
+                </a>
+            </div>
+            <div class="tutorial-toggle-wrapper">
+            <label class="tutorial-toggle-label">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Modo Tutorial</span>
+                <div class="tutorial-switch">
+                    <input type="checkbox" id="tutorialSwitch">
+                    <span class="tutorial-switch-slider"></span>
+                </div>
+            </label>
+        </div>
+        </nav>
+        
+        <button class="sidebar-toggle" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+    </aside>
+
+    <div class="parchment">
+        <!-- Encabezado del pergamino -->
+        <div class="header">
+            <div class="main-title">
+                <h1>LA LIBRETA DEL ESCRIBA</h1>
+                <h2>Crónicas de Aventureros</h2>
+            </div>
+        </div>
+
+        <!-- Contenido principal -->
+        <main class="character-sheet">
+            <!-- Sección izquierda: Información básica y atributos -->
+            <div class="left-column">
+                <!-- Información básica -->
+                <section class="card basic-info" id="card-basic-info">
+                    <h3 class="card-title">
+                        <i class="fas fa-scroll"></i>
+                        INFORMACIÓN DEL PERSONAJE
+                    </h3>
+                    <div class="form-row">
+                        <label><i class="fas fa-user"></i> Nombre</label>
+                        <input type="text" id="char-name" placeholder="...">
+                    </div>
+                    <div class="form-row">
+                        <label><i class="fas fa-hat-wizard"></i> Clase</label>
+                        <input type="text" id="char-class" placeholder="...">
+                    </div>
+                    <div class="form-row">
+                        <label><i class="fas fa-dragon"></i> Raza</label>
+                        <input type="text" id="char-race" placeholder="...">
+                    </div>
+                    <div class="form-row">
+                        <label><i class="fas fa-history"></i> Trasfondo</label>
+                        <input type="text" id="char-bg" placeholder="...">
+                    </div>
+                    <div class="form-row">
+                        <label><i class="fas fa-balance-scale"></i> Alineamiento</label>
+                        <input type="text" id="char-align" placeholder="...">
+                    </div>
+                    <!-- Sección de Experiencia -->
+<div class="exp-section">
+    <div class="exp-header">
+        <div class="exp-level-display">
+            <label><i class="fas fa-level-up-alt"></i> NIVEL</label>
+            <div class="level-badge" id="level-display">1</div>
+            <div class="level-controls">
+                <button type="button" class="level-btn minus" id="level-down-btn" title="Bajar nivel">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button type="button" class="level-btn" id="level-up-btn" title="Subir nivel">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+        <button type="button" class="exp-config-btn" id="configExpBtn" title="Configurar experiencia">
+            <i class="fas fa-cog"></i>
+        </button>
+    </div>
+    
+    <!-- Barra de experiencia -->
+    <div class="exp-bar-container">
+        <div class="exp-bar-bg">
+            <div class="exp-bar-fill" id="expBarFill"></div>
+        </div>
+        <div class="exp-numbers">
+            <span id="expCurrentLabel">0</span>
+            <span id="expPercentage">0%</span>
+            <span id="expMaxLabel">300</span>
+        </div>
+    </div>
+    
+    <!-- Inputs de experiencia -->
+    <div class="exp-inputs">
+        <div class="exp-input-group">
+            <label><i class="fas fa-star"></i> Actual</label>
+            <input type="number" id="current-exp" value="0" min="0">
+        </div>
+        <div class="exp-input-group">
+            <label><i class="fas fa-bullseye"></i> Requerida</label>
+            <input type="number" id="max-exp" value="300" min="1">
+        </div>
+    </div>
+    
+    <!-- Input oculto para nivel (se sincroniza con el badge) -->
+    <input type="hidden" id="character-level" value="1">
+</div>
+
+                </section>
+
+                 <!-- Percepción Pasiva -->
+                <section class="card passive-perception" id="card-passive-perception">
+                    <h3 class="card-title">
+                        <i class="fas fa-eye"></i>
+                        PERCEPCIÓN PASIVA
+                    </h3>
+                    <div class="passive-perception-container">
+                        <div class="passive-perception-display">
+                            <input type="number" id="passivePerception" value="10" min="1" max="30" class="passive-perception-input">
+                            <span class="passive-perception-label">Total</span>
+                        </div>
+                        <div class="passive-perception-formula">
+                            <i class="fas fa-calculator"></i> 10 + Mod. Sabiduría + Bonif. Competencia
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- Atributos dinámicos -->
+                <section class="card attributes-section" id="card-attributes">
+                    <div class="section-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-dumbbell"></i>
+                            ATRIBUTOS
+                        </h3>
+                        <button type="button" class="btn-add" id="addAttributeBtn" title="Añadir atributo">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="attributes-container" id="attributesContainer">
+                        <!-- Atributos base -->
+                    </div>
+                    
+                    <div class="attributes-info">
+                        <p><i class="fas fa-calculator"></i> Modificador = (Valor - 10) ÷ 2</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Imagen de PJ y Recursos -->
+            <div class="right-column">
+                <!-- Sección de imagen del personaje -->
+                <section class="card character-image-section" id="card-character-image">
+                    <h3 class="card-title">
+                        <i class="fas fa-portrait"></i>
+                        RETRATO DEL PERSONAJE
+                    </h3>
+                    <div class="image-container" id="imageContainer">
+                        <div class="image-upload-area" id="imageUploadArea">
+                            <i class="fas fa-camera-retro"></i>
+                            <p>Haz clic para subir imagen</p>
+                            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                        </div>
+                        <div class="image-preview" id="imagePreview" style="display: none;">
+                            <img id="characterImage" src="" alt="Imagen del personaje">
+                            <button type="button" class="btn-change-image" id="changeImageBtn">
+                                <i class="fas fa-sync-alt"></i> Cambiar
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card saving-throws" id="card-saving-throws">
+        <div class="section-header">
+            <h3 class="card-title">
+                <i class="fas fa-shield-alt"></i>
+                TIRADAS DE SALVACIÓN
+            </h3>
+        </div>
+        
+        <div class="saving-throws-container" id="savingThrowsContainer">
+            <!-- Las salvaciones se generan dinámicamente -->
+        </div>
+    </section>
+
+                <!-- Salvaciones de Muerte -->
+                <section class="card death-saves" id="card-death-saves">
+                    <h3 class="card-title">
+                        <i class="fas fa-skull"></i>
+                        SALVACIONES DE MUERTE
+                    </h3>
+                    <div class="death-saves-container">
+                        <div class="death-saves-group">
+                            <label><i class="fas fa-check-circle" style="color: #4CAF50;"></i> ÉXITOS</label>
+                            <div class="death-checkbox-group" id="successSaves">
+                                <label class="death-checkbox">
+                                    <input type="checkbox" class="death-save-success" data-index="0">
+                                    <span class="death-checkmark"></span>
+                                </label>
+                                <label class="death-checkbox">
+                                    <input type="checkbox" class="death-save-success" data-index="1">
+                                    <span class="death-checkmark"></span>
+                                </label>
+                                <label class="death-checkbox">
+                                    <input type="checkbox" class="death-save-success" data-index="2">
+                                    <span class="death-checkmark"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="death-saves-group">
+                            <label><i class="fas fa-times-circle" style="color: #ff4444;"></i> FALLOS</label>
+                            <div class="death-checkbox-group" id="failSaves">
+                                <label class="death-checkbox">
+                                    <input type="checkbox" class="death-save-fail" data-index="0">
+                                    <span class="death-checkmark"></span>
+                                </label>
+                                <label class="death-checkbox">
+                                    <input type="checkbox" class="death-save-fail" data-index="1">
+                                    <span class="death-checkmark"></span>
+                                </label>
+                                <label class="death-checkbox">
+                                    <input type="checkbox" class="death-save-fail" data-index="2">
+                                    <span class="death-checkmark"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="death-saves-info">
+                        <i class="fas fa-info-circle"></i> 3 éxitos: Estable, 3 fallos: Muerte
+                    </div>
+                </section>
+
+                <!-- Recursos (Maná/Energía) -->
+                <section class="card resources-section" id="card-resources">
+                    <h3 class="card-title">
+                        <i class="fas fa-gem"></i>
+                        RECURSOS MÁGICOS
+                    </h3>
+                    
+                    <!-- Maná/Energía -->
+                    <div class="resource-mana">
+                        <div class="resource-header">
+                            <h4><i class="fas fa-bolt"></i> MANÁ</h4>
+                            <button type="button" class="btn-config-resource" id="configManaBtn">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="mana-display">
+                            <div class="mana-bar-container">
+                                <div class="mana-bar-bg">
+                                    <div class="mana-bar-fill" id="manaBarFill"></div>
+                                </div>
+                                <div class="mana-numbers">
+                                    <span id="currentMana">2</span>
+                                    <span class="mana-separator">/</span>
+                                    <span id="maxMana">15</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mana-controls">
+                                <button type="button" class="mana-btn mana-minus" id="manaMinusBtn">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <input type="number" class="mana-input" id="manaInput" value="2" min="0" max="15">
+                                <button type="button" class="mana-btn mana-plus" id="manaPlusBtn">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Slots de conjuros -->
+                    <div class="spell-slots-section">
+                        <div class="resource-header">
+                            <h4><i class="fas fa-magic"></i> SLOTS DE CONJUROS</h4>
+                            <button type="button" class="btn-config-resource" id="configSlotsBtn">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="slots-grid" id="slotsGrid">
+                            <!-- Slots se generan dinámicamente -->
+                        </div>
+                    </div>
+                </section>
+                 <!-- Competencias e Idiomas -->
+                <section class="card proficiencies" id="card-proficiencies">
+                    <div class="section-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-language"></i>
+                            COMPETENCIAS & IDIOMAS
+                        </h3>
+                        <button type="button" class="btn-add" id="addProficiencyBtn" title="Añadir competencia/idioma">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="proficiencies-container" id="proficienciesContainer">
+                    </div>
+                    
+                    <div class="proficiency-tabs">
+                        <button type="button" class="proficiency-tab active" data-type="all">Todos</button>
+                        <button type="button" class="proficiency-tab" data-type="armor">Armaduras</button>
+                        <button type="button" class="proficiency-tab" data-type="weapon">Armas</button>
+                        <button type="button" class="proficiency-tab" data-type="tool">Herramientas</button>
+                        <button type="button" class="proficiency-tab" data-type="language">Idiomas</button>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Sección central: Combate y Puntos de Golpe -->
+            <div class="center-column">
+                <!-- Estadísticas de combate -->
+                <section class="card combat-stats" id="card-combat-stats">
+                    <h3 class="card-title">
+                        <i class="fas fa-fist-raised"></i>
+                        ESTADÍSTICAS DE COMBATE
+                    </h3>
+                    <div class="combat-grid">
+                        <div class="combat-stat">
+                            <label>CLASE DE ARMADURA</label>
+                            <div class="stat-display">
+                                <input type="number" id="armor-class" value="12" min="0">
+                            </div>
+                        </div>
+                        <div class="combat-stat">
+                            <label>VELOCIDAD</label>
+                            <div class="stat-display">
+                                <input type="number" id="speed" value="30" min="0">
+                                <span class="stat-unit">pies</span>
+                            </div>
+                        </div>
+                        <div class="combat-stat">
+                            <label>INICIATIVA</label>
+                            <div class="stat-display">
+                                <input type="number" id="initiative" value="1" min="-5" max="10">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Puntos de golpe -->
+                <section class="card hit-points" id="card-hit-points">
+                    <h3 class="card-title">
+                        <i class="fas fa-heart"></i>
+                        PUNTOS DE GOLPE
+                    </h3>
+                    <div class="hp-container">
+                        <div class="hp-main">
+                            <div class="hp-current-section">
+                                <label>ACTUAL</label>
+                                <div class="hp-display-large">
+                                    <input type="number" id="current-hp" value="26" min="0" max="999">
+                                </div>
+                            </div>
+                            <div class="hp-max-section">
+                                <label>MÁXIMO</label>
+                                <div class="hp-display-large">
+                                    <input type="number" id="max-hp" value="26" min="1" max="999">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="hp-temp-section">
+                            <label>TEMPORALES</label>
+                            <div class="hp-display">
+                                <input type="number" id="temp-hp" value="0" min="0" max="999">
+                            </div>
+                        </div>
+                        
+                        <!-- Barra de vida -->
+                        <div class="hp-bar-container">
+                            <div class="hp-bar-bg">
+                                <div class="hp-bar-fill" id="hpBarFill"></div>
+                            </div>
+                            <div class="hp-bar-labels">
+                                <span>0</span>
+                                <span id="hpCurrentLabel">26</span>
+                                <span id="hpMaxLabel">26</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                 <!-- Habilidades -->
+                <section class="card skills-section" id="card-skills">
+                    <div class="section-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-brain"></i>
+                            HABILIDADES
+                        </h3>
+                        <div class="skills-header-buttons">
+                            <button type="button" class="btn-remove-all" id="removeAllSkillsBtn" title="Eliminar todas las habilidades">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            <button type="button" class="btn-add" id="addSkillBtn" title="Añadir habilidad">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="skills-container" id="skillsContainer">
+        
+                    </div>
+                </section>
+
+
+                <!-- Ataques y conjuros -->
+                <section class="card attacks-spells" id="card-attacks-spells">
+                    <h3 class="card-title">
+                        <i class="fas fa-crosshairs"></i>
+                        ATAQUES & CONJUROS
+                    </h3>
+                    <div class="attacks-list">
+                        <div class="attack-item">
+                            <input type="text" class="attack-name" placeholder="Nombre">
+                            <input type="text" class="attack-bonus" placeholder="Bonif.">
+                            <input type="text" class="attack-damage" placeholder="Daño">
+                        </div>
+                        <div class="attack-item">
+                            <input type="text" class="attack-name" placeholder="Nombre">
+                            <input type="text" class="attack-bonus" placeholder="Bonif.">
+                            <input type="text" class="attack-damage" placeholder="Daño">
+                        </div>
+                        <button type="button" class="btn-secondary" id="addAttackBtn">
+                            <i class="fas fa-plus-circle"></i> Añadir ataque
+                        </button>
+                    </div>
+                </section>
+                <!-- Tarjeta de Inventario -->
+<section class="card inventory-section collapsible-card" id="card-inventory">
+    <div class="card-header-with-toggle"> <!-- NUEVO: Contenedor para título y botón -->
+        <h3 class="card-title">
+            <i class="fas fa-box-open"></i>
+            INVENTARIO
+        </h3>
+        <button type="button" class="btn-collapse" id="toggleInventoryBtn" title="Enrollar/Desplegar inventario">
+            <i class="fas fa-chevron-up"></i> <!-- Icono de flecha hacia arriba (desplegado) -->
+        </button>
+    </div>
+    
+    <!-- NUEVO: Envolvemos todo el contenido en un div para poder ocultarlo fácilmente -->
+    <div class="inventory-content">
+        <!-- Sistema monetario personalizable -->
+        <div class="currency-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-coins"></i> <span id="currencyName">Monedas</span></h4>
+                <button type="button" class="btn-config-resource" id="configCurrencyBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+            
+            <div class="currency-grid" id="currencyGrid">
+                <div class="currency-item">
+                    <label><i class="fas fa-circle" style="color: #ffd700;"></i> Oro</label>
+                    <input type="number" id="goldAmount" value="0" min="0" class="currency-input">
+                </div>
+                <div class="currency-item">
+                    <label><i class="fas fa-circle" style="color: #c0c0c0;"></i> Plata</label>
+                    <input type="number" id="silverAmount" value="0" min="0" class="currency-input">
+                </div>
+                <div class="currency-item">
+                    <label><i class="fas fa-circle" style="color: #b87333;"></i> Cobre</label>
+                    <input type="number" id="copperAmount" value="0" min="0" class="currency-input">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tesoros y Gemas -->
+        <div class="treasure-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-gem"></i> TESOROS & GEMAS</h4>
+                <button type="button" class="btn-secondary btn-small" id="addTreasureBtn">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div class="treasure-list" id="treasureList">
+                <!-- Los tesoros se generan dinámicamente -->
+            </div>
+        </div>
+        
+        <!-- Pociones -->
+        <div class="potions-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-flask"></i> POCIONES</h4>
+                <button type="button" class="btn-secondary btn-small" id="addPotionBtn">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div class="potions-list" id="potionsList">
+                <!-- Las pociones se generan dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Equipo -->
+        <div class="equipment-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-chess-board"></i> EQUIPO</h4>
+                <button type="button" class="btn-secondary btn-small" id="addEquipmentBtn">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div class="equipment-list" id="equipmentList">
+                <!-- El equipo se generará dinámicamente -->
+            </div>
+        </div>
+    </div> <!-- Cierre del nuevo div inventory-content -->
+</section>
+            </div>
+            <!-- Sección inferior: Características y equipo -->
+            <div class="full-width">
+                <!-- Características y rasgos -->
+                <section class="card traits" id="card-traits">
+                    <h3 class="card-title">
+                        <i class="fas fa-feather-alt"></i>
+                        RASGOS & CARACTERÍSTICAS
+                    </h3>
+                    <div class="traits-grid">
+                        <div class="trait-group">
+                            <label><i class="fas fa-smile"></i> Rasgos de Personalidad</label>
+                            <textarea id="personality" rows="3"></textarea>
+                        </div>
+                        <div class="trait-group">
+                            <label><i class="fas fa-star"></i> Ideales</label>
+                            <textarea id="ideals" rows="3"></textarea>
+                        </div>
+                        <div class="trait-group">
+                            <label><i class="fas fa-link"></i> Vínculos</label>
+                            <textarea id="bonds" rows="3"></textarea>
+                        </div>
+                        <div class="trait-group">
+                            <label><i class="fas fa-skull-crossbones"></i> Defectos</label>
+                            <textarea id="flaws" rows="3" ></textarea>
+                        </div>
+                        <div class="trait-group full-width">
+                            <label><i class="fas fa-award"></i> Rasgos Especiales</label>
+                            <textarea id="features" rows="4"></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Conjuros -->
+               <section class="card spells" id="card-spells">
+    <div class="section-header">
+        <h3 class="card-title">
+            <i class="fas fa-book-spells"></i>
+            CONJUROS
+        </h3>
+        <button type="button" class="btn-secondary" id="addSpellBtn">
+            <i class="fas fa-plus-circle"></i> Añadir conjuro
+        </button>
+    </div>
+    
+    <div class="spells-list" id="spellsList">
+        <!-- Los conjuros se generan dinámicamente por JS -->
+    </div>
+</section>
+            </div>
+        </main>
+
+        <!-- En el footer, reemplazar con: -->
+<footer class="footer">
+    <div class="footer-buttons">
+        <button type="button" class="btn-save" id="saveBtn">
+            <i class="fas fa-save"></i> GUARDAR PERSONAJE
+        </button>
+        <button type="button" class="btn-import" id="importBtn">
+            <i class="fas fa-file-import"></i> IMPORTAR
+        </button>
+        <button type="button" class="btn-export" id="exportBtn">
+            <i class="fas fa-file-export"></i> EXPORTAR
+        </button>
+        <button type="button" class="btn-reset" id="resetBtn">
+            <i class="fas fa-redo"></i> RESTABLECER
+        </button>
+    </div>
+    <p class="version">
+        <i class="fas fa-quill"></i> La Libreta del Escriba • Versión 3.2
+    </p>
+</footer>
+    </div>
+
+    <!-- Modal para configuración de recursos -->
+    <div class="modal" id="configModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cogs"></i> Configurar Recursos</h3>
+                <button class="modal-close" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Contenido dinámico según recurso -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para personalización de colores de TEXTO -->
+    <div class="modal" id="textColorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-palette"></i> Personalizar Colores de Texto</h3>
+                <button class="modal-close" id="closeTextColorModalBtn">&times;</button>
+            </div>
+            <div class="modal-body" id="textColorModalBody">
+                <!-- Contenido se genera dinámicamente en JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón de personalización de colores -->
+    <button class="customizer-btn" id="colorCustomizerBtn" title="Personalizar colores del tema">
+        <i class="fas fa-palette"></i>
+    </button>
+
+    <!-- Botón de personalización de TEXTO -->
+    <button class="text-customizer-btn" id="textCustomizerBtn" title="Personalizar colores de texto">
+        <i class="fas fa-font"></i>
+    </button>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="/node_modules/gridstack/dist/gridstack-all.js"></script>
+    <script src="/src/JS/hoja.js"></script>
+    <script src="/src/JS/pdf-importer.js"></script>
+    <script src="/src/JS/tutorial.js"></script>
+    <script src="/src/JS/sidebar.js"></script>
+</body>
+</html>

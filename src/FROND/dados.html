@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lanzador de Dados - D&D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="/src/CSS/sidebar.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --parchment-light: #f5e6d3;
+            --parchment-dark: #e6d0b5;
+            --ink-dark: #2c1810;
+            --ink-light: #5c4033;
+            --accent-gold: #d4af37;
+            --accent-red: #8b0000;
+            --accent-blue: #1e3a5f;
+            --accent-purple: #6a0dad;
+            --accent-teal: #008080;
+            --shadow-dark: rgba(0, 0, 0, 0.3);
+            --shadow-light: rgba(0, 0, 0, 0.1);
+            
+            /* Colores de fondo */
+            --bg-dark: #1a0f0a;
+            --bg-darker: #120a06;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
+            color: var(--ink-dark);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Contenedor principal */
+        .dice-wrapper {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* Header */
+        .dice-header {
+            background: 
+                linear-gradient(var(--parchment-light), var(--parchment-dark)),
+                url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23d4af37' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+            border-bottom: 3px solid var(--accent-gold);
+            padding: 25px 30px;
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 4px 15px var(--shadow-dark);
+        }
+
+        .dice-header h1 {
+            font-family: 'MedievalSharp', cursive;
+            color: var(--accent-blue);
+            font-size: 2.2rem;
+            text-shadow: 2px 2px 4px var(--shadow-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .dice-header h1 i {
+            color: var(--accent-gold);
+            font-size: 2.5rem;
+        }
+
+        .dice-header p {
+            text-align: center;
+            color: var(--ink-light);
+            font-style: italic;
+            margin-top: 10px;
+            font-size: 1.1rem;
+        }
+
+        /* Contenedor principal */
+        .dice-container {
+            background: linear-gradient(135deg, var(--parchment-light), var(--parchment-dark));
+            border: 3px solid var(--accent-gold);
+            border-radius: 0 0 10px 10px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .dice-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-gold), var(--accent-blue), var(--accent-purple));
+        }
+
+        /* Contenido */
+        .dice-content {
+            padding: 40px;
+        }
+
+        /* Área de dados */
+        .dice-main {
+            background: rgba(255, 255, 255, 0.7);
+            border: 2px solid var(--accent-gold);
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Selector de dados con iconos geométricos */
+        .dice-selector-area {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .dice-option {
+            flex: 0 0 auto;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .dice-option input[type="radio"] {
+            display: none;
+        }
+
+        .dice-option label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: white;
+            border: 2px solid var(--accent-gold);
+            border-radius: 10px;
+            min-width: 80px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .dice-option input[type="radio"]:checked + label {
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-blue));
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
+        }
+
+        .dice-option label i {
+            font-size: 2.2rem;
+            color: var(--accent-blue);
+        }
+
+        .dice-option input[type="radio"]:checked + label i {
+            color: white;
+        }
+
+        .dice-option label span {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--ink-dark);
+        }
+
+        .dice-option input[type="radio"]:checked + label span {
+            color: white;
+        }
+
+        /* Botón de lanzar simplificado */
+        .roll-button-area {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .roll-btn {
+            background: linear-gradient(145deg, var(--accent-red), #a52a2a);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 40px;
+            font-family: 'Cinzel', serif;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.3);
+            border: 2px solid var(--accent-gold);
+        }
+
+        .roll-btn:hover {
+            background: linear-gradient(145deg, #a52a2a, var(--accent-red));
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(139, 0, 0, 0.5);
+        }
+
+        .roll-btn:active {
+            transform: translateY(0);
+        }
+
+        .roll-btn i {
+            font-size: 1.3rem;
+        }
+
+        /* Resultado simplificado */
+        .result-area {
+            text-align: center;
+            padding: 20px;
+            background: rgba(30, 58, 95, 0.1);
+            border-radius: 10px;
+            border: 2px solid var(--accent-blue);
+        }
+
+        .result-label {
+            font-size: 1.1rem;
+            color: var(--ink-light);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .result-number {
+            font-size: 4rem;
+            font-weight: bold;
+            color: var(--accent-blue);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            line-height: 1;
+            margin-bottom: 5px;
+            font-family: 'MedievalSharp', cursive;
+            transition: all 0.1s ease;
+        }
+
+        .result-number.rolling {
+            transform: scale(1.1);
+            color: var(--accent-gold);
+        }
+
+        .result-dice {
+            font-size: 1.1rem;
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        /* Historial */
+        .history-area {
+            background: rgba(255, 255, 255, 0.5);
+            border: 2px solid var(--accent-gold);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--accent-gold);
+        }
+
+        .history-header h3 {
+            font-family: 'MedievalSharp', cursive;
+            color: var(--accent-blue);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .clear-btn {
+            background: var(--accent-red);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 15px;
+            font-family: 'Cinzel', serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .clear-btn:hover {
+            background: #a52a2a;
+        }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-item {
+            background: white;
+            border-left: 4px solid var(--accent-gold);
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.2s ease;
+        }
+
+        .history-dice {
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        .history-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-red);
+        }
+
+        .history-time {
+            font-size: 0.8rem;
+            color: var(--ink-light);
+        }
+
+        /* Footer */
+        .dice-footer {
+            background: linear-gradient(90deg, var(--accent-blue), var(--bg-dark));
+            padding: 15px 30px;
+            text-align: center;
+            border-top: 3px solid var(--accent-gold);
+            color: white;
+        }
+
+        .dice-footer p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .dice-footer i {
+            color: var(--accent-gold);
+            margin: 0 5px;
+        }
+
+        /* Animaciones simplificadas */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-5px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--parchment-light);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-gold);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-blue);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dice-header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .dice-content {
+                padding: 20px;
+            }
+            
+            .dice-option label {
+                min-width: 70px;
+                padding: 8px;
+            }
+            
+            .dice-option label i {
+                font-size: 1.8rem;
+            }
+            
+            .result-number {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+     <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo">
+                <i class="fas fa-book-open"></i>
+                <span>El Escriba</span>
+            </a>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="sidebar-item">
+                <a href="/src/FROND/hoja.html" class="sidebar-link" id="nav-hoja">
+                    <i class="fas fa-scroll"></i>
+                    <span>hoja - PJ</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/Cartas.html" class="sidebar-link" id="nav-cartas">
+                    <i class="fas fa-crown"></i>
+                    <span>Cartas</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/DMS.html" class="sidebar-link" id="nav-bestias">
+                    <i class="fas fa-dragon"></i>
+                    <span>DM Screen</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/mapa.html" class="sidebar-link" id="nav-mapa">
+                    <i class="fas fa-map"></i>
+                    <span>Mapa</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="/src/FROND/dados.html" class="sidebar-link active" id="nav-dados">
+                    <i class="fas fa-dice-d20"></i>
+                    <span>Lanzar Dados</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-item">
+                <a href="#" class="sidebar-link" id="nav-ajustes">
+                    <i class="fas fa-cog"></i>
+                    <span>Ajustes</span>
+                </a>
+            </div>
+        </nav>
+        
+        <button class="sidebar-toggle" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+    </aside>
+
+
+    <div class="dice-wrapper">
+        <!-- Header -->
+        <div class="dice-header">
+            <h1>
+                <i class="fas fa-dice-d20"></i>
+                Lanzador de Dados
+                <i class="fas fa-dice-d20"></i>
+            </h1>
+            <p>Que la suerte del dado esté siempre de tu lado</p>
+        </div>
+
+        <!-- Contenedor de dados -->
+        <div class="dice-container">
+            <div class="dice-content">
+                <div class="dice-main">
+                    <!-- Selector de dados con iconos geométricos -->
+                    <div class="dice-selector-area">
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d4" value="d4" checked>
+                            <label for="d4">
+                                <i class="fas fa-shapes"></i> <!-- Tetraedro -->
+                                <span>d4</span>
+                            </label>
+                        </div>
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d6" value="d6">
+                            <label for="d6">
+                                <i class="fas fa-dice-d6"></i> <!-- Cubo -->
+                                <span>d6</span>
+                            </label>
+                        </div>
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d8" value="d8">
+                            <label for="d8">
+                                <i class="fas fa-gem"></i> <!-- Octaedro -->
+                                <span>d8</span>
+                            </label>
+                        </div>
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d10" value="d10">
+                            <label for="d10">
+                                <i class="fas fa-star"></i> <!-- Pentágono -->
+                                <span>d10</span>
+                            </label>
+                        </div>
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d12" value="d12">
+                            <label for="d12">
+                                <i class="fas fa-circle"></i> <!-- Dodecaedro -->
+                                <span>d12</span>
+                            </label>
+                        </div>
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d20" value="d20">
+                            <label for="d20">
+                                <i class="fas fa-dice-d20"></i>
+                                <span>d20</span>
+                            </label>
+                        </div>
+                        <div class="dice-option">
+                            <input type="radio" name="dice" id="d100" value="d100">
+                            <label for="d100">
+                                <i class="fas fa-percent"></i> <!-- Porcentaje -->
+                                <span>d100</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Botón de lanzar -->
+                    <div class="roll-button-area">
+                        <button class="roll-btn" id="rollBtn">
+                            <i class="fas fa-dice-d20"></i>
+                            ¡Lanzar!
+                        </button>
+                    </div>
+
+                    <!-- Resultado -->
+                    <div class="result-area">
+                        <div class="result-label">Resultado</div>
+                        <div class="result-number" id="resultNumber">-</div>
+                        <div class="result-dice" id="resultDice">Selecciona un dado</div>
+                    </div>
+                </div>
+
+                <!-- Historial -->
+                <div class="history-area">
+                    <div class="history-header">
+                        <h3>
+                            <i class="fas fa-history"></i>
+                            Historial
+                        </h3>
+                        <button class="clear-btn" id="clearHistory">
+                            <i class="fas fa-trash"></i>
+                            Limpiar
+                        </button>
+                    </div>
+                    <div class="history-list" id="historyList">
+                        <div class="history-item" style="opacity: 0.7; text-align: center; justify-content: center;">
+                            <span>Aún no hay tiradas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="dice-footer">
+                <p>
+                    <i class="fas fa-dragon"></i>
+                    La Libreta del Escriba
+                    <i class="fas fa-crown"></i>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/src/JS/sidebar.js"></script>
+
+    <script>
+        class DiceRoller {
+            constructor() {
+                this.history = [];
+                this.init();
+            }
+
+            init() {
+                // Elementos del DOM
+                this.rollBtn = document.getElementById('rollBtn');
+                this.resultNumber = document.getElementById('resultNumber');
+                this.resultDice = document.getElementById('resultDice');
+                this.historyList = document.getElementById('historyList');
+                this.clearBtn = document.getElementById('clearHistory');
+                this.diceRadios = document.querySelectorAll('input[name="dice"]');
+
+                // Event listeners
+                this.rollBtn.addEventListener('click', () => this.rollDice());
+                this.clearBtn.addEventListener('click', () => this.clearHistory());
+
+                // Atajo de teclado (barra espaciadora)
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' && !e.repeat) {
+                        e.preventDefault();
+                        this.rollDice();
+                    }
+                });
+            }
+
+            getSelectedDice() {
+                for (let radio of this.diceRadios) {
+                    if (radio.checked) {
+                        return radio.value;
+                    }
+                }
+                return 'd20';
+            }
+
+            rollDice() {
+                const diceType = this.getSelectedDice();
+                const diceValue = parseInt(diceType.substring(1));
+                
+                // Animación simple
+                this.resultNumber.classList.add('rolling');
+                
+                setTimeout(() => {
+                    let result;
+                    if (diceType === 'd100') {
+                        result = Math.floor(Math.random() * 100) + 1;
+                    } else {
+                        result = Math.floor(Math.random() * diceValue) + 1;
+                    }
+                    
+                    // Mostrar resultado
+                    this.resultNumber.textContent = result;
+                    this.resultDice.textContent = `Tirada de ${diceType}`;
+                    
+                    // Guardar en historial
+                    this.addToHistory(diceType, result);
+                    
+                    // Quitar animación
+                    this.resultNumber.classList.remove('rolling');
+                }, 100);
+            }
+
+            addToHistory(dice, result) {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('es-ES', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                
+                this.history.unshift({
+                    dice: dice,
+                    result: result,
+                    time: timeString
+                });
+                
+                // Limitar historial a 15 items
+                if (this.history.length > 15) {
+                    this.history.pop();
+                }
+                
+                this.updateHistoryDisplay();
+            }
+
+            updateHistoryDisplay() {
+                if (this.history.length === 0) {
+                    this.historyList.innerHTML = `
+                        <div class="history-item" style="opacity: 0.7; text-align: center; justify-content: center;">
+                            <span>Aún no hay tiradas</span>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                this.historyList.innerHTML = '';
+                this.history.forEach(item => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    historyItem.innerHTML = `
+                        <span class="history-dice">${item.dice}</span>
+                        <span class="history-value">${item.result}</span>
+                        <span class="history-time">${item.time}</span>
+                    `;
+                    this.historyList.appendChild(historyItem);
+                });
+            }
+
+            clearHistory() {
+                if (this.history.length > 0) {
+                    if (confirm('¿Limpiar todo el historial de tiradas?')) {
+                        this.history = [];
+                        this.updateHistoryDisplay();
+                    }
+                }
+            }
+        }
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            new DiceRoller();
+        });
+    </script>
+</body>
+</html>

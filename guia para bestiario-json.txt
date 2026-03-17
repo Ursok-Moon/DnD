@@ -1,0 +1,35 @@
+El nombre de la criatura siempre tiene que estar en mayuscula, siempre debe de marcar su ca y sus pg
+
+[
+  {
+    "nombre": "VENGAMOSCA", 
+    "descripcion": "La Vengamoscas es un insecto volador territorial y agresivo, conocido por su habilidad para realizar ataques rápidos y certeros. A menudo habita en áreas abiertas o cerca de nidos, donde patrulla incansablemente. Aunque no es particularmente resistente, su velocidad y capacidad para atacar en grupo la convierten en un enemigo peligroso para aventureros desprevenidos.",
+    "estadisticas": {
+      "tipo": "Bestia Mediana, no alineada",
+      "ca": "0",
+      "pg": "6",
+      "velocidad": "6 casillas, volar",
+      "desafio": "50 PX",
+      "atributos_especiales": [
+        {
+          "nombre": "Ataque Enjambre",
+          "descripcion": "Si hay más de una Vengamoscas en combate, cada Vengamoscas obtiene +1 a sus tiradas de ataque debido a su coordinación natural."
+        },
+        {
+          "nombre": "Evasión Aérea",
+          "descripcion": "Los ataques cuerpo a cuerpo contra la Vengamoscas tienen desventaja, debido a su constante movimiento en el aire."
+        }
+      ],
+      "acciones": [
+        {
+          "nombre": "Picotazo Veloz",
+          "descripcion": "Ataque con arma cuerpo a cuerpo: +5 a impactar, alcance 5 pies, un objetivo. Impacto: 4 (1d6 + 2) de daño perforante. El objetivo debe superar una tirada de salvación de Destreza CD 12 o quedar desbalanceado, perdiendo 1 casilla de movimiento en su próximo turno."
+        }
+      ],
+      "recompensas": {
+        "gold": ,
+        "exp": ,
+        "botin_opcional": "algo."
+      }
+    }
+  },

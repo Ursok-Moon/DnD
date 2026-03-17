@@ -1,0 +1,150 @@
+{
+  "cartas": [
+    {
+      "id": 1,
+      "nombre": "carta-I",
+      "descripcion": "El golpe aturde al oponente por 1d3 de turnos.",
+      "imagen": "src/demo/I-B.png"
+    },
+    {
+      "id": 2,
+      "nombre": "carta-II",
+      "descripcion": "El enemigo cae al suelo, y tira con desventaja.",
+      "imagen": "src/demo/II-B.png"
+    },
+    {
+      "id": 3,
+      "nombre": "carta-III",
+      "descripcion": "El golpe te da un ataque adicional contra el mismo objetivo.",
+      "imagen": "src/demo/III-B.png"
+    },
+    {
+      "id": 4,
+      "nombre": "carta-IV",
+      "descripcion": "El golpe corta una extremidad inferior/trasera. Pierde la mitad de sus casillas de movimiento.",
+      "imagen": "src/demo/IV-B.png"
+    },
+    {
+      "id": 5,
+      "nombre": "carta-V",
+      "descripcion": "El golpe daña los ojos del enemigo. No puede ver hasta que reciba curación.",
+      "imagen": "src/demo/V-B.png"
+    },
+    {
+      "id": 6,
+      "nombre": "carta-VI",
+      "descripcion": "El golpe corta una extremidad superior/delantera. un ataque menos.",
+      "imagen": "src/demo/VI-B.png"
+    },
+    {
+      "id": 7,
+      "nombre": "carta-VII",
+      "descripcion": "El golpe provoca de sangramiento de 1 PG por turno (acumulativo hasta recibir curación).",
+      "imagen": "src/demo/VII-B.png"
+    },
+    {
+      "id": 8,
+      "nombre": "carta-VIII",
+      "descripcion": "El golpe rompe el arma del oponente.",
+      "imagen": "src/demo/VIII-B.png"
+    },
+    {
+      "id": 9,
+      "nombre": "carta-IX",
+      "descripcion": "Haces daño a los dos enemigos adyacentes a tu objetivo.",
+      "imagen": "src/demo/IX-B.png"
+    },
+    {
+      "id": 10,
+      "nombre": "carta-X",
+      "descripcion": "El golpe derriba y empuja al enemigo 2 casillas.",
+      "imagen": "src/demo/X-B.png"
+    },
+    {
+      "id": 11,
+      "nombre": "carta-XI",
+      "descripcion": "Agregas 2 dados de daño.",
+      "imagen": "src/demo/XI-B.png"
+    },
+    {
+      "id": 12,
+      "nombre": "carta-XII",
+      "descripcion": "El golpe corta la cebeza del enemigo (La rompe o la atraviesa).",
+      "imagen": "src/demo/XII-B.png"
+    }
+  ],
+  "cartas2": [
+    {
+      "id": 1,
+      "nombre": "carta-I",
+      "descripcion": "Te agotas. Pierdes el siguiente turno.",
+      "imagen": "src/demo/I-R.png"
+    },
+    {
+      "id": 2,
+      "nombre": "carta-II",
+      "descripcion": "Te asestas un golpe crítico a ti mismo.",
+      "imagen": "src/demo/II-R.png"
+    },
+    {
+      "id": 3,
+      "nombre": "carta-III",
+      "descripcion": "Asestas un golpe a un aliado/da.",
+      "imagen": "src/demo/III-R.png"
+    },
+    {
+      "id": 4,
+      "nombre": "carta-IV",
+      "descripcion": "Distraes al aliad@ más cercano. Este atacará con desventaja.",
+      "imagen": "src/demo/IV-R.png"
+    },
+    {
+      "id": 5,
+      "nombre": "carta-V",
+      "descripcion": "Te pegas a ti mismo",
+      "imagen": "src/demo/V-R.png"
+    },
+    {
+      "id": 6,
+      "nombre": "carta-VI",
+      "descripcion": "Regalas un ataque de oportunidad a quien intentabas atacar.",
+      "imagen": "src/demo/VI-R.png"
+    },
+    {
+      "id": 7,
+      "nombre": "carta-VII",
+      "descripcion": "Te da un calambre, pierdes el ataque, cuentas como desprevenido y tú siguiente ataque será con desventaja.",
+      "imagen": "src/demo/VII-R.png"
+    },
+    {
+      "id": 8,
+      "nombre": "carta-VIII",
+      "descripcion": "El arma cae de tús manos a una casilla adyacente. Tiras otra vez si el arma es natural.",
+      "imagen": "src/demo/VIII-R.png"
+    },
+    {
+      "id": 9,
+      "nombre": "carta-IX",
+      "descripcion": "Dañas la eficacia de tú arma. -1 de daño hasta que sea reparada.",
+      "imagen": "src/demo/IX-R.png"
+    },
+    {
+      "id": 10,
+      "nombre": "carta-X",
+      "descripcion": "Te tropiezas, resbalas o pierdes el equilibrio y quedas derribado.",
+      "imagen": "src/demo/X-R.png"
+    },
+    {
+      "id": 11,
+      "nombre": "carta-XI",
+      "descripcion": "Te lastimas al fallar el ataque, tú proximo ataque será con desventaja.",
+      "imagen": "src/demo/XI-R.png"
+    },
+    {
+      "id": 12,
+      "nombre": "carta-XII",
+      "descripcion": "Aplica un critico a un compañero.",
+      "imagen": "src/demo/XII-R.png"
+    }
+  ]
+}

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridStack - Corregido</title>
+    
+    <!-- GridStack CSS -->
+    <link href="/node_modules/gridstack/dist/gridstack.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/gridstack@8.2.0/dist/gridstack-extra.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 24px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+        
+        button.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .grid-stack {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            min-height: 500px;
+        }
+        
+        .grid-stack-item {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .grid-stack-item-content {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            cursor: move;
+            transition: all 0.3s;
+        }
+        
+        .grid-stack-item-content:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        
+        .widget-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .widget-close {
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            background: #ff4757;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .widget-close:hover {
+            background: #ff6b81;
+            transform: rotate(90deg);
+        }
+        
+        .debug-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            font-family: monospace;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            color: #333;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: none;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="margin:0;">📊 GridStack Dashboard</h1>
+            <p style="margin:5px 0 0; opacity:0.9;">Arrastra y redimensiona los widgets libremente</p>
+        </div>
+        
+        <div class="controls">
+            <button onclick="addWidget()" class="primary">➕ Agregar Widget</button>
+            <button onclick="addChartWidget()" class="primary">📊 Agregar Gráfico</button>
+            <button onclick="saveLayout()">💾 Guardar Layout</button>
+            <button onclick="loadLayout()">📂 Cargar Layout</button>
+            <button onclick="clearAll()" class="danger">🗑️ Limpiar Todo</button>
+        </div>
+
+        <!-- Contenedor GridStack -->
+        <div class="grid-stack"></div>
+
+        <div class="debug-info">
+            <strong>📊 Estado:</strong> <span id="status">Inicializando...</span><br>
+            <strong>📦 Widgets activos:</strong> <span id="widgetCount">0</span>
+        </div>
+    </div>
+    
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- GridStack JS -->
+    <script src="/node_modules/gridstack/dist/gridstack-all.js"></script>
+    
+    <script>
+        // Variable global para el grid
+        let grid = null;
+        
+        // Inicialización cuando el DOM está listo
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM cargado, inicializando GridStack...');
+            
+            // Inicializar GridStack
+            grid = GridStack.init({
+                column: 12,
+                cellHeight: 80,
+                margin: 10,
+                minRow: 2,
+                float: true,
+                animate: true,
+                draggable: {
+                    handle: '.grid-stack-item-content',
+                    scroll: true,
+                    appendTo: 'body'
+                },
+                resizable: {
+                    handles: 'e, se, s, sw, w'
+                }
+            });
+            
+            console.log('GridStack inicializado:', grid);
+            updateStatus('✅ GridStack listo');
+            
+            // Agregar widgets de demostración
+            setTimeout(() => {
+                addWidget();
+                addChartWidget();
+                addWidget();
+            }, 100);
+        });
+
+        // Contador para IDs únicos
+        let widgetCounter = 0;
+
+        // Función para mostrar notificaciones
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            toast.innerHTML = message;
+            toast.style.background = type === 'success' ? '#00d2d3' : '#ff6b81';
+            toast.style.color = 'white';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Actualizar estado
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+            updateWidgetCount();
+        }
+
+        // Actualizar contador de widgets
+        function updateWidgetCount() {
+            if (grid) {
+                const count = grid.getGridItems().length;
+                document.getElementById('widgetCount').innerHTML = count;
+            }
+        }
+
+        // Agregar widget básico
+        function addWidget() {
+            if (!grid) {
+                console.error('Grid no inicializado');
+                return;
+            }
+            
+            widgetCounter++;
+            
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            const x = Math.floor(Math.random() * 6);
+            const y = Math.floor(Math.random() * 3);
+            const w = Math.floor(Math.random() * 4) + 2;
+            const h = Math.floor(Math.random() * 3) + 2;
+            
+            const widgetId = `widget-${widgetCounter}`;
+            
+            const widget = {
+                x: x,
+                y: y,
+                w: w,
+                h: h,
+                id: widgetId,
+                content: `
+                    <div style="height: 100%; display: flex; flex-direction: column; background: ${randomColor}; border-radius: 10px;">
+                        <div class="widget-header" style="background: rgba(255,255,255,0.1);">
+                            <span class="widget-title" style="color: white;">📦 Widget ${widgetCounter}</span>
+                            <span class="widget-close" onclick="removeWidget(this)">✕</span>
+                        </div>
+                        <div style="flex:1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; padding: 15px;">
+                            <div style="font-size: 24px; margin-bottom: 10px;">📌</div>
+                            <div>Ancho: ${w} | Alto: ${h}</div>
+                            <div style="margin-top: 10px; font-size: 12px;">ID: ${widgetId}</div>
+                        </div>
+                    </div>
+                `
+            };
+            
+            grid.addWidget(widget);
+            updateStatus(`✅ Widget #${widgetCounter} agregado`);
+            showToast(`Widget #${widgetCounter} agregado`);
+        }
+
+        // Agregar widget de gráfico
+        function addChartWidget() {
+            if (!grid) {
+                console.error('Grid no inicializado');
+                return;
+            }
+            
+            widgetCounter++;
+            
+            const widgetId = `chart-${widgetCounter}`;
+            
+            const widget = {
+                x: 0,
+                y: 0,
+                w: 6,
+                h: 4,
+                id: widgetId,
+                content: `
+                    <div style="height: 100%; display: flex; flex-direction: column; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px;">
+                        <div class="widget-header" style="background: rgba(255,255,255,0.1);">
+                            <span class="widget-title" style="color: white;">📊 Gráfico de Ventas</span>
+                            <span class="widget-close" onclick="removeWidget(this)">✕</span>
+                        </div>
+                        <div style="flex:1; display: flex; justify-content: center; align-items: center; color: white; padding: 15px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 36px; margin-bottom: 10px;">📈</div>
+                                <div style="font-size: 20px; font-weight: bold;">+25%</div>
+                                <div style="margin-top: 10px;">Crecimiento este mes</div>
+                                <div style="margin-top: 20px; font-size: 14px; opacity: 0.8;">Widget ID: ${widgetId}</div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            };
+            
+            grid.addWidget(widget);
+            updateStatus('✅ Gráfico agregado');
+            showToast('Gráfico agregado');
+        }
+
+        // Eliminar widget
+        window.removeWidget = function(element) {
+            if (!grid) return;
+            
+            const widget = element.closest('.grid-stack-item');
+            if (widget) {
+                const widgetId = widget.getAttribute('gs-id');
+                grid.removeWidget(widget);
+                updateStatus('🗑️ Widget eliminado');
+                showToast(`Widget ${widgetId} eliminado`, 'warning');
+                updateWidgetCount();
+            }
+        };
+
+        // Guardar layout
+        function saveLayout() {
+            if (!grid) return;
+            
+            const widgets = grid.save();
+            localStorage.setItem('gridstackLayout', JSON.stringify(widgets));
+            updateStatus('💾 Layout guardado');
+            showToast('Layout guardado correctamente');
+        }
+
+        // Cargar layout
+        function loadLayout() {
+            if (!grid) return;
+            
+            const savedLayout = localStorage.getItem('gridstackLayout');
+            if (savedLayout) {
+                try {
+                    const widgets = JSON.parse(savedLayout);
+                    grid.load(widgets);
+                    updateWidgetCount();
+                    updateStatus('📂 Layout cargado');
+                    showToast('Layout cargado correctamente');
+                } catch (e) {
+                    updateStatus('❌ Error al cargar');
+                    showToast('Error al cargar el layout', 'error');
+                }
+            } else {
+                updateStatus('⚠️ No hay layout guardado');
+                showToast('No hay layout guardado', 'warning');
+            }
+        }
+
+        // Limpiar todos los widgets
+        function clearAll() {
+            if (!grid) return;
+            
+            grid.removeAll();
+            widgetCounter = 0;
+            updateStatus('🗑️ Todos los widgets eliminados');
+            showToast('Dashboard limpiado', 'warning');
+            updateWidgetCount();
+        }
+
+        // Hacer funciones globales
+        window.addWidget = addWidget;
+        window.addChartWidget = addChartWidget;
+        window.saveLayout = saveLayout;
+        window.loadLayout = loadLayout;
+        window.clearAll = clearAll;
+    </script>
+</body>
+</html>

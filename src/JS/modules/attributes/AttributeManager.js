@@ -66,9 +66,12 @@ export class AttributeManager {
     update(id, updates) {
         const index = this.attributes.findIndex(a => a.id === id);
         if (index !== -1) {
+            const oldValue = this.attributes[index].value;
+            const newValue = updates.value !== undefined ? updates.value : oldValue;
+            
             this.attributes[index] = { ...this.attributes[index], ...updates };
             
-            if (updates.value !== undefined) {
+            if (updates.value !== undefined && updates.value !== oldValue) {
                 this.attributes[index].modifier = Helpers.calculateModifier(updates.value);
             }
             
@@ -93,7 +96,6 @@ export class AttributeManager {
 
     subscribe(listener) {
         this.listeners.push(listener);
-        // Llamar inmediatamente con datos actuales
         listener(this.attributes);
     }
 

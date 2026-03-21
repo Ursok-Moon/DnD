@@ -2633,6 +2633,27 @@ img, svg, iframe, video, embed {
     animation: fadeIn 0.3s ease;
 }
 
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.modal {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(5px);
+    }
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1200px) {
     .character-sheet {

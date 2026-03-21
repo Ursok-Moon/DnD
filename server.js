@@ -280,6 +280,74 @@ app.use('/data/imagenes', express.static(path.join(__dirname, 'data', 'imagenes'
 app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use('/data/personajes', express.static(path.join(__dirname, 'data', 'personajes')));
 
+// ===== ENDPOINTS PARA REGISTRO DE USUARIOS =====
+app.post('/api/usuario/registrar', async (req, res) => {
+    try {
+        const { nombre, socketId, ip } = req.body;
+        
+        if (!nombre || nombre.trim().length < 2) {
+            return res.status(400).json({ error: 'Nombre debe tener al menos 2 caracteres' });
+        }
+        
+        const usuariosPath = path.join(DATA_PATH, 'usuarios.json');
+        
+        let usuarios = { usuarios: [] };
+        try {
+            const data = await fs.readFile(usuariosPath, 'utf8');
+            usuarios = JSON.parse(data);
+        } catch (e) {
+            // Archivo no existe, se creará
+        }
+        
+        // Verificar si el usuario ya existe
+        const index = usuarios.usuarios.findIndex(u => u.nombre === nombre);
+        
+        const usuarioData = {
+            nombre: nombre.trim(),
+            socketId: socketId,
+            ip: ip,
+            ultimaConexion: new Date().toISOString(),
+            fechaRegistro: index !== -1 ? usuarios.usuarios[index].fechaRegistro : new Date().toISOString()
+        };
+        
+        if (index !== -1) {
+            usuarios.usuarios[index] = usuarioData;
+        } else {
+            usuarios.usuarios.push(usuarioData);
+        }
+        
+        await fs.writeFile(usuariosPath, JSON.stringify(usuarios, null, 2));
+        
+        console.log(`👤 Usuario registrado: ${nombre} desde ${ip}`);
+        
+        res.json({ 
+            success: true, 
+            usuario: usuarioData,
+            mensaje: 'Usuario registrado correctamente'
+        });
+        
+    } catch (error) {
+        console.error('Error registrando usuario:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/usuarios', async (req, res) => {
+    try {
+        const usuariosPath = path.join(DATA_PATH, 'usuarios.json');
+        let usuarios = { usuarios: [] };
+        
+        try {
+            const data = await fs.readFile(usuariosPath, 'utf8');
+            usuarios = JSON.parse(data);
+        } catch (e) {}
+        
+        res.json(usuarios);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ===== ENDPOINTS DE IMÁGENES =====
 app.post('/api/imagenes/subir', upload.single('imagen'), (req, res) => {
     try {
@@ -679,7 +747,7 @@ app.post('/api/personajes/guardar', async (req, res) => {
         
         console.log(`✅ Personaje guardado con ${Object.keys(personajeData.colores_personalizados || {}).length} colores personalizados`);
         
-        // NUEVO: Emitir evento de personaje guardado
+        // Emitir evento de personaje guardado
         io.emit('personaje-guardado', {
             personaje: {
                 nombre: personajeData.nombre,

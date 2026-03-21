@@ -18,6 +18,7 @@ import { ColorManager } from '../modules/ui/ColorManager.js';
 import { DragDropManager } from '../modules/ui/DragDropManager.js';
 import { ResizeManager } from '../modules/ui/ResizeManager.js';
 import { ImageManager } from '../modules/ui/ImageManager.js';
+import { UserManager } from './UserManager.js';
 
 // Inventory Managers
 import { CurrencyManager } from '../modules/inventory/CurrencyManager.js';
@@ -36,6 +37,7 @@ export class CharacterSheet {
         this.eventBus = new EventBus();
         this.storage = new StorageService('dnd_');
         this.api = new ApiService();
+        this.userManager = new UserManager(this.storage); 
         
         // Usar WebSocket global
         this.ws = null;
@@ -57,6 +59,13 @@ export class CharacterSheet {
         this.setupTraitsAutoSave();
 
         this.passivePerception = 10;
+
+        this.ensureUserIsSet();
+
+        const savedName = localStorage.getItem('jugadorNombre');
+        if (savedName === 'Aventurero' || savedName === 'Anónimo' || !savedName) {
+        localStorage.removeItem('jugadorNombre');
+    }
     }
 
     waitForWebSocket() {
@@ -85,13 +94,61 @@ export class CharacterSheet {
         setTimeout(() => clearInterval(checkInterval), 5000);
     }
 
+  async ensureUserIsSet() {
+        // Esperar a que el DOM esté listo
+        if (document.readyState === 'loading') {
+            await new Promise(resolve => {
+                document.addEventListener('DOMContentLoaded', resolve);
+            });
+        }
+        
+        // Si no hay usuario configurado, mostrar prompt
+        if (!this.userManager.isUserSet()) {
+            await this.userManager.showUserPrompt();
+        }
+        
+        // Actualizar cualquier UI que muestre el nombre del jugador
+        this.updatePlayerNameDisplay();
+        
+        // Sincronizar con WebSocket
+        this.syncCharacterWithWebSocket();
+    }
+
+    updatePlayerNameDisplay() {
+        const userName = this.userManager.getUserName();
+        if (userName) {
+            // Si hay algún elemento que muestre el nombre del jugador, actualizarlo
+            const playerNameElements = document.querySelectorAll('.player-name-display, .jugador-nombre, [data-player-name]');
+            playerNameElements.forEach(el => {
+                el.textContent = userName;
+            });
+            
+            // También actualizar cualquier input oculto que pueda contener el nombre
+            const playerNameInputs = document.querySelectorAll('input[name="jugadorNombre"], input[name="playerName"]');
+            playerNameInputs.forEach(input => {
+                input.value = userName;
+            });
+        }
+    }
+
     async saveCharacter() {
         const personajeNombre = document.getElementById('char-name')?.value.trim() || 'Sin nombre';
         const clase = document.getElementById('char-class')?.value || '';
         const raza = document.getElementById('char-race')?.value || '';
         const trasfondo = document.getElementById('char-bg')?.value || '';
         const alineamiento = document.getElementById('char-align')?.value || '';
-        
+        const jugadorNombre = this.getPlayerName();
+        if (jugadorNombre === 'Aventurero' || jugadorNombre === 'Anónimo') {
+        console.warn('⚠️ Jugador sin registrar, mostrando prompt');
+        await this.userManager.showUserPrompt();
+        // Recargar el nombre después del registro
+        const nuevoNombre = this.getPlayerName();
+        if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
+            Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
+            return;
+        }
+    }
+
         const inventoryCard = document.getElementById('card-inventory');
         const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
         
@@ -150,7 +207,7 @@ export class CharacterSheet {
             clase: clase,
             raza: raza,
             nivel: this.expManager?.getData().level || 1,
-            jugador: localStorage.getItem('jugadorNombre') || 'Aventurero',
+            jugador: this.getPlayerName(),
             imagen: imagenUrl,
             colores_personalizados: {
                 background: coloresGuardados.background || null,
@@ -297,9 +354,6 @@ export class CharacterSheet {
             if (personajeRecibido?.nombre === this.getCharacterName() && 
                 personajeRecibido?.jugador === this.getPlayerName()) {
                 
-                if (confirm('Este personaje fue actualizado en otra sesión. ¿Quieres recargar los cambios?')) {
-                    this.refreshCharacterFromServer();
-                }
             }
         });
 
@@ -351,20 +405,141 @@ export class CharacterSheet {
         this.setupInventoryCollapse();
         this.setupBasicInfo();
         this.setupAddButtons();
+        this.setupAttributeEvents();
+        this.setupAttackEvents();
+        this.setupSpellEvents();
         this.loadTraitsFromStorage();
     }
 
+    setupAttributeEvents() {
+        // Escuchar cambios en los atributos usando el eventBus del AttributeUI
+        this.eventBus.on('attributeChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        
+        this.eventBus.on('attributeNameChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+    }
+
+    setupAttackEvents() {
+        // Usar MutationObserver para detectar nuevos ataques
+        const attacksList = document.querySelector('.attacks-list');
+        if (attacksList) {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.classList && node.classList.contains('attack-item')) {
+                                this.setupAttackItemEvents(node);
+                            }
+                        });
+                    }
+                });
+            });
+            
+            observer.observe(attacksList, { childList: true, subtree: true });
+        }
+        
+        // Configurar eventos para ataques existentes
+        document.querySelectorAll('.attack-item').forEach(item => {
+            this.setupAttackItemEvents(item);
+        });
+    }
+
+    setupAttackItemEvents(attackItem) {
+        const inputs = attackItem.querySelectorAll('input');
+        inputs.forEach(input => {
+            // Usar 'change' en lugar de 'input' para guardar solo cuando se complete el cambio
+            input.addEventListener('change', () => {
+                this.saveAttacksToStorage();
+                if (this.hasValidCharacterName()) this.saveCharacter();
+            });
+        });
+        
+        const removeBtn = attackItem.querySelector('.btn-remove-attack');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                setTimeout(() => {
+                    this.saveAttacksToStorage();
+                    if (this.hasValidCharacterName()) this.saveCharacter();
+                }, 100);
+            });
+        }
+    }
+
+    setupSpellEvents() {
+        // Usar MutationObserver para detectar nuevos conjuros
+        const spellsList = document.getElementById('spellsList');
+        if (spellsList) {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.classList && node.classList.contains('spell-item')) {
+                                this.setupSpellItemEvents(node);
+                            }
+                        });
+                    }
+                });
+            });
+            
+            observer.observe(spellsList, { childList: true, subtree: true });
+        }
+        
+        // Configurar eventos para conjuros existentes
+        document.querySelectorAll('#spellsList .spell-item').forEach(item => {
+            this.setupSpellItemEvents(item);
+        });
+        
+        // Escuchar eventos del SpellManager
+        this.eventBus.on('spellsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+    }
+
+    setupSpellItemEvents(spellItem) {
+        const inputs = spellItem.querySelectorAll('input, textarea');
+        inputs.forEach(input => {
+            // Usar 'change' en lugar de 'input' para guardar solo cuando se complete el cambio
+            input.addEventListener('change', () => {
+                if (this.hasValidCharacterName()) this.saveCharacter();
+            });
+        });
+        
+        const removeBtn = spellItem.querySelector('.btn-remove-spell');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                setTimeout(() => {
+                    if (this.hasValidCharacterName()) this.saveCharacter();
+                }, 100);
+            });
+        }
+    }
+
     setupAutoSave() {
+
+         let saveTimeout;
+    const debouncedSave = () => {
+        if (!this.hasValidCharacterName()) return;
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            this.saveCharacter();
+        }, 300); 
+    };
+    
+    this.eventBus.on('attributeChanged', () => {
+        debouncedSave();
+    });
+    
+    this.eventBus.on('attributeNameChanged', () => {
+        debouncedSave();
+    });
+
         this.eventBus.on('healthChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
         this.eventBus.on('manaChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
-        });
-        this.eventBus.on('attributeChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
-        });
-        this.eventBus.on('attributeNameChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
         this.eventBus.on('skillsChanged', () => {
@@ -392,9 +567,6 @@ export class CharacterSheet {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
         this.eventBus.on('equipmentChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
-        });
-        this.eventBus.on('spellsChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
         this.eventBus.on('spellSlotsChanged', () => {
@@ -518,9 +690,9 @@ export class CharacterSheet {
 
         const perceptionInput = document.getElementById('passivePerception');
         if (perceptionInput) {
-            perceptionInput.addEventListener('input', (e) => {
+            perceptionInput.addEventListener('change', (e) => {
                 this.passivePerception = parseInt(e.target.value) || 10;
-                this.saveCharacter();
+                if (this.hasValidCharacterName()) this.saveCharacter();
             });
         }
         
@@ -668,7 +840,7 @@ export class CharacterSheet {
             currentExpInput.replaceWith(currentExpInput.cloneNode(true));
             const newCurrentExp = document.getElementById('current-exp');
             
-            newCurrentExp.addEventListener('input', (e) => {
+            newCurrentExp.addEventListener('change', (e) => {
                 const value = parseInt(e.target.value) || 0;
                 this.expManager.setCurrent(value);
             });
@@ -678,7 +850,7 @@ export class CharacterSheet {
             maxExpInput.replaceWith(maxExpInput.cloneNode(true));
             const newMaxExp = document.getElementById('max-exp');
             
-            newMaxExp.addEventListener('input', (e) => {
+            newMaxExp.addEventListener('change', (e) => {
                 const value = parseInt(e.target.value) || 1;
                 this.expManager.setMax(value);
             });
@@ -696,15 +868,15 @@ export class CharacterSheet {
             this.manaManager.setCurrent(parseInt(e.target.value) || 0);
         });
         
-        document.getElementById('current-hp')?.addEventListener('input', (e) => {
+        document.getElementById('current-hp')?.addEventListener('change', (e) => {
             this.healthManager.setCurrent(parseInt(e.target.value) || 0);
         });
         
-        document.getElementById('max-hp')?.addEventListener('input', (e) => {
+        document.getElementById('max-hp')?.addEventListener('change', (e) => {
             this.healthManager.setMax(parseInt(e.target.value) || 1);
         });
         
-        document.getElementById('temp-hp')?.addEventListener('input', (e) => {
+        document.getElementById('temp-hp')?.addEventListener('change', (e) => {
             this.healthManager.setTemp(parseInt(e.target.value) || 0);
         });
         
@@ -1310,7 +1482,7 @@ export class CharacterSheet {
         ['char-class', 'char-race', 'char-bg', 'char-align'].forEach(id => {
             const input = document.getElementById(id);
             if (input) {
-                input.addEventListener('input', () => {
+                input.addEventListener('change', () => {
                     this.saveBasicInfo();
                     const currentName = document.getElementById('char-name')?.value.trim();
                     if (currentName && currentName !== '') {
@@ -1359,7 +1531,7 @@ export class CharacterSheet {
         ['armor-class', 'speed', 'initiative'].forEach(id => {
             const input = document.getElementById(id);
             if (input) {
-                input.addEventListener('input', () => {
+                input.addEventListener('change', () => {
                     if (this.hasValidCharacterName()) {
                         this.saveCharacter();
                     }
@@ -1407,24 +1579,11 @@ export class CharacterSheet {
         
         attacksList.insertBefore(item, addBtn);
         
-        item.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', () => {
-                this.saveAttacksToStorage();
-                this.saveCharacter();
-            });
-        });
-        
-        item.querySelector('.btn-remove-attack').addEventListener('click', () => {
-            if (confirm('¿Eliminar este ataque?')) {
-                item.remove();
-                this.saveAttacksToStorage();
-                this.saveCharacter();
-            }
-        });
+        this.setupAttackItemEvents(item);
         
         if (saveToStorage) {
             this.saveAttacksToStorage();
-            this.saveCharacter();
+            if (this.hasValidCharacterName()) this.saveCharacter();
         }
     }
 
@@ -1432,7 +1591,7 @@ export class CharacterSheet {
         ['personality', 'ideals', 'bonds', 'flaws', 'features'].forEach(id => {
             const textarea = document.getElementById(id);
             if (textarea) {
-                textarea.addEventListener('input', () => {
+                textarea.addEventListener('change', () => {
                     if (this.hasValidCharacterName()) {
                         this.saveCharacter();
                     }
@@ -2496,6 +2655,9 @@ export class CharacterSheet {
     }
 
     getPlayerName() {
+        if (this.userManager && this.userManager.isUserSet()) {
+            return this.userManager.getUserName();
+        }
         return localStorage.getItem('jugadorNombre') || 'Anónimo';
     }
 

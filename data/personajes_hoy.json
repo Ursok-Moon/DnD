@@ -2,12 +2,12 @@
   "fecha": "2026-03-21",
   "personajes": [
     {
-      "id": "pj_1774057928776_ulldsqiny",
-      "nombre": "Moon",
-      "clase": "Mago",
+      "id": "pj_1774114349565_rja5mdan2",
+      "nombre": "Baltazar",
+      "clase": "Druida",
       "raza": "Tiefling Variante",
-      "nivel": 2,
-      "jugador": "Aventurero",
+      "nivel": 3,
+      "jugador": "Otman",
       "imagen": null,
       "colores_personalizados": {
         "background": null,
@@ -26,9 +26,9 @@
           "percentage": 100
         },
         "mana": {
-          "current": 2,
+          "current": 6,
           "max": 15,
-          "percentage": 13.333333333333334
+          "percentage": 40
         },
         "ca": 12,
         "velocidad": 30,
@@ -36,46 +36,46 @@
         "atributos": [
           {
             "nombre": "FUERZA",
-            "valor": 10,
-            "modificador": 0
+            "valor": 16,
+            "modificador": 3
           },
           {
             "nombre": "DESTREZA",
-            "valor": 10,
-            "modificador": 0
+            "valor": 16,
+            "modificador": 3
           },
           {
             "nombre": "CONSTITUCIÓN",
-            "valor": 10,
-            "modificador": 0
+            "valor": 13,
+            "modificador": 1
           },
           {
             "nombre": "INTELIGENCIA",
-            "valor": 10,
-            "modificador": 0
+            "valor": 14,
+            "modificador": 2
           },
           {
             "nombre": "SABIDURÍA",
-            "valor": 10,
-            "modificador": 0
+            "valor": 16,
+            "modificador": 3
           },
           {
             "nombre": "CARISMA",
-            "valor": 10,
+            "valor": 11,
             "modificador": 0
           }
         ]
       },
       "ataques": [
         {
-          "name": "",
-          "bonus": "",
-          "damage": ""
+          "name": "Espada",
+          "bonus": "+4",
+          "damage": "1d6"
         },
         {
-          "name": "",
-          "bonus": "",
-          "damage": ""
+          "name": "Guadaña ",
+          "bonus": "+2",
+          "damage": "1d10"
         }
       ],
       "conjuros": [],
@@ -90,8 +90,33 @@
           "copperName": "Cobre",
           "total": 0
         },
-        "tesoros": [],
-        "pociones": [],
+        "tesoros": [
+          {
+            "id": "1774114058198-3r4ib0e8p",
+            "name": "Rubi",
+            "value": 0,
+            "type": "gem",
+            "date": "2026-03-21T17:27:38.198Z"
+          }
+        ],
+        "pociones": [
+          {
+            "id": "1774114058210-0baajmig9",
+            "name": "Elixir",
+            "type": "life",
+            "value": 50,
+            "amount": 10,
+            "date": "2026-03-21T17:27:38.210Z"
+          },
+          {
+            "id": "1774114058220-odslbprhf",
+            "name": "Poción",
+            "type": "mana",
+            "value": 50,
+            "amount": 10,
+            "date": "2026-03-21T17:27:38.220Z"
+          }
+        ],
         "equipo": [],
         "collapsed": false
       },
@@ -111,34 +136,34 @@
       },
       "skills": [
         {
-          "id": "1774057290012-yp4o36xlw",
+          "id": "1774114058233-v79ozz87n",
           "name": "Acrobacias",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "DESTREZA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-0ex7cwog8",
+          "id": "1774114058241-yb4u032hr",
           "name": "Arcano",
-          "bonus": 0,
+          "bonus": 2,
           "attribute": "INTELIGENCIA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-8t42w77nh",
+          "id": "1774114058251-orr6ur8w5",
           "name": "Atletismo",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "FUERZA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-906hrlzfa",
+          "id": "1774114058260-knjpxv0ff",
           "name": "Engaño",
           "bonus": 0,
           "attribute": "CARISMA",
@@ -147,16 +172,16 @@
           "misc": 0
         },
         {
-          "id": "1774057290012-y2w7qtxtt",
+          "id": "1774114058270-w5o26yvok",
           "name": "Historia",
-          "bonus": 0,
+          "bonus": 2,
           "attribute": "INTELIGENCIA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-nh7nh1a1h",
+          "id": "1774114058283-oslb8mkae",
           "name": "Interpretación",
           "bonus": 0,
           "attribute": "CARISMA",
@@ -165,7 +190,7 @@
           "misc": 0
         },
         {
-          "id": "1774057290012-ohg8141qh",
+          "id": "1774114058293-dunwuh2ik",
           "name": "Intimidación",
           "bonus": 0,
           "attribute": "CARISMA",
@@ -174,61 +199,61 @@
           "misc": 0
         },
         {
-          "id": "1774057290012-wul88uf07",
+          "id": "1774114058303-suvspv73i",
           "name": "Investigación",
-          "bonus": 0,
+          "bonus": 2,
           "attribute": "INTELIGENCIA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-d8x4a0bfs",
+          "id": "1774114058313-267sxzya6",
           "name": "Juego de Manos",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "DESTREZA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-wsghm87sg",
+          "id": "1774114058325-xwfy133fo",
           "name": "Medicina",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "SABIDURÍA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-3g0mld4ty",
+          "id": "1774114058336-8iejzdl6v",
           "name": "Naturaleza",
-          "bonus": 0,
+          "bonus": 2,
           "attribute": "INTELIGENCIA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-85ft9r5jt",
+          "id": "1774114058348-qjdzj30d4",
           "name": "Percepción",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "SABIDURÍA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-9wjz5y6s5",
+          "id": "1774114058360-tq4eh046q",
           "name": "Perspicacia",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "SABIDURÍA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-ig7il1xe8",
+          "id": "1774114058417-160j5084v",
           "name": "Persuasión",
           "bonus": 0,
           "attribute": "CARISMA",
@@ -237,27 +262,27 @@
           "misc": 0
         },
         {
-          "id": "1774057290012-5unkbuedc",
+          "id": "1774114058427-fh9j8131x",
           "name": "Religión",
-          "bonus": 0,
+          "bonus": 2,
           "attribute": "INTELIGENCIA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-o5oqfzq6n",
+          "id": "1774114058437-ws9kc5xsu",
           "name": "Sigilo",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "DESTREZA",
           "proficient": false,
           "expertise": false,
           "misc": 0
         },
         {
-          "id": "1774057290012-3ud1tg7yu",
+          "id": "1774114058448-oqyk764i4",
           "name": "Supervivencia",
-          "bonus": 0,
+          "bonus": 3,
           "attribute": "SABIDURÍA",
           "proficient": false,
           "expertise": false,
@@ -265,42 +290,48 @@
         }
       ],
       "passivePerception": 10,
-      "proficiencies": [],
+      "proficiencies": [
+        {
+          "id": "1774114058477-o5g81f8ty",
+          "name": "Común",
+          "type": "language"
+        }
+      ],
       "savingThrows": [
         {
           "name": "FUERZA",
-          "value": 0,
+          "value": 3,
           "proficient": false,
           "basedOn": "FUERZA",
-          "modifier": 0
+          "modifier": 3
         },
         {
           "name": "DESTREZA",
-          "value": 0,
+          "value": 3,
           "proficient": false,
           "basedOn": "DESTREZA",
-          "modifier": 0
+          "modifier": 3
         },
         {
           "name": "CONSTITUCIÓN",
-          "value": 0,
-          "proficient": false,
+          "value": 3,
+          "proficient": true,
           "basedOn": "CONSTITUCIÓN",
-          "modifier": 0
+          "modifier": 1
         },
         {
           "name": "INTELIGENCIA",
-          "value": 0,
+          "value": 2,
           "proficient": false,
           "basedOn": "INTELIGENCIA",
-          "modifier": 0
+          "modifier": 2
         },
         {
           "name": "SABIDURÍA",
-          "value": 0,
-          "proficient": false,
+          "value": 5,
+          "proficient": true,
           "basedOn": "SABIDURÍA",
-          "modifier": 0
+          "modifier": 3
         },
         {
           "name": "CARISMA",
@@ -311,11 +342,11 @@
         }
       ],
       "notas": {
-        "personalidad": "",
-        "ideales": "",
-        "vinculos": "",
-        "defectos": "",
-        "rasgos": ""
+        "personalidad": "Amable ",
+        "ideales": "Honor",
+        "vinculos": "Solitario",
+        "defectos": "Conflictivo ",
+        "rasgos": "Vision en la oscuridad "
       },
       "layout": {
         "card-basic-info": {
@@ -355,7 +386,7 @@
         },
         "card-proficiencies": {
           "width": "826px",
-          "height": "277px",
+          "height": "254.667px",
           "parentId": "right-column"
         },
         "card-combat-stats": {
@@ -380,7 +411,7 @@
         },
         "card-inventory": {
           "width": "826px",
-          "height": "651px",
+          "height": "817.667px",
           "parentId": "center-column"
         },
         "card-traits": {
@@ -394,10 +425,8 @@
           "parentId": "full-width"
         }
       },
-      "fecha_creacion": "2026-03-21T01:52:08.776Z",
+      "fecha_creacion": "2026-03-21T17:32:29.565Z",
       "version": "3.2"
     }
-  ],
-  "creado": "2026-03-21T01:42:21.491Z",
-  "sesion": "Sesión del 2026-03-21"
+  ]
 }

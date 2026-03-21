@@ -79,12 +79,18 @@ export class AttributeUI {
             }
         });
 
-        valueInput.addEventListener('input', () => {
+        valueInput.addEventListener('change', () => {
             const value = Helpers.validateNumber(valueInput.value, 1, 30, 10);
             if (this.attributeManager.update(attribute.id, { value })) {
                 const modifier = Helpers.calculateModifier(value);
                 modifierEl.textContent = Helpers.formatModifier(modifier);
                 this.eventBus.emit('attributeChanged', { id: attribute.id, value, modifier });
+            }
+        });
+
+        valueInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                valueInput.blur();
             }
         });
 

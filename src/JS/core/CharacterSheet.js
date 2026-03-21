@@ -1,0 +1,2517 @@
+// js/core/CharacterSheet.js
+import { StorageService } from '../services/StorageService.js';
+import { ApiService } from '../services/ApiService.js';
+import { EventBus } from './EventBus.js';
+import { Helpers } from '../utils/Helpers.js';
+
+// Managers
+import { AttributeManager } from '../modules/attributes/AttributeManager.js';
+import { AttributeUI } from '../modules/attributes/AttributeUI.js';
+import { HealthManager } from '../modules/combat/HealthManager.js';
+import { ManaManager } from '../modules/combat/ManaManager.js';
+import { DeathSavesManager } from '../modules/combat/DeathSavesManager.js';
+import { SkillsManager } from '../modules/skills/SkillsManager.js';
+import { ProficiencyManager } from '../modules/skills/ProficiencyManager.js';
+import { SavingThrowsManager } from '../modules/skills/SavingThrowsManager.js';
+import { ExpManager } from '../modules/experience/ExpManager.js';
+import { ColorManager } from '../modules/ui/ColorManager.js';
+import { DragDropManager } from '../modules/ui/DragDropManager.js';
+import { ResizeManager } from '../modules/ui/ResizeManager.js';
+import { ImageManager } from '../modules/ui/ImageManager.js';
+
+// Inventory Managers
+import { CurrencyManager } from '../modules/inventory/CurrencyManager.js';
+import { TreasureManager } from '../modules/inventory/TreasureManager.js';
+import { PotionManager } from '../modules/inventory/PotionManager.js';
+import { EquipmentManager } from '../modules/inventory/EquipmentManager.js';
+
+// Spell Managers
+import { SpellSlotsManager } from '../modules/spells/SpellSlotsManager.js';
+import { SpellManager } from '../modules/spells/SpellManager.js';
+import { SpellUI } from '../modules/spells/SpellUI.js';
+
+export class CharacterSheet {
+    constructor() {
+        // Core services
+        this.eventBus = new EventBus();
+        this.storage = new StorageService('dnd_');
+        this.api = new ApiService();
+        
+        // Usar WebSocket global
+        this.ws = null;
+        this.waitForWebSocket();
+        
+        // Initialize all managers
+        this.initManagers();
+        
+        // Setup UI bindings
+        this.initUI();
+        
+        // Setup global events
+        this.setupGlobalEvents();
+
+        this.setupAutoSave();
+
+        this.setupCombatStatsAutoSave();
+
+        this.setupTraitsAutoSave();
+
+        this.passivePerception = 10;
+    }
+
+    waitForWebSocket() {
+        if (window.wsClient) {
+            this.ws = window.wsClient;
+            this.setupWebSocketListeners();
+            
+            if (this.ws.isConectado()) {
+                this.syncCharacterWithWebSocket();
+            }
+            return;
+        }
+        
+        const checkInterval = setInterval(() => {
+            if (window.wsClient) {
+                this.ws = window.wsClient;
+                this.setupWebSocketListeners();
+                
+                if (this.ws.isConectado()) {
+                    this.syncCharacterWithWebSocket();
+                }
+                clearInterval(checkInterval);
+            }
+        }, 100);
+        
+        setTimeout(() => clearInterval(checkInterval), 5000);
+    }
+
+    async saveCharacter() {
+        const personajeNombre = document.getElementById('char-name')?.value.trim() || 'Sin nombre';
+        const clase = document.getElementById('char-class')?.value || '';
+        const raza = document.getElementById('char-race')?.value || '';
+        const trasfondo = document.getElementById('char-bg')?.value || '';
+        const alineamiento = document.getElementById('char-align')?.value || '';
+        
+        const inventoryCard = document.getElementById('card-inventory');
+        const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
+        
+        const imagenUrl = localStorage.getItem('imagenUrl') || null;
+        
+        const atributosDOM = [];
+        document.querySelectorAll('.attribute-item').forEach(item => {
+            const nameInput = item.querySelector('.attribute-name');
+            const valueInput = item.querySelector('.ability-value');
+            const modifierElement = item.querySelector('.ability-modifier');
+            
+            if (nameInput && valueInput) {
+                const nombre = nameInput.value.trim() || 'ATRIBUTO';
+                const valor = parseInt(valueInput.value) || 10;
+                let modifier = 0;
+                
+                if (modifierElement) {
+                    const modifierText = modifierElement.textContent;
+                    modifier = parseInt(modifierText) || 0;
+                } else {
+                    modifier = Helpers.calculateModifier(valor);
+                }
+                
+                atributosDOM.push({
+                    nombre: nombre,
+                    valor: valor,
+                    modificador: modifier
+                });
+            }
+        });
+        
+        const notas = {
+            personalidad: document.getElementById('personality')?.value || '',
+            ideales: document.getElementById('ideals')?.value || '',
+            vinculos: document.getElementById('bonds')?.value || '',
+            defectos: document.getElementById('flaws')?.value || '',
+            rasgos: document.getElementById('features')?.value || ''
+        };
+        
+        const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
+        const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
+        
+        const layout = {};
+        document.querySelectorAll('.card').forEach((card, index) => {
+            const id = card.id || `card-${index}`;
+            layout[id] = {
+                width: card.style.width || getComputedStyle(card).width,
+                height: card.style.height || getComputedStyle(card).height,
+                parentId: card.parentNode?.id || card.parentNode?.className || ''
+            };
+        });
+
+        const characterData = {
+            id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            nombre: personajeNombre,
+            clase: clase,
+            raza: raza,
+            nivel: this.expManager?.getData().level || 1,
+            jugador: localStorage.getItem('jugadorNombre') || 'Aventurero',
+            imagen: imagenUrl,
+            colores_personalizados: {
+                background: coloresGuardados.background || null,
+                parchment: coloresGuardados.parchment || null,
+                accent: coloresGuardados.accent || null,
+                mana: coloresGuardados.mana || null,
+                hp: coloresGuardados.hp || null,
+                gems: coloresGuardados.gems || null,
+                textColors: textColorsGuardados
+            },
+            stats: {
+                hp: this.healthManager.getData(),
+                mana: this.manaManager.getData(),
+                ca: parseInt(document.getElementById('armor-class')?.value) || 12,
+                velocidad: parseInt(document.getElementById('speed')?.value) || 30,
+                iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
+                atributos: atributosDOM
+            },
+            ataques: this.getAttacks(),
+            conjuros: this.getSpells(),
+            inventario: {
+                monedas: this.currencyManager.getData(),
+                tesoros: this.treasureManager.getAll(),
+                pociones: this.potionManager.getAll(),
+                equipo: this.equipmentManager.getAll(),
+                collapsed: isInventoryCollapsed
+            },
+            deathSaves: this.deathSavesManager.getData(),
+            skills: this.skillsManager.getAll(),
+            passivePerception: this.passivePerception || 10,
+            proficiencies: this.proficiencyManager.getAll(),
+            savingThrows: this.savingThrowsManager.getAll(),
+            notas: notas,
+            layout: layout,
+            fecha_creacion: new Date().toISOString(),
+            version: '3.2'
+        };
+        
+        localStorage.setItem('dndCharacterSheet', JSON.stringify(characterData));
+        localStorage.setItem('personajeNombre', personajeNombre);
+        
+        this.storage.save('basicInfo', {
+            name: personajeNombre,
+            class: clase,
+            race: raza,
+            background: trasfondo,
+            alignment: alineamiento
+        });
+        
+        if (personajeNombre === 'Sin nombre' && !document.getElementById('char-name')?.value.trim()) {
+            return;
+        }
+
+        this.storage.save('traits', {
+            personality: notas.personalidad,
+            ideals: notas.ideales,
+            bonds: notas.vinculos,
+            flaws: notas.defectos,
+            features: notas.rasgos
+        });
+        this.storage.save('passivePerception', this.passivePerception);
+        
+        // Sincronizar con WebSocket con datos completos
+        if (window.wsClient && window.wsClient.isConectado()) {
+            const notificacionCompleta = {
+                id: characterData.id,
+                nombre: personajeNombre,
+                jugador: characterData.jugador,
+                clase: clase,
+                nivel: characterData.nivel,
+                raza: raza,
+                stats: characterData.stats,
+                inventario: characterData.inventario,
+                ataques: characterData.ataques,
+                conjuros: characterData.conjuros,
+                notas: characterData.notas,
+                skills: characterData.skills,
+                savingThrows: characterData.savingThrows,
+                passivePerception: characterData.passivePerception,
+                deathSaves: characterData.deathSaves,
+                proficiencies: characterData.proficiencies,
+                imagen: characterData.imagen,
+                colores_personalizados: characterData.colores_personalizados,
+                timestamp: new Date().toISOString()
+            };
+            
+            window.wsClient.emit('personaje-guardado', {
+                personaje: notificacionCompleta
+            });
+            
+            window.wsClient.actualizarPersonaje(notificacionCompleta);
+        }
+        
+        try {
+            const result = await this.api.saveCharacter(characterData);
+            
+            if (result.success) {
+                console.log('✅ Personaje guardado en servidor', result.data);
+                this.showSaveConfirmation();
+            } else {
+                console.error('❌ Error guardando personaje:', result.error);
+                Helpers.showMessage('Error al guardar en servidor: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('❌ Error inesperado:', error);
+            Helpers.showMessage('Error de conexión con el servidor', 'error');
+        }
+    }
+
+    async refreshCharacterFromServer() {
+        try {
+            const nombrePersonaje = this.getCharacterName();
+            if (!nombrePersonaje || nombrePersonaje === 'Sin nombre') return;
+            
+            const response = await fetch('/api/personajes/hoy');
+            const data = await response.json();
+            
+            const jugadorActual = this.getPlayerName();
+            const personajeEncontrado = data.personajes?.find(p => 
+                p.nombre === nombrePersonaje && p.jugador === jugadorActual
+            );
+            
+            if (personajeEncontrado) {
+                this.loadCharacterFromData(personajeEncontrado);
+            }
+        } catch (error) {
+            console.error('Error recargando personaje:', error);
+            Helpers.showMessage('Error al recargar personaje', 'error');
+        }
+    }
+
+    setupWebSocketListeners() {
+        if (!this.ws) return;
+        
+        this.ws.on('personaje-actualizado', (data) => {
+            if (data.personaje?.nombre === this.getCharacterName()) {
+                Helpers.showMessage('Tu personaje fue actualizado en otra sesión', 'info');
+            }
+        });
+
+        this.ws.on('personaje-guardado', (data) => {
+            const personajeRecibido = data.personaje;
+            
+            if (personajeRecibido?.nombre === this.getCharacterName() && 
+                personajeRecibido?.jugador === this.getPlayerName()) {
+                
+                if (confirm('Este personaje fue actualizado en otra sesión. ¿Quieres recargar los cambios?')) {
+                    this.refreshCharacterFromServer();
+                }
+            }
+        });
+
+        this.ws.on('usuario-unido', (usuario) => {
+            if (usuario.nombre !== this.getPlayerName()) {
+                Helpers.showMessage(`${usuario.nombre} se unió a la sesión`, 'info');
+            }
+        });
+
+        this.ws.on('connect', () => {
+            this.syncCharacterWithWebSocket();
+        });
+    }
+
+    initManagers() {
+        this.colorManager = new ColorManager(this.storage);
+        this.attributeManager = new AttributeManager(this.storage);
+        this.healthManager = new HealthManager(this.storage, this.eventBus);
+        this.manaManager = new ManaManager(this.storage, this.eventBus);
+        this.deathSavesManager = new DeathSavesManager(this.storage, this.eventBus);
+        this.loadDeathSavesFromStorage();
+        this.loadPassivePerceptionFromStorage();
+        this.expManager = new ExpManager(this.storage, this.eventBus);
+        this.skillsManager = new SkillsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
+        this.proficiencyManager = new ProficiencyManager(this.storage, this.eventBus);
+        this.savingThrowsManager = new SavingThrowsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
+        
+        this.currencyManager = new CurrencyManager(this.storage, this.eventBus);
+        this.treasureManager = new TreasureManager(this.storage, this.eventBus);
+        this.potionManager = new PotionManager(this.storage, this.eventBus);
+        this.equipmentManager = new EquipmentManager(this.storage, this.eventBus, this.attributeManager);
+        
+        this.spellSlotsManager = new SpellSlotsManager(this.storage, this.eventBus);
+        this.spellManager = new SpellManager(this.storage, this.eventBus);
+        
+        this.imageManager = new ImageManager(this.api, this.eventBus);
+        this.dragDropManager = new DragDropManager(this.storage);
+        this.resizeManager = new ResizeManager(this.storage);
+        this.loadAttacksFromStorage();
+    }
+
+    initUI() {
+        this.attributeUI = new AttributeUI(this.attributeManager, this.colorManager, this.eventBus);
+        this.spellUI = new SpellUI(this.spellManager, this.spellSlotsManager, this.eventBus);
+        
+        this.setupSubscriptions();
+        
+        this.setupQuickHPControls();
+        this.setupInventoryCollapse();
+        this.setupBasicInfo();
+        this.setupAddButtons();
+        this.loadTraitsFromStorage();
+    }
+
+    setupAutoSave() {
+        this.eventBus.on('healthChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('manaChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('attributeChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('attributeNameChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('skillsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('proficienciesChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('savingThrowsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('expChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('deathSavesChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('currencyChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('treasuresChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('potionsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('equipmentChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('spellsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('spellSlotsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('imageChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.setupCombatStatsAutoSave();
+        this.setupTraitsAutoSave();
+    }
+
+    hasValidCharacterName() {
+        const charName = document.getElementById('char-name')?.value.trim();
+        return charName && charName !== '' && charName !== 'Sin nombre';
+    }
+
+    showAddProficiencyModal() {
+        const existingModal = document.getElementById('addProficiencyModal');
+        if (existingModal) existingModal.remove();
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'addProficiencyModal';
+        modal.style.display = 'flex';
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-plus-circle"></i> Añadir Competencia / Idioma</h3>
+                    <button class="modal-close" id="closeAddModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Nombre</label>
+                        <input type="text" id="newProficiencyName" placeholder=" ">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-filter"></i> Tipo</label>
+                        <select id="newProficiencyType">
+                            <option value="language">Idioma</option>
+                            <option value="armor">Armadura</option>
+                            <option value="weapon">Arma</option>
+                            <option value="tool">Herramienta</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-actions" style="justify-content: flex-end; gap: 10px; padding: 15px;">
+                    <button type="button" class="btn-secondary btn-cancel" id="cancelAddBtn">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn-secondary" id="saveAddBtn" style="background: #4CAF50;">
+                        <i class="fas fa-check"></i> Añadir
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        document.getElementById('closeAddModal').addEventListener('click', () => {
+            modal.remove();
+        });
+        
+        document.getElementById('cancelAddBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+        
+        document.getElementById('saveAddBtn').addEventListener('click', () => {
+            const name = document.getElementById('newProficiencyName').value.trim();
+            const type = document.getElementById('newProficiencyType').value;
+            
+            if (name) {
+                this.proficiencyManager.add(name, type);
+                Helpers.showMessage('Competencia añadida', 'info');
+                modal.remove();
+            } else {
+                Helpers.showMessage('Por favor, ingresa un nombre', 'warning');
+            }
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    setupSubscriptions() {
+        this.healthManager.subscribe((data) => {
+            this.updateHealthDisplay(data);
+        });
+        
+        this.manaManager.subscribe((data) => {
+            this.updateManaDisplay(data);
+        });
+        
+        this.deathSavesManager.subscribe((data) => {
+            this.updateDeathSavesDisplay(data);
+        });
+        
+        this.skillsManager.subscribe((skills) => {
+            this.renderSkills(skills);
+        });
+        
+        this.proficiencyManager.subscribe((allProficiencies) => {
+            const activeTab = document.querySelector('.proficiency-tab.active');
+            const filterType = activeTab ? activeTab.dataset.type : 'all';
+            
+            if (filterType === 'all') {
+                this.renderProficiencies(allProficiencies);
+            } else {
+                const filtered = this.proficiencyManager.getByType(filterType);
+                this.renderProficiencies(filtered);
+            }
+        });
+        
+        this.savingThrowsManager.subscribe((savingThrows) => {
+            this.renderSavingThrows(savingThrows);
+        });
+
+        const perceptionInput = document.getElementById('passivePerception');
+        if (perceptionInput) {
+            perceptionInput.addEventListener('input', (e) => {
+                this.passivePerception = parseInt(e.target.value) || 10;
+                this.saveCharacter();
+            });
+        }
+        
+        this.expManager.subscribe((data) => {
+            this.updateExpDisplay(data);
+        });
+        
+        this.currencyManager.subscribe((data) => {
+            this.updateCurrencyDisplay(data);
+        });
+        
+        this.treasureManager.subscribe((treasures) => {
+            this.renderTreasures(treasures);
+        });
+        
+        this.potionManager.subscribe((potions) => {
+            this.renderPotions(potions);
+        });
+        
+        this.equipmentManager.subscribe((equipment) => {
+            this.renderEquipment(equipment);
+        });
+        
+        this.spellSlotsManager.subscribe((slots) => {});
+        
+        this.eventBus.on('levelChanged', (level) => {
+            this.updateSavingThrows();
+            document.getElementById('level-display').textContent = level;
+            document.getElementById('character-level').value = level;
+        });
+        
+        this.eventBus.on('deathSavesSuccess', (message) => {
+            Helpers.showMessage(message, 'info');
+        });
+        
+        this.eventBus.on('deathSavesFail', (message) => {
+            Helpers.showMessage(message, 'error');
+        });
+        
+        this.eventBus.on('requestProficiencyBonus', () => {
+            const bonus = this.expManager.getProficiencyBonus();
+            this.eventBus.emit('proficiencyBonusResponse', bonus);
+        });
+    }
+
+    setupAddButtons() {
+        document.getElementById('addSkillBtn')?.addEventListener('click', () => {
+            const name = prompt('Nombre de la habilidad:');
+            if (name) {
+                const attribute = prompt('Atributo asociado (FUERZA, DESTREZA, etc.) opcional:');
+                this.skillsManager.add(name, attribute || '');
+            }
+        });
+        
+        document.getElementById('addProficiencyBtn')?.addEventListener('click', () => {
+            this.showAddProficiencyModal();
+        });
+
+        document.getElementById('addTreasureBtn')?.addEventListener('click', () => {
+            this.showAddTreasureModal();
+        });
+
+        document.getElementById('addPotionBtn')?.addEventListener('click', () => {
+            this.showAddPotionModal();
+        });
+
+        document.getElementById('addEquipmentBtn')?.addEventListener('click', () => {
+            this.showAddEquipmentModal();
+        });
+
+        document.getElementById('addAttackBtn')?.addEventListener('click', () => {
+            this.addAttack();
+        });
+
+        document.getElementById('addSpellBtn')?.addEventListener('click', () => {
+            this.spellManager.add();
+        });
+    }
+
+    setupGlobalEvents() {
+        document.querySelectorAll('.proficiency-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.proficiency-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                const type = tab.dataset.type;
+                const proficiencies = this.proficiencyManager.getByType(type);
+                this.renderProficiencies(proficiencies);
+            });
+        });
+        
+        document.getElementById('exportBtn')?.addEventListener('click', () => {
+            this.exportCharacter();
+        });
+        
+        document.getElementById('importBtn')?.addEventListener('click', () => {
+            this.importCharacter();
+        });
+
+        document.getElementById('saveBtn')?.addEventListener('click', () => {
+            this.saveCharacter();
+        });
+        
+        document.getElementById('resetBtn')?.addEventListener('click', () => {
+            if (confirm('¿Restablecer toda la hoja? Se perderán los cambios no guardados.')) {
+                this.resetAll();
+            }
+        });
+        
+        document.getElementById('colorCustomizerBtn')?.addEventListener('click', () => {
+            this.showColorCustomizer();
+        });
+        
+        document.getElementById('textCustomizerBtn')?.addEventListener('click', () => {
+            this.showTextColorCustomizer();
+        });
+        
+        document.getElementById('configManaBtn')?.addEventListener('click', () => {
+            this.showManaConfig();
+        });
+        
+        document.getElementById('configExpBtn')?.addEventListener('click', () => {
+            this.showExpConfig();
+        });
+        
+        document.getElementById('configSlotsBtn')?.addEventListener('click', () => {
+            this.showSpellSlotsConfig();
+        });
+        
+        document.getElementById('configCurrencyBtn')?.addEventListener('click', () => {
+            this.showCurrencyConfig();
+        });
+        
+        document.getElementById('level-up-btn')?.addEventListener('click', () => {
+            this.expManager.changeLevel(1);
+        });
+        
+        document.getElementById('level-down-btn')?.addEventListener('click', () => {
+            this.expManager.changeLevel(-1);
+        });
+
+        const currentExpInput = document.getElementById('current-exp');
+        const maxExpInput = document.getElementById('max-exp');
+        if (currentExpInput) {
+            currentExpInput.replaceWith(currentExpInput.cloneNode(true));
+            const newCurrentExp = document.getElementById('current-exp');
+            
+            newCurrentExp.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value) || 0;
+                this.expManager.setCurrent(value);
+            });
+        }
+
+        if (maxExpInput) {
+            maxExpInput.replaceWith(maxExpInput.cloneNode(true));
+            const newMaxExp = document.getElementById('max-exp');
+            
+            newMaxExp.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value) || 1;
+                this.expManager.setMax(value);
+            });
+        }
+        
+        document.getElementById('manaPlusBtn')?.addEventListener('click', () => {
+            this.manaManager.modify(1);
+        });
+        
+        document.getElementById('manaMinusBtn')?.addEventListener('click', () => {
+            this.manaManager.modify(-1);
+        });
+        
+        document.getElementById('manaInput')?.addEventListener('change', (e) => {
+            this.manaManager.setCurrent(parseInt(e.target.value) || 0);
+        });
+        
+        document.getElementById('current-hp')?.addEventListener('input', (e) => {
+            this.healthManager.setCurrent(parseInt(e.target.value) || 0);
+        });
+        
+        document.getElementById('max-hp')?.addEventListener('input', (e) => {
+            this.healthManager.setMax(parseInt(e.target.value) || 1);
+        });
+        
+        document.getElementById('temp-hp')?.addEventListener('input', (e) => {
+            this.healthManager.setTemp(parseInt(e.target.value) || 0);
+        });
+        
+        document.getElementById('closeModalBtn')?.addEventListener('click', () => {
+            document.getElementById('configModal').style.display = 'none';
+        });
+        
+        document.getElementById('closeTextColorModalBtn')?.addEventListener('click', () => {
+            document.getElementById('textColorModal').style.display = 'none';
+        });
+        
+        document.getElementById('configModal')?.addEventListener('click', (e) => {
+            if (e.target === document.getElementById('configModal')) {
+                e.target.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('textColorModal')?.addEventListener('click', (e) => {
+            if (e.target === document.getElementById('textColorModal')) {
+                e.target.style.display = 'none';
+            }
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('configModal').style.display = 'none';
+                document.getElementById('textColorModal').style.display = 'none';
+            }
+        });
+    }
+
+    updateHealthDisplay(data) {
+        const currentHP = document.getElementById('current-hp');
+        const maxHP = document.getElementById('max-hp');
+        const hpBarFill = document.getElementById('hpBarFill');
+        const hpCurrentLabel = document.getElementById('hpCurrentLabel');
+        const hpMaxLabel = document.getElementById('hpMaxLabel');
+        const tempHP = document.getElementById('temp-hp');
+        
+        if (currentHP) currentHP.value = data.current;
+        if (maxHP) maxHP.value = data.max;
+        if (tempHP) tempHP.value = data.temp;
+        if (hpCurrentLabel) hpCurrentLabel.textContent = data.current;
+        if (hpMaxLabel) hpMaxLabel.textContent = data.max;
+        
+        if (hpBarFill) {
+            hpBarFill.style.width = `${data.percentage}%`;
+            
+            if (data.percentage < 25) {
+                hpBarFill.style.background = 'linear-gradient(90deg, #000000, #332f2f)';
+            } else if (data.percentage < 50) {
+                hpBarFill.style.background = 'linear-gradient(90deg, #ffaa00, #ffcc44)';
+            } else {
+                hpBarFill.style.background = 'linear-gradient(90deg, var(--hp-color, #dc143c), #ff6b6b)';
+            }
+        }
+    }
+
+    updateManaDisplay(data) {
+        const manaInput = document.getElementById('manaInput');
+        const currentManaSpan = document.getElementById('currentMana');
+        const maxManaSpan = document.getElementById('maxMana');
+        const manaBarFill = document.getElementById('manaBarFill');
+        
+        if (manaInput) {
+            manaInput.value = data.current;
+            manaInput.max = data.max;
+        }
+        if (currentManaSpan) currentManaSpan.textContent = data.current;
+        if (maxManaSpan) maxManaSpan.textContent = data.max;
+        
+        if (manaBarFill) {
+            manaBarFill.style.width = `${data.percentage}%`;
+            
+            if (data.percentage < 20) {
+                manaBarFill.style.background = 'linear-gradient(90deg, #ff4444, #ff6b6b)';
+            } else if (data.percentage < 50) {
+                manaBarFill.style.background = 'linear-gradient(90deg, #ffaa00, #ffcc44)';
+            } else {
+                manaBarFill.style.background = 'linear-gradient(90deg, var(--mana-color, #4169e1), #6495ed)';
+            }
+        }
+    }
+
+    updateDeathSavesDisplay(data) {
+        const successCheckboxes = document.querySelectorAll('.death-save-success');
+        const failCheckboxes = document.querySelectorAll('.death-save-fail');
+        
+        data.successes.forEach((checked, index) => {
+            if (successCheckboxes[index]) successCheckboxes[index].checked = checked;
+        });
+        
+        data.fails.forEach((checked, index) => {
+            if (failCheckboxes[index]) failCheckboxes[index].checked = checked;
+        });
+    }
+
+    loadTraitsFromStorage() {
+        const savedData = this.storage.load('traits');
+        if (savedData) {
+            document.getElementById('personality').value = savedData.personality || '';
+            document.getElementById('ideals').value = savedData.ideals || '';
+            document.getElementById('bonds').value = savedData.bonds || '';
+            document.getElementById('flaws').value = savedData.flaws || '';
+            document.getElementById('features').value = savedData.features || '';
+        }
+    }
+
+    loadDeathSavesFromStorage() {
+        const saved = this.storage.load('deathSaves');
+        if (saved) {
+            this.deathSavesManager.successes = saved.successes || [false, false, false];
+            this.deathSavesManager.fails = saved.fails || [false, false, false];
+            this.deathSavesManager.notify();
+        }
+    }
+
+    loadPassivePerceptionFromStorage() {
+        const saved = this.storage.load('passivePerception');
+        if (saved) {
+            this.passivePerception = saved;
+            const perceptionInput = document.getElementById('passivePerception');
+            if (perceptionInput) perceptionInput.value = saved;
+        }
+    }
+
+    updateExpDisplay(data) {
+        const currentExp = document.getElementById('current-exp');
+        const maxExp = document.getElementById('max-exp');
+        const expBarFill = document.getElementById('expBarFill');
+        const expCurrentLabel = document.getElementById('expCurrentLabel');
+        const expMaxLabel = document.getElementById('expMaxLabel');
+        const expPercentage = document.getElementById('expPercentage');
+        const levelDisplay = document.getElementById('level-display');
+        const characterLevel = document.getElementById('character-level');
+        
+        if (currentExp) currentExp.value = data.current;
+        if (maxExp) maxExp.value = data.max;
+        if (expCurrentLabel) expCurrentLabel.textContent = data.current;
+        if (expMaxLabel) expMaxLabel.textContent = data.max;
+        if (expPercentage) expPercentage.textContent = `${Math.round(data.percentage)}%`;
+        if (levelDisplay) levelDisplay.textContent = data.level;
+        if (characterLevel) characterLevel.value = data.level;
+        
+        if (expBarFill) {
+            expBarFill.style.width = `${data.percentage}%`;
+            
+            if (data.percentage >= 100) {
+                expBarFill.style.background = 'linear-gradient(90deg, #ffd700, #ffaa00)';
+            } else if (data.percentage >= 75) {
+                expBarFill.style.background = 'linear-gradient(90deg, #4CAF50, #8bc34a)';
+            } else {
+                expBarFill.style.background = 'linear-gradient(90deg, var(--exp-color, #4a90e2), #7dc1ff)';
+            }
+        }
+    }
+
+    updateCurrencyDisplay(data) {
+        document.getElementById('currencyName').textContent = data.name;
+        
+        const goldLabel = document.querySelector('.currency-item:first-child label');
+        const silverLabel = document.querySelector('.currency-item:nth-child(2) label');
+        const copperLabel = document.querySelector('.currency-item:last-child label');
+        
+        if (goldLabel) {
+            goldLabel.innerHTML = `<i class="fas fa-circle" style="color: #ffd700;"></i> ${data.goldName}`;
+        }
+        if (silverLabel) {
+            silverLabel.innerHTML = `<i class="fas fa-circle" style="color: #c0c0c0;"></i> ${data.silverName}`;
+        }
+        if (copperLabel) {
+            copperLabel.innerHTML = `<i class="fas fa-circle" style="color: #b87333;"></i> ${data.copperName}`;
+        }
+        
+        document.getElementById('goldAmount').value = data.gold;
+        document.getElementById('silverAmount').value = data.silver;
+        document.getElementById('copperAmount').value = data.copper;
+    }
+
+    renderSkills(skills) {
+        const container = document.getElementById('skillsContainer');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (skills.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay habilidades</p>';
+            return;
+        }
+        
+        skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
+            const item = document.createElement('div');
+            item.className = 'skill-item';
+            
+            const bonusClass = skill.bonus > 0 ? 'positive' : (skill.bonus < 0 ? 'negative' : '');
+            
+            const profIcon = skill.proficient ? (skill.expertise ? 'fa-star' : 'fa-check-circle') : 'fa-circle';
+            const profTitle = skill.expertise ? 'Experto' : (skill.proficient ? 'Competente' : 'Sin competencia');
+            
+            let attributeText = '—';
+            let attributeTitle = 'Sin atributo asociado';
+            
+            if (skill.attribute) {
+                attributeText = 'ⓘ';
+                attributeTitle = `Atributo: ${skill.attribute}`;
+            }
+            
+            item.innerHTML = `
+                <div class="skill-header">
+                    <span class="skill-prof" title="${profTitle}" style="color: var(--accent-gold);">
+                        <i class="fas ${profIcon}"></i>
+                    </span>
+                    <span class="skill-name">${skill.name}</span>
+                    <span class="skill-bonus ${bonusClass}">${Helpers.formatModifier(skill.bonus)}</span>
+                    <span class="skill-attribute-info" title="${attributeTitle}" style="cursor: help; margin: 0 5px; color: var(--accent-gold);">
+                        ${attributeText}
+                    </span>
+                    <button class="btn-remove-skill" title="Eliminar"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+            
+            container.appendChild(item);
+            
+            const profSpan = item.querySelector('.skill-prof');
+            profSpan.addEventListener('click', () => {
+                if (!skill.proficient) {
+                    this.skillsManager.toggleProficient(skill.id);
+                } else if (!skill.expertise) {
+                    this.skillsManager.toggleExpertise(skill.id);
+                } else {
+                    this.skillsManager.toggleProficient(skill.id);
+                }
+            });
+            
+            item.querySelector('.btn-remove-skill').addEventListener('click', () => {
+                if (confirm('¿Eliminar esta habilidad?')) {
+                    this.skillsManager.remove(skill.id);
+                }
+            });
+        });
+    }
+
+    renderSavingThrows(savingThrows) {
+        const container = document.getElementById('savingThrowsContainer');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (savingThrows.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay atributos</p>';
+            return;
+        }
+        
+        savingThrows.forEach((st, index) => {
+            const item = document.createElement('div');
+            item.className = 'saving-throw-item';
+            
+            const valueClass = st.value > 0 ? 'positive' : (st.value < 0 ? 'negative' : '');
+            const profIcon = st.proficient ? 'fa-check-circle' : 'fa-circle';
+            const profClass = st.proficient ? 'proficient' : '';
+            
+            let displayName = st.name;
+            if (displayName.length > 8) {
+                displayName = displayName.substring(0, 7) + '…';
+            }
+            
+            item.innerHTML = `
+                <span class="saving-throw-name" title="${st.name}">${displayName}</span>
+                <input type="number" class="saving-throw-value ${valueClass}" value="${st.value}" readonly>
+                <span class="saving-throw-proficiency ${profClass}" title="Competencia">
+                    <i class="fas ${profIcon}"></i>
+                </span>
+            `;
+            
+            container.appendChild(item);
+            
+            const profIconElement = item.querySelector('.saving-throw-proficiency');
+            profIconElement.addEventListener('click', () => {
+                this.savingThrowsManager.toggleProficient(index);
+            });
+        });
+    }
+
+    renderProficiencies(proficiencies) {
+        const container = document.getElementById('proficienciesContainer');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (!proficiencies || proficiencies.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center; padding: 20px;">No hay competencias o idiomas. Haz clic en + para añadir.</p>';
+            return;
+        }
+        
+        proficiencies.forEach(prof => {
+            const profButton = document.createElement('button');
+            profButton.className = 'proficiency-button';
+            profButton.dataset.id = prof.id;
+            profButton.dataset.type = prof.type;
+            
+            const icon = this.proficiencyManager.getIcon(prof.type);
+            
+            profButton.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <span>${prof.name}</span>
+            `;
+            
+            profButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                if (e.target.classList.contains('fa-times') || 
+                    e.target.parentElement?.classList.contains('fa-times')) {
+                    return;
+                }
+                
+                this.openProficiencyEditModal(prof);
+            });
+            
+            const deleteIcon = document.createElement('i');
+            deleteIcon.className = 'fas fa-times';
+            deleteIcon.style.marginLeft = 'auto';
+            deleteIcon.style.opacity = '0.7';
+            deleteIcon.style.cursor = 'pointer';
+            deleteIcon.style.padding = '0 5px';
+            deleteIcon.style.fontSize = '0.9rem';
+            
+            deleteIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm('¿Eliminar esta competencia?')) {
+                    this.proficiencyManager.remove(prof.id);
+                    Helpers.showMessage('Competencia eliminada', 'info');
+                }
+            });
+            
+            profButton.appendChild(deleteIcon);
+            container.appendChild(profButton);
+        });
+    }
+
+    openProficiencyEditModal(proficiency) {
+        const existingModal = document.getElementById('proficiencyEditModal');
+        if (existingModal) existingModal.remove();
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'proficiencyEditModal';
+        modal.style.display = 'flex';
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-edit"></i> Editar Competencia</h3>
+                    <button class="modal-close" id="closeEditModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Nombre</label>
+                        <input type="text" id="editProficiencyName" value="${proficiency.name}" placeholder="Nombre">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-filter"></i> Tipo</label>
+                        <select id="editProficiencyType">
+                            <option value="armor" ${proficiency.type === 'armor' ? 'selected' : ''}>Armadura</option>
+                            <option value="weapon" ${proficiency.type === 'weapon' ? 'selected' : ''}>Arma</option>
+                            <option value="tool" ${proficiency.type === 'tool' ? 'selected' : ''}>Herramienta</option>
+                            <option value="language" ${proficiency.type === 'language' ? 'selected' : ''}>Idioma</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-actions" style="justify-content: space-between; padding: 15px;">
+                    <button type="button" class="btn-secondary" id="deleteProficiencyBtn" style="background: #dc3545;">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                    <div>
+                        <button type="button" class="btn-secondary" id="cancelEditBtn">
+                            Cancelar
+                        </button>
+                        <button type="button" class="btn-secondary" id="saveEditBtn" style="background: #4CAF50;">
+                            <i class="fas fa-check"></i> Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        document.getElementById('closeEditModal').addEventListener('click', () => {
+            modal.remove();
+        });
+        
+        document.getElementById('cancelEditBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+        
+        document.getElementById('saveEditBtn').addEventListener('click', () => {
+            const newName = document.getElementById('editProficiencyName').value.trim();
+            const newType = document.getElementById('editProficiencyType').value;
+            
+            if (newName) {
+                this.proficiencyManager.update(proficiency.id, { 
+                    name: newName, 
+                    type: newType 
+                });
+                Helpers.showMessage('Competencia actualizada', 'info');
+                modal.remove();
+            } else {
+                Helpers.showMessage('El nombre no puede estar vacío', 'warning');
+            }
+        });
+        
+        document.getElementById('deleteProficiencyBtn').addEventListener('click', () => {
+            if (confirm('¿Estás seguro de que quieres eliminar esta competencia?')) {
+                this.proficiencyManager.remove(proficiency.id);
+                Helpers.showMessage('Competencia eliminada', 'info');
+                modal.remove();
+            }
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    renderTreasures(treasures) {
+        const container = document.getElementById('treasureList');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (treasures.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay tesoros</p>';
+            return;
+        }
+        
+        treasures.sort((a, b) => b.value - a.value).forEach(treasure => {
+            const item = document.createElement('div');
+            item.className = 'treasure-item';
+            
+            const icon = this.getTreasureIcon(treasure.type);
+            
+            item.innerHTML = `
+                <div class="treasure-info">
+                    <i class="fas ${icon}" style="color: var(--accent-gold);"></i>
+                    <span class="treasure-name">${treasure.name}</span>
+                    <span class="treasure-value">${treasure.value} ${this.currencyManager.getData().name}</span>
+                </div>
+                <button type="button" class="btn-remove-treasure" data-id="${treasure.id}">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(item);
+            
+            item.querySelector('.btn-remove-treasure').addEventListener('click', () => {
+                this.treasureManager.remove(treasure.id);
+            });
+        });
+    }
+
+    renderPotions(potions) {
+        const container = document.getElementById('potionsList');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (potions.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay pociones</p>';
+            return;
+        }
+        
+        potions.forEach(potion => {
+            const item = document.createElement('div');
+            item.className = 'potion-item';
+            
+            const icon = potion.type === 'life' ? 'fa-heart' : 'fa-bolt';
+            const iconClass = potion.type === 'life' ? 'life' : 'mana';
+            const targetBar = potion.type === 'life' ? 'Vida' : 'Maná';
+            
+            item.innerHTML = `
+                <div class="potion-icon ${iconClass}">
+                    <i class="fas ${icon}"></i>
+                </div>
+                <div class="potion-details">
+                    <span class="potion-name">${potion.name}</span>
+                    <span class="potion-effect">
+                        <i class="fas ${icon}"></i>
+                        Restaura <span class="potion-amount">+${potion.amount}</span> ${targetBar}
+                    </span>
+                    <span class="potion-value">${potion.value} ${this.currencyManager.getData().name}</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn-consume" data-id="${potion.id}">
+                        <i class="fas fa-wine-bottle"></i>
+                    </button>
+                    <button type="button" class="btn-remove-potion" data-id="${potion.id}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(item);
+            
+            item.querySelector('.btn-consume').addEventListener('click', () => {
+                this.potionManager.consume(potion.id, this.healthManager, this.manaManager);
+            });
+            
+            item.querySelector('.btn-remove-potion').addEventListener('click', () => {
+                this.potionManager.remove(potion.id);
+            });
+        });
+    }
+
+    renderEquipment(equipment) {
+        const container = document.getElementById('equipmentList');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (equipment.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay equipo</p>';
+            return;
+        }
+        
+        equipment.forEach(item => {
+            const element = document.createElement('div');
+            element.className = 'equipment-item';
+            element.dataset.id = item.id;
+            
+            const stealthIcon = item.stealth === 'advantage' ? 'fa-check-circle' : 
+                               (item.stealth === 'disadvantage' ? 'fa-exclamation-circle' : 'fa-circle');
+            const stealthColor = item.stealth === 'advantage' ? '#4CAF50' : 
+                                (item.stealth === 'disadvantage' ? '#ff4444' : '#888');
+            
+            const bonusHtml = item.attribute && item.bonus !== 0 ? 
+                `<span class="equipment-bonus" style="color: ${item.bonus > 0 ? '#4CAF50' : '#ff4444'};">
+                    <i class="fas fa-arrow-up"></i> ${item.bonus > 0 ? '+' : ''}${item.bonus} a ${item.attribute}
+                </span>` : '';
+            
+            element.innerHTML = `
+                <div class="equipment-header">
+                    <div class="equipment-name">
+                        <i class="fas fa-chess-queen" style="color: var(--accent-gold);"></i>
+                        <span>${item.name}</span>
+                        ${bonusHtml}
+                    </div>
+                    <button type="button" class="btn-remove-equipment">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="equipment-details">
+                    <span class="equipment-cost"><i class="fas fa-coins"></i> ${item.cost} ${this.currencyManager.getData().name}</span>
+                    <span class="equipment-weight"><i class="fas fa-weight-hanging"></i> ${item.weight} kg</span>
+                    <span class="equipment-stealth" style="color: ${stealthColor};">
+                        <i class="fas ${stealthIcon}"></i> 
+                        ${item.stealth === 'advantage' ? 'Ventaja' : (item.stealth === 'disadvantage' ? 'Desventaja' : 'Normal')}
+                    </span>
+                </div>
+                <div class="equipment-description">
+                    <i class="fas fa-align-left" style="color: var(--ink-light);"></i>
+                    ${item.description}
+                </div>
+            `;
+            
+            container.appendChild(element);
+            
+            element.querySelector('.btn-remove-equipment').addEventListener('click', () => {
+                this.equipmentManager.remove(item.id);
+            });
+        });
+    }
+
+    getTreasureIcon(type) {
+        const icons = {
+            'gem': 'fa-gem',
+            'jewelry': 'fa-crown',
+            'artifact': 'fa-archway',
+            'other': 'fa-box'
+        };
+        return icons[type] || 'fa-box';
+    }
+
+    setupBasicInfo() {
+        const basicInfo = this.storage.load('basicInfo');
+        if (basicInfo) {
+            document.getElementById('char-name').value = basicInfo.name || '';
+            document.getElementById('char-class').value = basicInfo.class || '';
+            document.getElementById('char-race').value = basicInfo.race || '';
+            document.getElementById('char-bg').value = basicInfo.background || '';
+            document.getElementById('char-align').value = basicInfo.alignment || '';
+        }
+        
+        const charNameInput = document.getElementById('char-name');
+        if (charNameInput) {
+            charNameInput.addEventListener('change', () => {
+                this.saveBasicInfo();
+                this.saveCharacter(); 
+            });
+        }
+        
+        ['char-class', 'char-race', 'char-bg', 'char-align'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => {
+                    this.saveBasicInfo();
+                    const currentName = document.getElementById('char-name')?.value.trim();
+                    if (currentName && currentName !== '') {
+                        this.saveCharacter();
+                    }
+                });
+            }
+        });
+    }
+
+    saveBasicInfo() {
+        const basicInfo = {
+            name: document.getElementById('char-name')?.value || '',
+            class: document.getElementById('char-class')?.value || '',
+            race: document.getElementById('char-race')?.value || '',
+            background: document.getElementById('char-bg')?.value || '',
+            alignment: document.getElementById('char-align')?.value || ''
+        };
+        this.storage.save('basicInfo', basicInfo);
+    }
+
+    setupQuickHPControls() {
+        const hpContainer = document.querySelector('.hp-container');
+        if (!hpContainer || document.querySelector('.hp-quick-controls')) return;
+        
+        const controls = document.createElement('div');
+        controls.className = 'hp-quick-controls';
+        controls.innerHTML = `
+            <button type="button" class="hp-quick-btn hp-damage" data-amount="-1">-1</button>
+            <button type="button" class="hp-quick-btn hp-damage" data-amount="-5">-5</button>
+            <button type="button" class="hp-quick-btn hp-heal" data-amount="+1">+1</button>
+            <button type="button" class="hp-quick-btn hp-heal" data-amount="+5">+5</button>
+        `;
+        
+        hpContainer.appendChild(controls);
+        
+        controls.addEventListener('click', (e) => {
+            if (e.target.classList.contains('hp-quick-btn')) {
+                const amount = parseInt(e.target.dataset.amount);
+                this.healthManager.modify(amount);
+            }
+        });
+    }
+
+    setupCombatStatsAutoSave() {
+        ['armor-class', 'speed', 'initiative'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => {
+                    if (this.hasValidCharacterName()) {
+                        this.saveCharacter();
+                    }
+                });
+            }
+        });
+    }
+
+    setupInventoryCollapse() {
+        const toggleBtn = document.getElementById('toggleInventoryBtn');
+        const inventoryCard = document.getElementById('card-inventory');
+        
+        if (!toggleBtn || !inventoryCard) return;
+        
+        const savedState = this.storage.load('inventoryCollapsed');
+        if (savedState) {
+            inventoryCard.classList.add('collapsed');
+            toggleBtn.querySelector('i').className = 'fas fa-chevron-down';
+        }
+        
+        toggleBtn.addEventListener('click', () => {
+            inventoryCard.classList.toggle('collapsed');
+            const icon = toggleBtn.querySelector('i');
+            icon.className = inventoryCard.classList.contains('collapsed') 
+                ? 'fas fa-chevron-down' 
+                : 'fas fa-chevron-up';
+            
+            this.storage.save('inventoryCollapsed', inventoryCard.classList.contains('collapsed'));
+        });
+    }
+
+    addAttack(name = '', bonus = '', damage = '', saveToStorage = true) {
+        const attacksList = document.querySelector('.attacks-list');
+        const addBtn = document.getElementById('addAttackBtn');
+        if (!attacksList || !addBtn) return;
+        
+        const item = document.createElement('div');
+        item.className = 'attack-item';
+        item.innerHTML = `
+            <input type="text" class="attack-name" placeholder="Ataque" value="${name}">
+            <input type="text" class="attack-bonus" placeholder="Bonif." value="${bonus}">
+            <input type="text" class="attack-damage" placeholder="Daño" value="${damage}">
+            <button type="button" class="btn-remove-attack"><i class="fas fa-times"></i></button>
+        `;
+        
+        attacksList.insertBefore(item, addBtn);
+        
+        item.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', () => {
+                this.saveAttacksToStorage();
+                this.saveCharacter();
+            });
+        });
+        
+        item.querySelector('.btn-remove-attack').addEventListener('click', () => {
+            if (confirm('¿Eliminar este ataque?')) {
+                item.remove();
+                this.saveAttacksToStorage();
+                this.saveCharacter();
+            }
+        });
+        
+        if (saveToStorage) {
+            this.saveAttacksToStorage();
+            this.saveCharacter();
+        }
+    }
+
+    setupTraitsAutoSave() {
+        ['personality', 'ideals', 'bonds', 'flaws', 'features'].forEach(id => {
+            const textarea = document.getElementById(id);
+            if (textarea) {
+                textarea.addEventListener('input', () => {
+                    if (this.hasValidCharacterName()) {
+                        this.saveCharacter();
+                    }
+                });
+            }
+        });
+    }
+
+    saveAttacksToStorage() {
+        const attacks = this.getAttacks();
+        this.storage.save('attacks', attacks);
+        this.eventBus.emit('attacksChanged', attacks);
+    }
+
+    getAttacks() {
+        const attacks = [];
+        const attackItems = document.querySelectorAll('.attack-item');
+        
+        attackItems.forEach(item => {
+            const name = item.querySelector('.attack-name')?.value || '';
+            const bonus = item.querySelector('.attack-bonus')?.value || '';
+            const damage = item.querySelector('.attack-damage')?.value || '';
+            
+            attacks.push({ name, bonus, damage });
+        });
+        
+        return attacks;
+    }
+
+    getSpells() {
+        const spells = [];
+        const spellItems = document.querySelectorAll('#spellsList .spell-item');
+        
+        spellItems.forEach(item => {
+            const name = item.querySelector('.spell-name')?.value || '';
+            const level = item.querySelector('.spell-level-input')?.value || '';
+            const description = item.querySelector('.spell-desc')?.value || '';
+            
+            spells.push({ name, level, description });
+        });
+        
+        return spells;
+    }
+
+    showManaConfig() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-bolt"></i> Configurar Maná Máximo</h4>
+            <div class="form-row">
+                <label>Maná Máximo:</label>
+                <input type="number" id="configMaxMana" value="${this.manaManager.max}" min="1" max="999">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="saveManaConfig">Guardar</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelManaConfig">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('saveManaConfig').addEventListener('click', () => {
+            const newMax = parseInt(document.getElementById('configMaxMana').value) || 15;
+            this.manaManager.setMax(newMax);
+            modal.style.display = 'none';
+        });
+        
+        document.getElementById('cancelManaConfig').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showExpConfig() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-chart-line"></i> Configurar Experiencia</h4>
+            <div class="form-group">
+                <label>Color de barra:</label>
+                <input type="color" id="configExpColor" value="${localStorage.getItem('expColor') || '#4a90e2'}">
+            </div>
+            <div class="form-group">
+                <label>Sistema:</label>
+                <select id="configExpSystem">
+                    <option value="custom" ${this.expManager.system === 'custom' ? 'selected' : ''}>Personalizado</option>
+                    <option value="dnd5e" ${this.expManager.system === 'dnd5e' ? 'selected' : ''}>D&D 5e</option>
+                    <option value="pathfinder" ${this.expManager.system === 'pathfinder' ? 'selected' : ''}>Pathfinder</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="saveExpConfig">Guardar</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelExpConfig">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('saveExpConfig').addEventListener('click', () => {
+            const color = document.getElementById('configExpColor').value;
+            const system = document.getElementById('configExpSystem').value;
+            
+            document.documentElement.style.setProperty('--exp-color', color);
+            localStorage.setItem('expColor', color);
+            this.expManager.setSystem(system);
+            
+            modal.style.display = 'none';
+        });
+        
+        document.getElementById('cancelExpConfig').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showSpellSlotsConfig() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        const slots = this.spellSlotsManager.getData();
+        
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-gem"></i> Configurar Slots</h4>
+            <div class="form-row">
+                <label>Nivel:</label>
+                <input type="number" id="modalSpellLevel" value="${slots.level}" min="1" max="9">
+            </div>
+            <div class="form-row">
+                <label>Total:</label>
+                <input type="number" id="modalTotalSlots" value="${slots.total}" min="0" max="20">
+            </div>
+            <div class="form-row">
+                <label>Usados:</label>
+                <input type="number" id="modalUsedSlots" value="${slots.used}" min="0" max="${slots.total}">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="saveSlotsConfig">Guardar</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelSlotsConfig">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('saveSlotsConfig').addEventListener('click', () => {
+            const level = parseInt(document.getElementById('modalSpellLevel').value) || 1;
+            const total = parseInt(document.getElementById('modalTotalSlots').value) || 4;
+            const used = parseInt(document.getElementById('modalUsedSlots').value) || 0;
+            
+            this.spellSlotsManager.setLevel(level);
+            this.spellSlotsManager.setTotal(total);
+            this.spellSlotsManager.setUsed(Math.min(used, total));
+            
+            document.getElementById('spellLevel').value = level;
+            document.getElementById('totalSlots').value = total;
+            
+            modal.style.display = 'none';
+        });
+        
+        document.getElementById('cancelSlotsConfig').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showCurrencyConfig() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        const currencyData = this.currencyManager.getData();
+        
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-coins"></i> Configurar Monedas</h4>
+            <div class="form-group">
+                <label>Nombre genérico:</label>
+                <input type="text" id="modalCurrencyName" value="${currencyData.name}">
+            </div>
+            <div class="form-group">
+                <label>Nombre Oro:</label>
+                <input type="text" id="modalGoldName" value="${currencyData.goldName}">
+            </div>
+            <div class="form-group">
+                <label>Nombre Plata:</label>
+                <input type="text" id="modalSilverName" value="${currencyData.silverName}">
+            </div>
+            <div class="form-group">
+                <label>Nombre Cobre:</label>
+                <input type="text" id="modalCopperName" value="${currencyData.copperName}">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="saveCurrencyConfig">Guardar</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelCurrencyConfig">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('saveCurrencyConfig').addEventListener('click', () => {
+            this.currencyManager.updateNames({
+                name: document.getElementById('modalCurrencyName').value,
+                goldName: document.getElementById('modalGoldName').value,
+                silverName: document.getElementById('modalSilverName').value,
+                copperName: document.getElementById('modalCopperName').value
+            });
+            modal.style.display = 'none';
+        });
+        
+        document.getElementById('cancelCurrencyConfig').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showAddTreasureModal() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        const currencyData = this.currencyManager.getData();
+        
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-gem"></i> Añadir Tesoro</h4>
+            <div class="form-group">
+                <label>Nombre:</label>
+                <input type="text" id="treasureName">
+            </div>
+            <div class="form-group">
+                <label>Valor (${currencyData.name}):</label>
+                <input type="number" id="treasureValue" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Tipo:</label>
+                <select id="treasureType">
+                    <option value="gem">Gema</option>
+                    <option value="jewelry">Joya</option>
+                    <option value="artifact">Artefacto</option>
+                    <option value="other">Otro</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="addTreasureConfirm">Añadir</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelTreasure">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('addTreasureConfirm').addEventListener('click', () => {
+            const name = document.getElementById('treasureName').value.trim();
+            const value = parseInt(document.getElementById('treasureValue').value) || 0;
+            const type = document.getElementById('treasureType').value;
+            
+            if (name) {
+                this.treasureManager.add(name, value, type);
+                modal.style.display = 'none';
+            } else {
+                Helpers.showMessage('Ingresa un nombre', 'warning');
+            }
+        });
+        
+        document.getElementById('cancelTreasure').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showAddPotionModal() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        const currencyData = this.currencyManager.getData();
+        
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-flask"></i> Añadir Poción</h4>
+            <div class="form-group">
+                <label>Nombre:</label>
+                <input type="text" id="potionName">
+            </div>
+            <div class="form-group">
+                <label>Tipo:</label>
+                <select id="potionType">
+                    <option value="life">Vida</option>
+                    <option value="mana">Maná</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Valor (${currencyData.name}):</label>
+                <input type="number" id="potionValue" min="0" value="50">
+            </div>
+            <div class="form-group">
+                <label>Cantidad que restaura:</label>
+                <input type="number" id="potionAmount" min="1" value="10">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="addPotionConfirm">Añadir</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelPotion">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('addPotionConfirm').addEventListener('click', () => {
+            const name = document.getElementById('potionName').value.trim();
+            const type = document.getElementById('potionType').value;
+            const value = parseInt(document.getElementById('potionValue').value) || 0;
+            const amount = parseInt(document.getElementById('potionAmount').value) || 10;
+            
+            if (name) {
+                this.potionManager.add(name, type, value, amount);
+                modal.style.display = 'none';
+            } else {
+                Helpers.showMessage('Ingresa un nombre', 'warning');
+            }
+        });
+        
+        document.getElementById('cancelPotion').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showAddEquipmentModal() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        const currencyData = this.currencyManager.getData();
+        const attributes = this.attributeManager.getAll();
+        
+        if (!modal || !modalBody) return;
+        
+        let attributeOptions = '<option value="">Ninguno</option>';
+        attributes.forEach(attr => {
+            attributeOptions += `<option value="${attr.name}">${attr.name}</option>`;
+        });
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-chess-board"></i> Añadir Equipo</h4>
+            <div class="form-group">
+                <label>Nombre:</label>
+                <input type="text" id="equipmentName">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Costo:</label>
+                    <input type="number" id="equipmentCost" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Peso:</label>
+                    <input type="number" id="equipmentWeight" min="0" value="1" step="0.1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Descripción:</label>
+                <textarea id="equipmentDesc" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Sigilo:</label>
+                <select id="equipmentStealth">
+                    <option value="none">Sin efecto</option>
+                    <option value="disadvantage">Desventaja</option>
+                    <option value="advantage">Ventaja</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Bonificador:</label>
+                <div class="form-row">
+                    <select id="equipmentAttribute" style="flex: 2;">${attributeOptions}</select>
+                    <input type="number" id="equipmentBonus" min="-5" max="5" value="1" style="flex: 1;">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="addEquipmentConfirm">Añadir</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelEquipment">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('addEquipmentConfirm').addEventListener('click', () => {
+            const name = document.getElementById('equipmentName').value.trim();
+            const cost = parseInt(document.getElementById('equipmentCost').value) || 0;
+            const weight = parseFloat(document.getElementById('equipmentWeight').value) || 0;
+            const description = document.getElementById('equipmentDesc').value.trim();
+            const stealth = document.getElementById('equipmentStealth').value;
+            const attribute = document.getElementById('equipmentAttribute').value;
+            const bonus = parseInt(document.getElementById('equipmentBonus').value) || 0;
+            
+            if (name) {
+                this.equipmentManager.add(name, cost, weight, description, stealth, attribute, bonus);
+                modal.style.display = 'none';
+            } else {
+                Helpers.showMessage('Ingresa un nombre', 'warning');
+            }
+        });
+        
+        document.getElementById('cancelEquipment').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showColorCustomizer() {
+        const modal = document.getElementById('configModal');
+        const modalBody = document.getElementById('modalBody');
+        if (!modal || !modalBody) return;
+        
+        const currentColors = {
+            mana: this.colorManager.themeColors.mana || '#4169e1',
+            hp: this.colorManager.themeColors.hp || '#dc143c',
+            exp: this.colorManager.themeColors.exp || '#4a90e2',
+            accent: this.colorManager.themeColors.accent || '#d4af37',
+            background: this.colorManager.themeColors.background || '#1a0f0a',
+            parchment: this.colorManager.themeColors.parchment || '#f5e6d3',
+            gems: this.colorManager.themeColors.gems || '#9370db'
+        };
+        
+        modalBody.innerHTML = `
+            <h4><i class="fas fa-palette"></i> Colores del Tema</h4>
+            <div class="color-customizer">
+                <div class="color-group">
+                    <label>Maná</label>
+                    <input type="color" id="colorMana" value="${currentColors.mana}">
+                </div>
+                <div class="color-group">
+                    <label>Vida</label>
+                    <input type="color" id="colorHP" value="${currentColors.hp}">
+                </div>
+                <div class="color-group">
+                    <label>Experiencia</label>
+                    <input type="color" id="colorExp" value="${currentColors.exp}">
+                </div>
+                <div class="color-group">
+                    <label>Acento</label>
+                    <input type="color" id="colorAccent" value="${currentColors.accent}">
+                </div>
+                <div class="color-group">
+                    <label>Fondo</label>
+                    <input type="color" id="colorBackground" value="${currentColors.background}">
+                </div>
+                <div class="color-group">
+                    <label>Pergamino</label>
+                    <input type="color" id="colorParchment" value="${currentColors.parchment}">
+                </div>
+                <div class="color-group">
+                    <label>Gemas</label>
+                    <input type="color" id="colorGems" value="${currentColors.gems}">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="saveColorsBtn">Aplicar</button>
+                <button type="button" class="btn-secondary" id="resetColorsBtn">Restaurar</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelColorsBtn">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        const saveBtn = document.getElementById('saveColorsBtn');
+        const resetBtn = document.getElementById('resetColorsBtn');
+        const cancelBtn = document.getElementById('cancelColorsBtn');
+        
+        saveBtn.addEventListener('click', () => {
+            const colors = {
+                mana: document.getElementById('colorMana').value,
+                hp: document.getElementById('colorHP').value,
+                exp: document.getElementById('colorExp').value,
+                accent: document.getElementById('colorAccent').value,
+                background: document.getElementById('colorBackground').value,
+                parchment: document.getElementById('colorParchment').value,
+                gems: document.getElementById('colorGems').value
+            };
+            
+            Object.entries(colors).forEach(([key, value]) => {
+                this.colorManager.setThemeColor(key, value);
+            });
+            
+            setTimeout(() => {
+                this.updateHealthDisplay(this.healthManager.getData());
+                this.updateManaDisplay(this.manaManager.getData());
+                this.updateExpDisplay(this.expManager.getData());
+                if (this.spellUI) {
+                    this.spellUI.renderSpellSlots(this.spellSlotsManager.getData());
+                }
+            }, 50);
+            
+            modal.style.display = 'none';
+            Helpers.showMessage('Colores aplicados', 'info');
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            const defaultColors = {
+                mana: '#4169e1',
+                hp: '#dc143c',
+                exp: '#4a90e2',
+                accent: '#d4af37',
+                background: '#1a0f0a',
+                parchment: '#f5e6d3',
+                gems: '#9370db'
+            };
+            
+            Object.entries(defaultColors).forEach(([key, value]) => {
+                this.colorManager.setThemeColor(key, value);
+            });
+            
+            setTimeout(() => {
+                this.updateHealthDisplay(this.healthManager.getData());
+                this.updateManaDisplay(this.manaManager.getData());
+                this.updateExpDisplay(this.expManager.getData());
+                if (this.spellUI) {
+                    this.spellUI.renderSpellSlots(this.spellSlotsManager.getData());
+                }
+            }, 50);
+            
+            modal.style.display = 'none';
+            Helpers.showMessage('Colores restaurados', 'info');
+        });
+        
+        cancelBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showTextColorCustomizer() {
+        const modal = document.getElementById('textColorModal');
+        const modalBody = document.getElementById('textColorModalBody');
+        if (!modal || !modalBody) return;
+        
+        modalBody.innerHTML = `
+            <div class="text-color-customizer">
+                <div class="text-color-group">
+                    <label>Títulos</label>
+                    <input type="color" id="textColorTitle" value="${this.colorManager.textColors.title}">
+                </div>
+                <div class="text-color-group">
+                    <label>Subtítulos</label>
+                    <input type="color" id="textColorSubtitle" value="${this.colorManager.textColors.subtitle}">
+                </div>
+                <div class="text-color-group">
+                    <label>Etiquetas</label>
+                    <input type="color" id="textColorLabel" value="${this.colorManager.textColors.label}">
+                </div>
+                <div class="text-color-group">
+                    <label>Inputs</label>
+                    <input type="color" id="textColorInput" value="${this.colorManager.textColors.input}">
+                </div>
+                <div class="text-color-group">
+                    <label>Números</label>
+                    <input type="color" id="textColorNumber" value="${this.colorManager.textColors.number}">
+                </div>
+                <div class="text-color-group">
+                    <label>Modificadores</label>
+                    <input type="color" id="textColorModifier" value="${this.colorManager.textColors.modifier}">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="saveTextColors">Aplicar</button>
+                <button type="button" class="btn-secondary" id="resetTextColors">Restaurar</button>
+                <button type="button" class="btn-secondary btn-cancel" id="cancelTextColors">Cancelar</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        document.getElementById('saveTextColors').addEventListener('click', () => {
+            const colors = {
+                title: document.getElementById('textColorTitle').value,
+                subtitle: document.getElementById('textColorSubtitle').value,
+                label: document.getElementById('textColorLabel').value,
+                input: document.getElementById('textColorInput').value,
+                number: document.getElementById('textColorNumber').value,
+                modifier: document.getElementById('textColorModifier').value
+            };
+            
+            this.colorManager.setAllTextColors(colors);
+            modal.style.display = 'none';
+            Helpers.showMessage('Colores de texto aplicados', 'info');
+        });
+        
+        document.getElementById('resetTextColors').addEventListener('click', () => {
+            this.colorManager.resetTextColors();
+            modal.style.display = 'none';
+            Helpers.showMessage('Colores de texto restaurados', 'info');
+        });
+        
+        document.getElementById('cancelTextColors').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showSaveConfirmation() {
+        const saveBtn = document.getElementById('saveBtn');
+        if (!saveBtn) return;
+        
+        const originalHTML = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-check"></i> ✓ GUARDADO';
+        saveBtn.style.background = 'linear-gradient(145deg, #4CAF50, #2E7D32)';
+        
+        setTimeout(() => {
+            saveBtn.innerHTML = originalHTML;
+            saveBtn.style.background = '';
+        }, 2000);
+    }
+
+    exportCharacter() {
+        const personajeNombre = document.getElementById('char-name')?.value.trim() || 'Sin nombre';
+        const clase = document.getElementById('char-class')?.value || '';
+        const raza = document.getElementById('char-race')?.value || '';
+        const trasfondo = document.getElementById('char-bg')?.value || '';
+        const alineamiento = document.getElementById('char-align')?.value || '';
+        
+        const inventoryCard = document.getElementById('card-inventory');
+        const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
+        
+        const imagenUrl = localStorage.getItem('imagenUrl') || null;
+        
+        const atributosDOM = [];
+        document.querySelectorAll('.attribute-item').forEach(item => {
+            const nameInput = item.querySelector('.attribute-name');
+            const valueInput = item.querySelector('.ability-value');
+            const modifierElement = item.querySelector('.ability-modifier');
+            
+            if (nameInput && valueInput) {
+                const nombre = nameInput.value.trim() || 'ATRIBUTO';
+                const valor = parseInt(valueInput.value) || 10;
+                let modifier = 0;
+                
+                if (modifierElement) {
+                    const modifierText = modifierElement.textContent;
+                    modifier = parseInt(modifierText) || 0;
+                } else {
+                    modifier = Helpers.calculateModifier(valor);
+                }
+                
+                atributosDOM.push({
+                    nombre: nombre,
+                    valor: valor,
+                    modificador: modifier
+                });
+            }
+        });
+        
+        const notas = {
+            personalidad: document.getElementById('personality')?.value || '',
+            ideales: document.getElementById('ideals')?.value || '',
+            vinculos: document.getElementById('bonds')?.value || '',
+            defectos: document.getElementById('flaws')?.value || '',
+            rasgos: document.getElementById('features')?.value || ''
+        };
+        
+        const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
+        const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
+        
+        const layout = {};
+        document.querySelectorAll('.card').forEach((card, index) => {
+            const id = card.id || `card-${index}`;
+            layout[id] = {
+                width: card.style.width || getComputedStyle(card).width,
+                height: card.style.height || getComputedStyle(card).height,
+                parentId: card.parentNode?.id || card.parentNode?.className || ''
+            };
+        });
+        
+        const characterData = {
+            id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            nombre: personajeNombre,
+            clase: clase,
+            raza: raza,
+            nivel: this.expManager?.getData().level || 1,
+            jugador: localStorage.getItem('jugadorNombre') || 'Aventurero',
+            imagen: imagenUrl,
+            colores_personalizados: {
+                background: coloresGuardados.background || null,
+                parchment: coloresGuardados.parchment || null,
+                accent: coloresGuardados.accent || null,
+                mana: coloresGuardados.mana || null,
+                hp: coloresGuardados.hp || null,
+                gems: coloresGuardados.gems || null,
+                textColors: textColorsGuardados
+            },
+            stats: {
+                hp: this.healthManager.getData(),
+                mana: this.manaManager.getData(),
+                ca: parseInt(document.getElementById('armor-class')?.value) || 12,
+                velocidad: parseInt(document.getElementById('speed')?.value) || 30,
+                iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
+                atributos: atributosDOM
+            },
+            ataques: this.getAttacks(),
+            conjuros: this.getSpells(),
+            inventario: {
+                monedas: this.currencyManager.getData(),
+                tesoros: this.treasureManager.getAll(),
+                pociones: this.potionManager.getAll(),
+                equipo: this.equipmentManager.getAll(),
+                collapsed: isInventoryCollapsed
+            },
+            deathSaves: this.deathSavesManager.getData(),
+            skills: this.skillsManager.getAll(),
+            passivePerception: this.passivePerception || 10,
+            proficiencies: this.proficiencyManager.getAll(),
+            savingThrows: this.savingThrowsManager.getAll(),
+            notas: notas,
+            layout: layout,
+            fecha_creacion: new Date().toISOString(),
+            version: '3.2'
+        };
+        
+        const dataStr = JSON.stringify(characterData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `personaje-${personajeNombre.replace(/\s+/g, '-').toLowerCase() || 'sin-nombre'}.json`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        Helpers.showMessage('Personaje exportado correctamente', 'info');
+    }
+
+    importCharacter() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    this.loadCharacterFromData(data);
+                    Helpers.showMessage('Personaje importado correctamente', 'info');
+                } catch (error) {
+                    console.error('Error importing character:', error);
+                    Helpers.showMessage('Error al importar el archivo', 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        
+        input.click();
+    }
+
+    loadAttacksFromStorage() {
+        const savedAttacks = this.storage.load('attacks');
+        if (savedAttacks && savedAttacks.length > 0) {
+            const attacksList = document.querySelector('.attacks-list');
+            const addAttackBtn = document.getElementById('addAttackBtn');
+            if (attacksList) {
+                const attackItems = attacksList.querySelectorAll('.attack-item');
+                attackItems.forEach(item => item.remove());
+                
+                savedAttacks.forEach(attack => {
+                    this.addAttack(attack.name, attack.bonus, attack.damage, false);
+                });
+            }
+        }
+    }
+
+    loadCharacterFromData(data) {
+        this.clearAllData();
+        
+        if (data.basicInfo) {
+            document.getElementById('char-name').value = data.basicInfo.name || '';
+            document.getElementById('char-class').value = data.basicInfo.class || '';
+            document.getElementById('char-race').value = data.basicInfo.race || '';
+            document.getElementById('char-bg').value = data.basicInfo.background || '';
+            document.getElementById('char-align').value = data.basicInfo.alignment || '';
+            this.saveBasicInfo();
+        } else if (data.nombre) {
+            document.getElementById('char-name').value = data.nombre || '';
+            document.getElementById('char-class').value = data.clase || '';
+            document.getElementById('char-race').value = data.raza || '';
+        }
+        
+        if (data.attributes && data.attributes.length > 0) {
+            this.attributeManager.attributes = [];
+            data.attributes.forEach(attr => {
+                const nombre = attr.name || attr.nombre || 'ATRIBUTO';
+                const valor = attr.value || attr.valor || 10;
+                this.attributeManager.add(nombre, valor);
+            });
+            setTimeout(() => {
+                this.savingThrowsManager.updateFromAttributes();
+            }, 100);
+        } else if (data.stats?.atributos && data.stats.atributos.length > 0) {
+            this.attributeManager.attributes = [];
+            data.stats.atributos.forEach(attr => {
+                this.attributeManager.add(attr.nombre, attr.valor);
+            });
+        }
+        
+        if (data.hp) {
+            this.healthManager.setCurrent(data.hp.current || 26);
+            this.healthManager.setMax(data.hp.max || 26);
+            this.healthManager.setTemp(data.hp.temp || 0);
+        } else if (data.stats?.hp) {
+            this.healthManager.setCurrent(data.stats.hp.current || 26);
+            this.healthManager.setMax(data.stats.hp.max || 26);
+            this.healthManager.setTemp(data.stats.hp.temp || 0);
+        }
+        
+        if (data.mana) {
+            this.manaManager.setCurrent(data.mana.current || 2);
+            this.manaManager.setMax(data.mana.max || 15);
+        } else if (data.stats?.mana) {
+            this.manaManager.setCurrent(data.stats.mana.current || 2);
+            this.manaManager.setMax(data.stats.mana.max || 15);
+        }
+        
+        if (data.spellSlots) {
+            this.spellSlotsManager.setLevel(data.spellSlots.level || 1);
+            this.spellSlotsManager.setTotal(data.spellSlots.total || 4);
+            this.spellSlotsManager.setUsed(data.spellSlots.used || 0);
+        }
+        
+        if (data.stats) {
+            document.getElementById('armor-class').value = data.stats.ca || 12;
+            document.getElementById('speed').value = data.stats.velocidad || 30;
+            document.getElementById('initiative').value = data.stats.iniciativa || 1;
+        }
+        
+        const attacksList = document.querySelector('.attacks-list');
+        const addAttackBtn = document.getElementById('addAttackBtn');
+        if (attacksList) {
+            const attackItems = attacksList.querySelectorAll('.attack-item');
+            attackItems.forEach(item => item.remove());
+            
+            const attacks = data.attacks || data.ataques || [];
+            attacks.forEach(attack => {
+                this.addAttack(attack.name, attack.bonus, attack.damage, false);
+            });
+        }
+
+        if (data.attacks && data.attacks.length > 0) {
+            const attacksList = document.querySelector('.attacks-list');
+            const addAttackBtn = document.getElementById('addAttackBtn');
+            if (attacksList) {
+                const attackItems = attacksList.querySelectorAll('.attack-item');
+                attackItems.forEach(item => item.remove());
+                
+                data.attacks.forEach(attack => {
+                    this.addAttack(attack.name, attack.bonus, attack.damage, false);
+                });
+                
+                this.saveAttacksToStorage();
+            }
+        } else if (data.ataques && data.ataques.length > 0) {
+            const attacksList = document.querySelector('.attacks-list');
+            const addAttackBtn = document.getElementById('addAttackBtn');
+            if (attacksList) {
+                const attackItems = attacksList.querySelectorAll('.attack-item');
+                attackItems.forEach(item => item.remove());
+                
+                data.ataques.forEach(attack => {
+                    this.addAttack(attack.name, attack.bonus, attack.damage, false);
+                });
+                
+                this.saveAttacksToStorage();
+            }
+        }
+        
+        const spellsList = document.getElementById('spellsList');
+        if (spellsList) {
+            spellsList.innerHTML = '';
+            const spells = data.spells || data.conjuros || [];
+            spells.forEach(spell => {
+                this.spellManager.add(spell.name, spell.level, spell.description);
+            });
+        }
+        
+        if (data.exp) {
+            this.expManager.setCurrent(data.exp.current || 0);
+            this.expManager.setMax(data.exp.max || 300);
+            this.expManager.setLevel(data.exp.level || 1);
+        } else if (data.nivel) {
+            this.expManager.setLevel(data.nivel || 1);
+        }
+        
+        const inventory = data.inventario || data;
+        
+        if (inventory.currency || inventory.monedas) {
+            const currency = inventory.currency || inventory.monedas || {};
+            this.currencyManager.setGold(currency.gold || 0);
+            this.currencyManager.setSilver(currency.silver || 0);
+            this.currencyManager.setCopper(currency.copper || 0);
+            
+            if (currency.name) this.currencyManager.updateNames({
+                name: currency.name,
+                goldName: currency.goldName || 'Oro',
+                silverName: currency.silverName || 'Plata',
+                copperName: currency.copperName || 'Cobre'
+            });
+        }
+        
+        if (inventory.treasures || inventory.tesoros) {
+            const treasures = inventory.treasures || inventory.tesoros || [];
+            this.treasureManager.treasures = [];
+            treasures.forEach(t => {
+                this.treasureManager.add(t.name, t.value, t.type);
+            });
+        }
+        
+        if (inventory.potions || inventory.pociones) {
+            const potions = inventory.potions || inventory.pociones || [];
+            this.potionManager.potions = [];
+            potions.forEach(p => {
+                this.potionManager.add(p.name, p.type, p.value, p.amount);
+            });
+        }
+        
+        if (inventory.equipment || inventory.equipo) {
+            const equipment = inventory.equipment || inventory.equipo || [];
+            this.equipmentManager.equipment = [];
+            equipment.forEach(e => {
+                this.equipmentManager.add(
+                    e.name, 
+                    e.cost || 0, 
+                    e.weight || 0, 
+                    e.description || '', 
+                    e.stealth || 'none', 
+                    e.attribute || '', 
+                    e.bonus || 0
+                );
+            });
+        }
+        
+        if (data.deathSaves) {
+            this.deathSavesManager.successes = data.deathSaves.successes || [false, false, false];
+            this.deathSavesManager.fails = data.deathSaves.fails || [false, false, false];
+            this.deathSavesManager.notify();
+        }
+        
+        if (data.skills && data.skills.length > 0) {
+            this.skillsManager.skills = [];
+            data.skills.forEach(skill => {
+                this.skillsManager.add(skill.name, skill.attribute || '');
+                
+                const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
+                if (lastSkill) {
+                    lastSkill.bonus = skill.bonus || 0;
+                    lastSkill.proficient = skill.proficient || false;
+                    lastSkill.expertise = skill.expertise || false;
+                    lastSkill.misc = skill.misc || 0;
+                }
+            });
+            this.skillsManager.updateAllBonuses();
+            this.skillsManager.notify();
+        }
+        
+        if (data.passivePerception !== undefined) {
+            this.passivePerception = data.passivePerception;
+            document.getElementById('passivePerception').value = data.passivePerception;
+        }
+        
+        if (data.proficiencies && data.proficiencies.length > 0) {
+            this.proficiencyManager.proficiencies = [];
+            data.proficiencies.forEach(prof => {
+                this.proficiencyManager.add(prof.name, prof.type || 'language');
+            });
+        }
+        
+        if (data.savingThrows && data.savingThrows.length > 0) {
+            this.savingThrowsManager.savingThrows = data.savingThrows.map(st => ({
+                name: st.name,
+                value: st.value || 0,
+                proficient: st.proficient || false,
+                basedOn: st.basedOn || st.name,
+                modifier: st.modifier || 0
+            }));
+            this.savingThrowsManager.updateAllValues();
+            this.savingThrowsManager.notify();
+        }
+        
+        const notas = data.notas || data;
+        
+        if (notas.personalidad !== undefined) {
+            document.getElementById('personality').value = notas.personalidad || '';
+            document.getElementById('ideals').value = notas.ideales || '';
+            document.getElementById('bonds').value = notas.vinculos || '';
+            document.getElementById('flaws').value = notas.defectos || '';
+            document.getElementById('features').value = notas.rasgos || '';
+        } else if (notas.personality) {
+            document.getElementById('personality').value = notas.personality || '';
+            document.getElementById('ideals').value = notas.ideals || '';
+            document.getElementById('bonds').value = notas.bonds || '';
+            document.getElementById('flaws').value = notas.flaws || '';
+            document.getElementById('features').value = notas.features || '';
+        }
+        
+        if (data.layout) {
+            Object.entries(data.layout).forEach(([cardId, cardLayout]) => {
+                const card = document.getElementById(cardId);
+                if (card) {
+                    if (cardLayout.width) card.style.width = cardLayout.width;
+                    if (cardLayout.height) card.style.height = cardLayout.height;
+                }
+            });
+        }
+        
+        setTimeout(() => {
+            this.skillsManager.updateAllBonuses();
+            this.savingThrowsManager.updateFromAttributes();
+            this.syncCharacterWithWebSocket();
+        }, 500);
+        
+        this.saveCharacter();
+    }
+
+    clearAllData() {
+        if (this.attributeManager) {
+            this.attributeManager.attributes = [];
+        }
+        
+        if (this.skillsManager) {
+            this.skillsManager.skills = [];
+        }
+        
+        if (this.proficiencyManager) {
+            this.proficiencyManager.proficiencies = [];
+        }
+        
+        if (this.treasureManager) {
+            this.treasureManager.treasures = [];
+        }
+        
+        if (this.potionManager) {
+            this.potionManager.potions = [];
+        }
+        
+        if (this.equipmentManager) {
+            this.equipmentManager.equipment = [];
+        }
+        
+        if (this.spellManager) {
+            this.spellManager.spells = [];
+        }
+        
+        const attacksList = document.querySelector('.attacks-list');
+        if (attacksList) {
+            const attackItems = attacksList.querySelectorAll('.attack-item');
+            attackItems.forEach(item => item.remove());
+        }
+    }
+
+    resetAll() {
+        if (confirm('¿Estás seguro? Esta acción no se puede deshacer.')) {
+            this.storage.clear();
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    updateSavingThrows() {
+        this.savingThrowsManager.updateFromAttributes();
+    }
+
+    getCharacterName() {
+        return document.getElementById('char-name')?.value || 'Sin nombre';
+    }
+
+    getPlayerName() {
+        return localStorage.getItem('jugadorNombre') || 'Anónimo';
+    }
+
+    syncCharacterWithWebSocket() {
+        if (!this.ws || !this.ws.isConectado()) return;
+        
+        const personaje = {
+            nombre: this.getCharacterName(),
+            clase: document.getElementById('char-class')?.value || '',
+            nivel: this.expManager?.getData().level || 1,
+            raza: document.getElementById('char-race')?.value || '',
+            jugador: this.getPlayerName()
+        };
+        
+        if (personaje.nombre && personaje.nombre !== 'Sin nombre') {
+            this.ws.actualizarPersonaje(personaje);
+        }
+    }
+}

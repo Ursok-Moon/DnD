@@ -7,7 +7,6 @@ class DMScreen {
         this.currentRound = 1;
         this.combatMode = false;
         
-        // Para actualización en tiempo real del modal
         this.modalAbierto = null;
         this.intervaloActualizacionModal = null;
         this.ultimaVersionPersonaje = null;
@@ -23,7 +22,6 @@ class DMScreen {
         this.jugadoresDenominaciones = [];
         this.personajesHoy = [];
         
-        // PDF viewers
         this.pdfData = {
             manual: null,
             bestiary: null,
@@ -45,7 +43,6 @@ class DMScreen {
         this.timerInterval = null;
         this.timerSeconds = 0;
         
-        // Propiedades para el bestiario
         this.bestiarioData = [];
         this.bestiarioOriginal = null;
         this.bestiaryDenominaciones = [];
@@ -75,137 +72,44 @@ class DMScreen {
         this.updateTime();
         
         setInterval(() => this.updateTime(), 60000);
-        setInterval(() => {this.actualizarPersonajesPeriodicamente();}, 3000); 
-        this.setupWebSocketHandlers();   
+        setInterval(() => {this.actualizarPersonajesPeriodicamente();}, 3000);    
         console.log('DM Screen inicializada');
-    }
-
-    setupWebSocketHandlers() {
-        if (window.wsClient) {
-            window.wsClient.on('personaje-actualizado', (data) => {
-                console.log('📥 Personaje actualizado vía WebSocket:', data);
-                this.manejarActualizacionPersonaje(data.personaje);
-            });
-            
-            window.wsClient.on('personaje-guardado', (data) => {
-                console.log('💾 Personaje guardado vía WebSocket:', data);
-                this.cargarPersonajesHoy();
-            });
-            
-            window.wsClient.on('connect', () => {
-                console.log('🔄 WebSocket reconectado, sincronizando...');
-                this.cargarPersonajesHoy();
-            });
-        }
-    }
-
-    manejarActualizacionPersonaje(personajeActualizado) {
-    if (!personajeActualizado || !personajeActualizado.nombre) return;
-    
-    const index = this.personajesHoy.findIndex(p => 
-        p.nombre === personajeActualizado.nombre || p.id === personajeActualizado.id
-    );
-    
-    if (index !== -1) {
-        this.personajesHoy[index] = {
-            ...this.personajesHoy[index],
-            ...personajeActualizado,
-            stats: personajeActualizado.stats || this.personajesHoy[index].stats,
-            savingThrows: personajeActualizado.savingThrows || this.personajesHoy[index].savingThrows,
-            passivePerception: personajeActualizado.passivePerception || this.personajesHoy[index].passivePerception,
-            deathSaves: personajeActualizado.deathSaves || this.personajesHoy[index].deathSaves,
-            inventario: personajeActualizado.inventario || this.personajesHoy[index].inventario, 
-            ataques: personajeActualizado.ataques || this.personajesHoy[index].ataques,          
-            conjuros: personajeActualizado.conjuros || this.personajesHoy[index].conjuros,        
-            notas: personajeActualizado.notas || this.personajesHoy[index].notas              
-        };
-    } else {
-        this.personajesHoy.push(personajeActualizado);
-    }
-    
-    this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
-        text: pj.nombre,
-        value: pj.nombre,
-        jugador: pj.jugador,
-        clase: pj.clase,
-        nivel: pj.nivel,
-        raza: pj.raza,
-        stats: pj.stats,
-        ataques: pj.ataques,
-        conjuros: pj.conjuros,
-        inventario: pj.inventario,
-        notas: pj.notas,    
-        inventario: pj.inventario,
-        notas: pj.notas,
-        imagen: pj.imagen,
-        colores_personalizados: pj.colores_personalizados,
-        savingThrows: pj.savingThrows,
-        passivePerception: pj.passivePerception,
-        deathSaves: pj.deathSaves  
-    }));
-    
-    if (this.modalAbierto && (this.modalAbierto.nombre === personajeActualizado.nombre)) {
-        console.log(`🔄 Actualizando modal para ${personajeActualizado.nombre} por WebSocket`);
-        this.modalAbierto = personajeActualizado;
-        this.actualizarModalConDatos(personajeActualizado);
-    }
-    
-    this.actualizarJugadoresEnListas();
-}
-
-    actualizarJugadoresEnListas() {
-        this.players.forEach(player => {
-            const personaje = this.personajesHoy.find(p => p.nombre === player.name);
-            if (personaje) {
-                if (personaje.stats?.ca) player.ca = personaje.stats.ca;
-                if (personaje.stats?.hp?.max) {
-                    player.maxHp = personaje.stats.hp.max;
-                    player.hp = Math.min(player.hp, player.maxHp);
-                }
-            }
-        });
-        
-        this.updatePlayersList();
-        this.updateInitiativeOrder();
     }
     
     async cargarPersonajesHoy() {
-    try {
-        const url = `${this.baseUrl}/api/personajes/hoy`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error('Error al cargar personajes');
+        try {
+            const url = `${this.baseUrl}/api/personajes/hoy`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('Error al cargar personajes');
+            }
+            
+            const data = await response.json();
+            this.personajesHoy = data.personajes || [];
+            
+            this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
+                text: pj.nombre,
+                value: pj.nombre,
+                jugador: pj.jugador,
+                clase: pj.clase,
+                nivel: pj.nivel,
+                raza: pj.raza,
+                stats: pj.stats,
+                ataques: pj.ataques,
+                conjuros: pj.conjuros,
+                inventario: pj.inventario,
+                notas: pj.notas,
+                imagen: pj.imagen,
+                colores_personalizados: pj.colores_personalizados
+            }));
+            
+        } catch (error) {
+            console.warn('Error cargando personajes:', error);
+            this.personajesHoy = [];
+            this.jugadoresDenominaciones = [];
         }
-        
-        const data = await response.json();
-        this.personajesHoy = data.personajes || [];
-        
-        this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
-            text: pj.nombre,
-            value: pj.nombre,
-            jugador: pj.jugador,
-            clase: pj.clase,
-            nivel: pj.nivel,
-            raza: pj.raza,
-            stats: pj.stats,
-            ataques: pj.ataques,
-            conjuros: pj.conjuros,
-            inventario: pj.inventario,    
-            notas: pj.notas,              
-            imagen: pj.imagen,
-            colores_personalizados: pj.colores_personalizados,
-            savingThrows: pj.savingThrows,
-            passivePerception: pj.passivePerception,
-            deathSaves: pj.deathSaves
-        }));
-        
-    } catch (error) {
-        console.warn('Error cargando personajes:', error);
-        this.personajesHoy = [];
-        this.jugadoresDenominaciones = [];
     }
-}
 
     setupJugadoresAutocomplete() {
         const playerNameInput = document.getElementById('playerNameInput');
@@ -322,6 +226,50 @@ class DMScreen {
         document.addEventListener('click', this._boundJugadorDocumentClickHandler);
     }
 
+    async actualizarPersonajesPeriodicamente() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/personajes/hoy`);
+            const data = await response.json();
+            const nuevosPersonajes = data.personajes || [];
+            
+            const hayCambios = JSON.stringify(nuevosPersonajes) !== JSON.stringify(this.personajesHoy);
+            
+            if (hayCambios) {
+                console.log('🔄 Cambios detectados en personajes');
+                
+                const personajesAnteriores = this.personajesHoy;
+                this.personajesHoy = nuevosPersonajes;
+                
+                this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
+                    text: pj.nombre,
+                    value: pj.nombre,
+                    jugador: pj.jugador,
+                    clase: pj.clase,
+                    nivel: pj.nivel,
+                    raza: pj.raza,
+                    stats: pj.stats,
+                    ataques: pj.ataques,
+                    conjuros: pj.conjuros,
+                    inventario: pj.inventario,
+                    notas: pj.notas,
+                    imagen: pj.imagen,
+                    colores_personalizados: pj.colores_personalizados
+                }));
+                
+                if (nuevosPersonajes.length > personajesAnteriores.length) {
+                    this.showNotification(`Nuevo personaje: ${nuevosPersonajes[nuevosPersonajes.length-1].nombre}`, 'info');
+                }
+                
+                if (this.modalAbierto) {
+                    await this.verificarCambiosPersonaje();
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error actualizando personajes:', error);
+        }
+    }
+
     cargarDatosJugador(personaje) {
         const playerNameInput = document.getElementById('playerNameInput');
         const playerCAInput = document.getElementById('playerCAInput');
@@ -337,86 +285,7 @@ class DMScreen {
         
         this.showNotification(`Datos de ${personaje.text} precargados`, 'success');
     }
-
-    async actualizarPersonajesPeriodicamente() {
-    try {
-        const response = await fetch(`${this.baseUrl}/api/personajes/hoy`);
-        const data = await response.json();
-        const nuevosPersonajes = data.personajes || [];
-        
-        const cambios = this.detectarCambiosPersonajes(nuevosPersonajes, this.personajesHoy);
-        
-        if (cambios.hayCambios) {
-            console.log('🔄 Cambios detectados en personajes:', cambios);
-            
-            this.personajesHoy = nuevosPersonajes;
-            
-            this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
-                text: pj.nombre,
-                value: pj.nombre,
-                jugador: pj.jugador,
-                clase: pj.clase,
-                nivel: pj.nivel,
-                raza: pj.raza,
-                stats: pj.stats,
-                ataques: pj.ataques,
-                conjuros: pj.conjuros,
-                inventario: pj.inventario,
-                notas: pj.notas,
-                imagen: pj.imagen,
-                colores_personalizados: pj.colores_personalizados,
-                savingThrows: pj.savingThrows,
-                passivePerception: pj.passivePerception,
-                deathSaves: pj.deathSaves  // ← AÑADIR ESTA LÍNEA
-            }));
-            
-            if (cambios.nuevos.length > 0) {
-                cambios.nuevos.forEach(pj => {
-                    this.showNotification(`✨ Nuevo personaje: ${pj.nombre}`, 'info');
-                });
-            }
-            
-            if (cambios.modificados.length > 0 && this.modalAbierto) {
-                await this.verificarCambiosPersonaje();
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error actualizando personajes:', error);
-    }
-}
-
-    detectarCambiosPersonajes(nuevos, viejos) {
-        const resultado = {
-            hayCambios: false,
-            nuevos: [],
-            modificados: [],
-            eliminados: []
-        };
-        
-        nuevos.forEach(nuevo => {
-            const viejo = viejos.find(v => v.nombre === nuevo.nombre || v.id === nuevo.id);
-            
-            if (!viejo) {
-                resultado.nuevos.push(nuevo);
-                resultado.hayCambios = true;
-            } else if (JSON.stringify(nuevo) !== JSON.stringify(viejo)) {
-                resultado.modificados.push(nuevo);
-                resultado.hayCambios = true;
-            }
-        });
-        
-        viejos.forEach(viejo => {
-            const existe = nuevos.find(n => n.nombre === viejo.nombre || n.id === viejo.id);
-            if (!existe) {
-                resultado.eliminados.push(viejo);
-                resultado.hayCambios = true;
-            }
-        });
-        
-        return resultado;
-    }
-
+    
     iniciarSeguimientoModal(personaje) {
         this.detenerSeguimientoModal();
         
@@ -468,21 +337,11 @@ class DMScreen {
         const modalBody = document.getElementById('jugadorModalBody');
         if (!modalBody) return;
         
-        const tituloActual = modalBody.querySelector('h2')?.textContent;
-        if (tituloActual && tituloActual !== personaje.nombre) {
-            console.log('⚠️ El modal muestra otro personaje, ignorando actualización');
-            return;
-        }
-        
         if (personaje.colores_personalizados) {
             this.aplicarColoresPersonaje(modal, personaje.colores_personalizados);
         }
         
-        const scrollPos = modalBody.scrollTop;
-        
         modalBody.innerHTML = this.generarHTMLModal(personaje);
-        
-        modalBody.scrollTop = scrollPos;
         
         this.mostrarNotificacionActualizacion(modal);
     }
@@ -818,28 +677,28 @@ class DMScreen {
             html += `<div class="jugador-seccion">`;
             html += `<h3><i class="fas fa-box-open"></i> Inventario</h3>`;
             
-        if (inv.monedas) {
-            const monedas = inv.monedas;
-            html += `
-                <div class="inventario-subseccion">
-                    <h4><i class="fas fa-coins"></i> ${monedas.name || 'Monedas'}</h4>
-                    <div class="monedas-grid">
-                        <div class="moneda-item" style="background: linear-gradient(135deg, #ffd700, #b8860b);">
-                            <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.goldName || 'Oro'}</span>
-                            <span class="moneda-cantidad">${monedas.gold || 0}</span>
-                        </div>
-                        <div class="moneda-item" style="background: linear-gradient(135deg, #c0c0c0, #808080);">
-                            <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.silverName || 'Plata'}</span>
-                            <span class="moneda-cantidad">${monedas.silver || 0}</span>
-                        </div>
-                        <div class="moneda-item" style="background: linear-gradient(135deg, #b87333, #8b4513);">
-                            <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.copperName || 'Cobre'}</span>
-                            <span class="moneda-cantidad">${monedas.copper || 0}</span>
+            if (inv.monedas) {
+                const monedas = inv.monedas;
+                html += `
+                    <div class="inventario-subseccion">
+                        <h4><i class="fas fa-coins"></i> ${monedas.name || 'Monedas'}</h4>
+                        <div class="monedas-grid">
+                            <div class="moneda-item" style="background: linear-gradient(135deg, #ffd700, #b8860b);">
+                                <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.goldName || 'Oro'}</span>
+                                <span class="moneda-cantidad">${monedas.gold || 0}</span>
+                            </div>
+                            <div class="moneda-item" style="background: linear-gradient(135deg, #c0c0c0, #808080);">
+                                <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.silverName || 'Plata'}</span>
+                                <span class="moneda-cantidad">${monedas.silver || 0}</span>
+                            </div>
+                            <div class="moneda-item" style="background: linear-gradient(135deg, #b87333, #8b4513);">
+                                <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.copperName || 'Cobre'}</span>
+                                <span class="moneda-cantidad">${monedas.copper || 0}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-        }
+                `;
+            }
             
             if (inv.tesoros?.length > 0) {
                 html += `<div class="inventario-subseccion"><h4><i class="fas fa-gem"></i> Tesoros</h4><div class="items-lista">`;
@@ -1218,8 +1077,6 @@ class DMScreen {
             localStorage.removeItem('customBestiaryName');
             
             this.showNotification('Bestiario original restaurado', 'info');
-        } else {
-            this.loadBestiarioOriginal();
         }
     }
     
@@ -2295,6 +2152,7 @@ class DMScreen {
         `;
         
         let imageUrl = this.getBestiaryImage(entry.nombre);
+        let imageError = false;
         
         let html = '';
         

@@ -17,6 +17,8 @@ const DEFAULT_TEXT_COLORS = {
     modifier: '#2a4a7a'
 };
 
+const wsClient = window.wsClient;
+
 class CharacterSheet {
     constructor() {
         this.currentMana = 2;
@@ -2560,10 +2562,8 @@ async subirImagenAlServidor(file) {
     const inventoryCard = document.getElementById('card-inventory');
     const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
     
-    // Obtener la URL de la imagen (si existe)
     const imagenUrl = localStorage.getItem('imagenUrl') || null;
     
-    // Obtener atributos directamente del DOM
     const atributosDOM = [];
     document.querySelectorAll('.attribute-item').forEach(item => {
         const nameInput = item.querySelector('.attribute-name');
@@ -2598,60 +2598,74 @@ async subirImagenAlServidor(file) {
         rasgos: document.getElementById('features')?.value || ''
     };
     
-    const characterData = {
-    id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    nombre: personajeNombre,
-    clase: this.getBasicInfo().class || 'Sin clase',
-    raza: this.getBasicInfo().race || 'Sin raza',
-    nivel: this.characterLevel,
-    jugador: localStorage.getItem('jugadorNombre') || 'Aventurero',
-    imagen: imagenUrl,
-    colores_personalizados: {
-        background: localStorage.getItem('backgroundColor') || null,
-        parchment: localStorage.getItem('parchmentColor') || null,
-        accent: localStorage.getItem('accentColor') || null,
-        mana: localStorage.getItem('manaColor') || null,
-        hp: localStorage.getItem('hpColor') || null,
-        gems: localStorage.getItem('gemsColor') || null,
-        textColors: JSON.parse(localStorage.getItem('characterTextColors') || '{}')
-    },
-    stats: {
-        hp: {
-            current: this.currentHP,
-            max: this.maxHP,
-            temp: this.tempHP
-        },
-        mana: {
-            current: this.currentMana,
-            max: this.maxMana
-        },
-        ca: parseInt(document.getElementById('armor-class')?.value) || 12,
-        velocidad: parseInt(document.getElementById('speed')?.value) || 30,
-        iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
-        atributos: atributosDOM
-    },
-    ataques: this.getAttacks(),
-    conjuros: this.getSpells(),
-    inventario: {
-        monedas: this.currency,
-        tesoros: this.treasures,
-        pociones: this.potions,
-        equipo: this.equipment,
-        collapsed: isInventoryCollapsed
-    },
-    deathSaves: this.deathSaves,
-    skills: this.skills,
-    passivePerception: this.passivePerception,
-    proficiencies: this.proficiencies,
-    savingThrows: this.savingThrows,
+    const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
+    const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
     
-    notas: notas,
-    fecha_creacion: new Date().toISOString(),
-    version: '3.2'
-};
+    const characterData = {
+        id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        nombre: personajeNombre,
+        clase: this.getBasicInfo().class || 'Sin clase',
+        raza: this.getBasicInfo().race || 'Sin raza',
+        nivel: this.characterLevel,
+        jugador: localStorage.getItem('jugadorNombre') || 'Aventurero',
+        imagen: imagenUrl,
+        colores_personalizados: {
+            background: coloresGuardados.background || null,
+            parchment: coloresGuardados.parchment || null,
+            accent: coloresGuardados.accent || null,
+            mana: coloresGuardados.mana || null,
+            hp: coloresGuardados.hp || null,
+            gems: coloresGuardados.gems || null,
+            textColors: textColorsGuardados
+        },
+        stats: {
+            hp: {
+                current: this.currentHP,
+                max: this.maxHP,
+                temp: this.tempHP
+            },
+            mana: {
+                current: this.currentMana,
+                max: this.maxMana
+            },
+            ca: parseInt(document.getElementById('armor-class')?.value) || 12,
+            velocidad: parseInt(document.getElementById('speed')?.value) || 30,
+            iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
+            atributos: atributosDOM
+        },
+        ataques: this.getAttacks(),
+        conjuros: this.getSpells(),
+        inventario: {
+            monedas: this.currency,
+            tesoros: this.treasures,
+            pociones: this.potions,
+            equipo: this.equipment,
+            collapsed: isInventoryCollapsed
+        },
+        deathSaves: this.deathSaves,
+        skills: this.skills,
+        passivePerception: this.passivePerception,
+        proficiencies: this.proficiencies,
+        savingThrows: this.savingThrows,
+        
+        notas: notas,
+        fecha_creacion: new Date().toISOString(),
+        version: '3.2'
+    };
     
     localStorage.setItem('dndCharacterSheet', JSON.stringify(characterData));
     localStorage.setItem('personajeNombre', personajeNombre);
+    
+    // ===== NUEVO: Actualizar personaje en WebSocket ANTES de guardar en servidor =====
+    if (window.wsClient && window.wsClient.isConectado()) {
+        window.wsClient.actualizarPersonaje({
+            nombre: personajeNombre,
+            jugador: characterData.jugador,
+            clase: characterData.clase,
+            nivel: this.characterLevel,
+            raza: characterData.raza
+        });
+    }
     
     await this.guardarPersonajeEnServidor(characterData);
     
@@ -2659,26 +2673,49 @@ async subirImagenAlServidor(file) {
 }
 
     async guardarPersonajeEnServidor(characterData) {
-        try {
-            const response = await fetch('/api/personajes/guardar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(characterData)
-            });
+    try {
+        const response = await fetch('/api/personajes/guardar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(characterData)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Personaje guardado en servidor');
             
-            if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Personaje guardado en servidor');
-                //this.showMessage('Personaje registrado en la sesión', 'info');
-            } else {
-                console.error('❌ Error en respuesta del servidor:', response.status);
-                this.showMessage('Error al guardar en servidor', 'warning');
+            // ===== NUEVO: Notificar a WebSocket =====
+            if (window.wsClient && window.wsClient.isConectado()) {
+                // Preparar datos mínimos para la notificación
+                const notificacion = {
+                    nombre: characterData.nombre,
+                    jugador: characterData.jugador,
+                    clase: characterData.clase,
+                    nivel: characterData.nivel,
+                    raza: characterData.raza,
+                    stats: {
+                        hp: characterData.stats?.hp,
+                        ca: characterData.stats?.ca
+                    },
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Enviar a todos usando el método actualizarPersonaje
+                window.wsClient.actualizarPersonaje(notificacion);
+                
+                console.log('📡 Notificación WebSocket enviada');
             }
-        } catch (error) {
-            console.error('❌ Error guardando personaje:', error);
-            this.showMessage('Error de conexión con el servidor', 'error');
+            
+            this.showMessage('Personaje registrado en la sesión', 'info');
+        } else {
+            console.error('❌ Error en respuesta del servidor:', response.status);
+            this.showMessage('Error al guardar en servidor', 'warning');
         }
+    } catch (error) {
+        console.error('❌ Error guardando personaje:', error);
+        this.showMessage('Error de conexión con el servidor', 'error');
     }
+}
 
     // NUEVO MÉTODO: Obtener personajes de hoy
     async obtenerPersonajesHoy() {

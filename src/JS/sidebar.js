@@ -1,5 +1,5 @@
-// sidebar.js - Control del sidebar
-class SidebarManager {
+// js/sidebar.js - Versión módulo
+export class SidebarManager {
     constructor() {
         this.sidebar = document.getElementById('sidebar');
         this.currentPage = this.getCurrentPage();
@@ -129,9 +129,3 @@ class SidebarManager {
         }
     }
 }
-
-// Inicializar cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', () => {
-    const sidebarManager = new SidebarManager();
-    window.sidebarManager = sidebarManager;
-});

@@ -3029,3 +3029,25 @@ img, svg, iframe, video, embed {
     opacity: 0;
     pointer-events: none;
 }
+/* En tu archivo hoja.css, añade o asegúrate de tener: */
+
+.skill-attribute-info {
+    cursor: help;
+    margin: 0 5px;
+    color: var(--accent-gold);
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.skill-attribute-info:hover {
+    opacity: 0.8;
+}
+
+.skill-prof {
+    color: var(--accent-gold);
+    cursor: pointer;
+}
+
+.skill-prof:hover {
+    opacity: 0.8;
+}

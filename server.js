@@ -3,10 +3,24 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs').promises;
 const multer = require('multer');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
 const PORT = process.env.PORT || 3000;
+
+// ===== ALMACENAMIENTO DE CONEXIONES ACTIVAS =====
+const connectedUsers = new Map();
+const activeRooms = new Map();
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -38,7 +52,6 @@ console.log(` Ruta de datos: ${DATA_PATH}`);
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         const uploadPath = path.join(__dirname, 'data', 'imagenes');
-        // Crear la carpeta si no existe
         fs.mkdir(uploadPath, { recursive: true }).then(() => {
             cb(null, uploadPath);
         }).catch(err => {
@@ -46,7 +59,6 @@ const storage = multer.diskStorage({
         });
     },
     filename: function (req, file, cb) {
-        // Generar nombre único: pj_timestamp_originalname
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
         cb(null, 'pj_' + uniqueSuffix + ext);
@@ -55,9 +67,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Límite 5MB
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        // Aceptar solo imágenes
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
@@ -69,26 +80,20 @@ const upload = multer({
 // ===== FUNCIÓN PARA INICIALIZAR ARCHIVO DE SESIÓN =====
 async function inicializarArchivoSesion() {
     try {
-        // Obtener fecha actual en formato YYYY-MM-DD
         const hoy = new Date().toISOString().split('T')[0];
         
-        // Crear carpeta personajes si no existe
         const personajesPath = path.join(DATA_PATH, 'personajes');
         await fs.mkdir(personajesPath, { recursive: true });
         
-        // Crear carpeta imagenes si no existe
         const imagenesPath = path.join(DATA_PATH, 'imagenes');
         await fs.mkdir(imagenesPath, { recursive: true });
         
-        // Ruta del archivo de hoy
         const archivoHoy = path.join(personajesPath, `${hoy}.json`);
         
-        // Verificar si ya existe
         try {
             await fs.access(archivoHoy);
             console.log(`📁 Archivo de sesión para ${hoy} ya existe`);
         } catch {
-            // No existe, crearlo vacío
             const sesionInicial = {
                 fecha: hoy,
                 personajes: [],
@@ -100,7 +105,6 @@ async function inicializarArchivoSesion() {
             console.log(`✅ Archivo de sesión creado: ${hoy}.json`);
         }
         
-        // Crear/actualizar personajes_hoy.json como enlace simbólico/copia
         const archivoHoyLink = path.join(DATA_PATH, 'personajes_hoy.json');
         const contenidoHoy = await fs.readFile(archivoHoy, 'utf8');
         await fs.writeFile(archivoHoyLink, contenidoHoy);
@@ -112,7 +116,7 @@ async function inicializarArchivoSesion() {
     }
 }
 
-// ===== FUNCIÓN PARA LIMPIAR ARCHIVOS ANTIGUOS (OPCIONAL) =====
+// ===== FUNCIÓN PARA LIMPIAR ARCHIVOS ANTIGUOS =====
 async function limpiarArchivosAntiguos(diasAMantener = 30) {
     try {
         const personajesPath = path.join(DATA_PATH, 'personajes');
@@ -122,7 +126,6 @@ async function limpiarArchivosAntiguos(diasAMantener = 30) {
         fechaLimite.setDate(fechaLimite.getDate() - diasAMantener);
         
         for (const archivo of archivos) {
-            // Solo procesar archivos con formato YYYY-MM-DD.json
             if (!archivo.match(/^\d{4}-\d{2}-\d{2}\.json$/)) continue;
             
             const fechaArchivoStr = archivo.replace('.json', '');
@@ -141,11 +144,130 @@ async function limpiarArchivosAntiguos(diasAMantener = 30) {
 // ===== EJECUTAR INICIALIZACIÓN AL ARRANCAR EL SERVIDOR =====
 (async () => {
     await inicializarArchivoSesion();
-    // Opcional: limpiar archivos de más de 30 días
     await limpiarArchivosAntiguos(30);
 })();
 
-// Servir archivos estáticos
+// ===== MANEJADORES DE WEBSOCKET =====
+io.on('connection', (socket) => {
+    const clientIP = socket.handshake.address;
+    console.log(`🔌 Nueva conexión WebSocket: ${socket.id} (${clientIP})`);
+
+    // Registrar usuario
+    socket.on('registrar-usuario', (data) => {
+        const { nombre, tipo, personaje } = data;
+        connectedUsers.set(socket.id, {
+            id: socket.id,
+            nombre: nombre,
+            tipo: tipo || 'jugador',
+            personaje: personaje || null,
+            ip: clientIP,
+            conectado: new Date()
+        });
+        
+        console.log(`👤 Usuario registrado: ${nombre} (${tipo})`);
+        io.emit('usuarios-actualizados', Array.from(connectedUsers.values()));
+    });
+
+    // Unirse a sala
+    socket.on('unirse-sala', (codigoSala) => {
+        socket.join(codigoSala);
+        console.log(`📌 Usuario ${socket.id} se unió a sala: ${codigoSala}`);
+        
+        if (!activeRooms.has(codigoSala)) {
+            activeRooms.set(codigoSala, {
+                codigo: codigoSala,
+                usuarios: [],
+                creada: new Date()
+            });
+        }
+        
+        const sala = activeRooms.get(codigoSala);
+        const usuario = connectedUsers.get(socket.id);
+        if (usuario && !sala.usuarios.find(u => u.id === socket.id)) {
+            sala.usuarios.push(usuario);
+        }
+        
+        io.to(codigoSala).emit('usuario-unido', usuario);
+    });
+
+    // Enviar mensaje
+    socket.on('mensaje-sala', (data) => {
+        const { sala, mensaje, tipo } = data;
+        const usuario = connectedUsers.get(socket.id);
+        
+        const mensajeCompleto = {
+            id: Date.now(),
+            usuario: usuario?.nombre || 'Anónimo',
+            personaje: usuario?.personaje,
+            mensaje: mensaje,
+            tipo: tipo || 'texto',
+            timestamp: new Date().toISOString()
+        };
+        
+        io.to(sala).emit('nuevo-mensaje', mensajeCompleto);
+    });
+
+    // Actualizar personaje
+    socket.on('actualizar-personaje', (data) => {
+        const { sala, personaje } = data;
+        const usuario = connectedUsers.get(socket.id);
+        
+        if (usuario) {
+            usuario.personaje = personaje;
+            
+            if (sala && activeRooms.has(sala)) {
+                const salaData = activeRooms.get(sala);
+                const userIndex = salaData.usuarios.findIndex(u => u.id === socket.id);
+                if (userIndex !== -1) {
+                    salaData.usuarios[userIndex].personaje = personaje;
+                }
+            }
+            
+            io.emit('personaje-actualizado', {
+                usuarioId: socket.id,
+                personaje: personaje
+            });
+        }
+    });
+
+    // Iniciativa en tiempo real
+    socket.on('actualizar-iniciativa', (data) => {
+        const { sala, orden } = data;
+        io.to(sala).emit('iniciativa-actualizada', orden);
+    });
+
+    // Dibujo en tiempo real
+    socket.on('dibujo', (data) => {
+        const { sala, puntos } = data;
+        socket.to(sala).emit('nuevo-dibujo', puntos);
+    });
+
+    // Limpiar pizarra
+    socket.on('limpiar-pizarra', (sala) => {
+        io.to(sala).emit('pizarra-limpia');
+    });
+
+    // Desconexión
+    socket.on('disconnect', () => {
+        const usuario = connectedUsers.get(socket.id);
+        if (usuario) {
+            console.log(`🔌 Usuario desconectado: ${usuario.nombre} (${socket.id})`);
+            connectedUsers.delete(socket.id);
+            
+            activeRooms.forEach((sala, codigo) => {
+                const index = sala.usuarios.findIndex(u => u.id === socket.id);
+                if (index !== -1) {
+                    sala.usuarios.splice(index, 1);
+                    io.to(codigo).emit('usuario-desconectado', socket.id);
+                }
+            });
+            
+            io.emit('usuarios-actualizados', Array.from(connectedUsers.values()));
+        }
+    });
+});
+
+// ===== SERVIDOR DE ARCHIVOS ESTÁTICOS =====
 app.use(express.static(path.join(__dirname)));
 app.use('/src', express.static(path.join(__dirname, 'src')));
 app.use('/src/FROND', express.static(path.join(__dirname, 'src/FROND')));
@@ -154,17 +276,11 @@ app.use('/src/JS', express.static(path.join(__dirname, 'src/JS')));
 app.use('/src/Cartas', express.static(path.join(__dirname, 'src/Cartas')));
 app.use('/src/demo', express.static(path.join(__dirname, 'src/demo')));
 
-// Servir imágenes estáticas
 app.use('/data/imagenes', express.static(path.join(__dirname, 'data', 'imagenes')));
-
-// Servir cualquier archivo dentro de /data 
 app.use('/data', express.static(path.join(__dirname, 'data')));
-
 app.use('/data/personajes', express.static(path.join(__dirname, 'data', 'personajes')));
 
 // ===== ENDPOINTS DE IMÁGENES =====
-
-// Subir imagen
 app.post('/api/imagenes/subir', upload.single('imagen'), (req, res) => {
     try {
         if (!req.file) {
@@ -185,7 +301,6 @@ app.post('/api/imagenes/subir', upload.single('imagen'), (req, res) => {
     }
 });
 
-// Listar imágenes
 app.get('/api/imagenes/listar', async (req, res) => {
     try {
         const imagenesPath = path.join(__dirname, 'data', 'imagenes');
@@ -212,7 +327,6 @@ app.get('/api/imagenes/listar', async (req, res) => {
     }
 });
 
-// Eliminar imagen
 app.post('/api/imagenes/eliminar', async (req, res) => {
     try {
         const { filename } = req.body;
@@ -230,7 +344,6 @@ app.post('/api/imagenes/eliminar', async (req, res) => {
     }
 });
 
-// Limpiar todas las imágenes
 app.post('/api/imagenes/limpiar-todas', async (req, res) => {
     try {
         const imagenesPath = path.join(__dirname, 'data', 'imagenes');
@@ -250,12 +363,9 @@ app.post('/api/imagenes/limpiar-todas', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS ESPECÍFICOS PARA ADMIN (VAN PRIMERO) =====
-
-// 1. Listar archivos JSON (excluyendo bestiario.json, bestiario-eng.json y demo.json)
+// ===== ENDPOINTS ESPECÍFICOS PARA ADMIN =====
 app.get('/api/json/list', async (req, res) => {
     try {
-        // Lista de archivos que NO queremos mostrar
         const archivosOcultos = [
             'bestiario.json',
             'bestiario-eng.json', 
@@ -275,14 +385,13 @@ app.get('/api/json/list', async (req, res) => {
                     const subFiles = await getJsonFiles(fullPath, relativePath);
                     results = results.concat(subFiles);
                 } else if (item.endsWith('.json')) {
-                    // Verificar si el archivo está en la lista de ocultos
                     if (!archivosOcultos.includes(item)) {
                         results.push({
                             name: relativePath,
                             size: stat.size,
                             modified: stat.mtime,
                             path: relativePath,
-                            isProtected: false // Todos los visibles son editables/eliminables
+                            isProtected: false
                         });
                     }
                 }
@@ -298,7 +407,6 @@ app.get('/api/json/list', async (req, res) => {
     }
 });
 
-// 2. Subir archivo JSON
 app.post('/api/json/upload', (req, res) => {
     const { filename, content } = req.body;
     const filePath = path.join(DATA_PATH, filename);
@@ -309,7 +417,6 @@ app.post('/api/json/upload', (req, res) => {
     });
 });
 
-// Eliminar archivo JSON 
 app.post('/api/json/delete', async (req, res) => {
     try {
         const { filename } = req.body;
@@ -335,7 +442,6 @@ app.post('/api/json/delete', async (req, res) => {
     }
 });
 
-// 4. Exportar todos los archivos como ZIP
 app.get('/api/json/export-all', (req, res) => {
     const archiver = require('archiver');
     const dataDir = path.join(__dirname, 'data');
@@ -360,7 +466,6 @@ app.get('/api/json/export-all', (req, res) => {
     });
 });
 
-// 5. Estadísticas completas (JSONs e imágenes)
 app.get('/api/json/stats', async (req, res) => {
     try {
         const dataDir = path.join(__dirname, 'data');
@@ -377,7 +482,6 @@ app.get('/api/json/stats', async (req, res) => {
             }
         };
         
-        // Contar JSONs en toda la estructura
         async function countJsonFiles(dir) {
             let count = 0;
             try {
@@ -406,7 +510,6 @@ app.get('/api/json/stats', async (req, res) => {
         
         await countJsonFiles(dataDir);
         
-        // Contar imágenes
         const imageFiles = await fs.readdir(imagenesPath).catch(() => []);
         stats.images.count = imageFiles.filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f)).length;
         
@@ -425,7 +528,7 @@ app.get('/api/json/stats', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS GENÉRICOS PARA JSON (VAN DESPUÉS) =====
+// ===== ENDPOINTS GENÉRICOS PARA JSON =====
 app.get('/api/json/:tipo', async (req, res) => {
     try {
         const { tipo } = req.params;
@@ -576,6 +679,17 @@ app.post('/api/personajes/guardar', async (req, res) => {
         
         console.log(`✅ Personaje guardado con ${Object.keys(personajeData.colores_personalizados || {}).length} colores personalizados`);
         
+        // NUEVO: Emitir evento de personaje guardado
+        io.emit('personaje-guardado', {
+            personaje: {
+                nombre: personajeData.nombre,
+                jugador: personajeData.jugador,
+                nivel: personajeData.nivel,
+                clase: personajeData.clase
+            },
+            timestamp: new Date().toISOString()
+        });
+        
         res.json({ 
             success: true, 
             personaje: personajeData,
@@ -707,9 +821,10 @@ app.get('/', (req, res) => {
 });
 
 // ===== INICIAR SERVIDOR =====
-app.listen(PORT, () => {
-    console.log(` Servidor corriendo en ${SERVER_URL}`);
-    console.log(` Endpoints API:`);
+server.listen(PORT, () => {
+    console.log(`🚀 Servidor HTTP corriendo en ${SERVER_URL}`);
+    console.log(`🔌 WebSocket server activo en ws://localhost:${PORT}`);
+    console.log(`📊 Endpoints API:`);
     console.log(`   - GET ${SERVER_URL}/api/json/list`);
     console.log(`   - GET ${SERVER_URL}/api/json/stats`);
     console.log(`   - POST ${SERVER_URL}/api/json/upload`);

@@ -80,17 +80,17 @@ export class SkillsManager {
     }
 
     update(id, updates) {
-        const index = this.skills.findIndex(s => s.id === id);
-        if (index !== -1) {
-            this.skills[index] = { ...this.skills[index], ...updates };
-            this.updateSkillBonus(this.skills[index]);
-            this.save();
-            this.notify();
-            this.eventBus.emit('skillsChanged', this.skills);
-            return true;
-        }
-        return false;
+    const index = this.skills.findIndex(s => s.id === id);
+    if (index !== -1) {
+        this.skills[index] = { ...this.skills[index], ...updates };
+        this.updateAllBonuses();
+        this.save();
+        this.notify();
+        this.eventBus.emit('skillsChanged', this.skills);
+        return true;
     }
+    return false;
+}
 
     toggleProficient(id) {
         const skill = this.skills.find(s => s.id === id);

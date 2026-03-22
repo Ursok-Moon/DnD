@@ -110,7 +110,11 @@ class DMScreen {
         this.personajesHoy[index] = {
             ...this.personajesHoy[index],
             ...personajeActualizado,
+            trasfondo: personajeActualizado.trasfondo || this.personajesHoy[index].trasfondo,
+            alineamiento: personajeActualizado.alineamiento || this.personajesHoy[index].alineamiento,
             stats: personajeActualizado.stats || this.personajesHoy[index].stats,
+            spellSlots: personajeActualizado.spellSlots || this.personajesHoy[index].spellSlots,
+            spellStats: personajeActualizado.spellStats || this.personajesHoy[index].spellStats,
             savingThrows: personajeActualizado.savingThrows || this.personajesHoy[index].savingThrows,
             passivePerception: personajeActualizado.passivePerception || this.personajesHoy[index].passivePerception,
             deathSaves: personajeActualizado.deathSaves || this.personajesHoy[index].deathSaves,
@@ -130,7 +134,11 @@ class DMScreen {
         clase: pj.clase,
         nivel: pj.nivel,
         raza: pj.raza,
+        trasfondo: pj.trasfondo,
+        alineamiento: pj.alineamiento,
         stats: pj.stats,
+        spellSlots: pj.spellSlots,
+        spellStats: pj.spellStats,
         ataques: pj.ataques,
         conjuros: pj.conjuros,
         inventario: pj.inventario,
@@ -188,7 +196,11 @@ class DMScreen {
             clase: pj.clase,
             nivel: pj.nivel,
             raza: pj.raza,
+            trasfondo: pj.trasfondo,
+            alineamiento: pj.alineamiento,
             stats: pj.stats,
+            spellSlots: pj.spellSlots,
+            spellStats: pj.spellStats,
             ataques: pj.ataques,
             conjuros: pj.conjuros,
             inventario: pj.inventario,    
@@ -358,7 +370,10 @@ class DMScreen {
                 clase: pj.clase,
                 nivel: pj.nivel,
                 raza: pj.raza,
+                trasfondo: pj.trasfondo,
+                alineamiento: pj.alineamiento,
                 stats: pj.stats,
+                spellStats: pj.spellStats,
                 ataques: pj.ataques,
                 conjuros: pj.conjuros,
                 inventario: pj.inventario,
@@ -367,7 +382,7 @@ class DMScreen {
                 colores_personalizados: pj.colores_personalizados,
                 savingThrows: pj.savingThrows,
                 passivePerception: pj.passivePerception,
-                deathSaves: pj.deathSaves  // ← AÑADIR ESTA LÍNEA
+                deathSaves: pj.deathSaves 
             }));
             
             if (cambios.nuevos.length > 0) {
@@ -483,7 +498,7 @@ class DMScreen {
         modalBody.innerHTML = this.generarHTMLModal(personaje);
         
         modalBody.scrollTop = scrollPos;
-        
+        this.setupDeathSavesClickEvents(personaje);
         this.mostrarNotificacionActualizacion(modal);
     }
 
@@ -522,6 +537,108 @@ class DMScreen {
             }
         }, 2000);
     }
+
+    setupDeathSavesClickEvents(personaje) {
+    const modalBody = document.getElementById('jugadorModalBody');
+    if (!modalBody) return;
+    
+    const successChecks = modalBody.querySelectorAll('.success-check');
+    const failChecks = modalBody.querySelectorAll('.fail-check');
+    
+    successChecks.forEach(check => {
+        check.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const index = parseInt(check.dataset.index);
+            
+            // Obtener el personaje actualizado
+            const personajeActual = this.personajesHoy.find(p => p.nombre === personaje.nombre);
+            if (!personajeActual) return;
+            
+            // Crear una copia de deathSaves
+            const nuevosDeathSaves = { ...personajeActual.deathSaves };
+            if (!nuevosDeathSaves.successes) nuevosDeathSaves.successes = [false, false, false];
+            
+            // Alternar el estado
+            nuevosDeathSaves.successes[index] = !nuevosDeathSaves.successes[index];
+            
+            // Si hay 3 éxitos, resetear fallos
+            if (nuevosDeathSaves.successes.filter(Boolean).length >= 3) {
+                nuevosDeathSaves.successes = [true, true, true];
+                nuevosDeathSaves.fails = [false, false, false];
+            }
+            
+            // Actualizar en la lista local
+            const idx = this.personajesHoy.findIndex(p => p.nombre === personaje.nombre);
+            if (idx !== -1) {
+                this.personajesHoy[idx].deathSaves = nuevosDeathSaves;
+            }
+            
+            // Enviar actualización al servidor
+            await this.actualizarDeathSavesEnServidor(personaje.nombre, nuevosDeathSaves);
+            
+            // Actualizar el modal
+            this.modalAbierto = { ...personajeActual, deathSaves: nuevosDeathSaves };
+            this.actualizarModalConDatos(this.modalAbierto);
+        });
+    });
+    
+    failChecks.forEach(check => {
+        check.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const index = parseInt(check.dataset.index);
+            
+            const personajeActual = this.personajesHoy.find(p => p.nombre === personaje.nombre);
+            if (!personajeActual) return;
+            
+            const nuevosDeathSaves = { ...personajeActual.deathSaves };
+            if (!nuevosDeathSaves.fails) nuevosDeathSaves.fails = [false, false, false];
+            
+            nuevosDeathSaves.fails[index] = !nuevosDeathSaves.fails[index];
+            
+            if (nuevosDeathSaves.fails.filter(Boolean).length >= 3) {
+                nuevosDeathSaves.fails = [true, true, true];
+                nuevosDeathSaves.successes = [false, false, false];
+            }
+            
+            const idx = this.personajesHoy.findIndex(p => p.nombre === personaje.nombre);
+            if (idx !== -1) {
+                this.personajesHoy[idx].deathSaves = nuevosDeathSaves;
+            }
+            
+            await this.actualizarDeathSavesEnServidor(personaje.nombre, nuevosDeathSaves);
+            
+            this.modalAbierto = { ...personajeActual, deathSaves: nuevosDeathSaves };
+            this.actualizarModalConDatos(this.modalAbierto);
+        });
+    });
+}
+
+async actualizarDeathSavesEnServidor(nombrePersonaje, deathSaves) {
+    try {
+        const personaje = this.personajesHoy.find(p => p.nombre === nombrePersonaje);
+        if (!personaje) return;
+        
+        const updatedPersonaje = { ...personaje, deathSaves };
+        
+        const response = await fetch(`${this.baseUrl}/api/personajes/guardar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedPersonaje)
+        });
+        
+        if (response.ok) {
+            console.log(`✅ Salvaciones de muerte actualizadas para ${nombrePersonaje}`);
+            
+            if (window.wsClient && window.wsClient.isConectado()) {
+                window.wsClient.emit('personaje-guardado', {
+                    personaje: updatedPersonaje
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error actualizando death saves:', error);
+    }
+}
 
     async mostrarInfoJugador(personaje) {
         let modal = document.getElementById('jugadorModal');
@@ -564,260 +681,357 @@ class DMScreen {
     }
 
     generarHTMLModal(personaje) {
-        let html = '';
-        
-        html += `<div class="jugador-imagen-container">`;
-        if (personaje.imagen) {
-            let imagenUrl = personaje.imagen;
-            if (!imagenUrl.startsWith('http') && !imagenUrl.startsWith('/')) {
-                imagenUrl = '/' + imagenUrl;
-            }
-            html += `
-                <div class="jugador-imagen-wrapper">
-                    <img src="${imagenUrl}" alt="${personaje.nombre || 'Personaje'}" class="jugador-imagen"
-                         onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\\'jugador-imagen-placeholder\\'><i class=\\'fas fa-user\\'></i><span>${personaje.nombre || '?'}</span></div>';">
-                </div>
-            `;
-        } else {
-            html += `
-                <div class="jugador-imagen-placeholder">
-                    <i class="fas fa-user"></i>
-                    <span>${personaje.nombre || 'Personaje'}</span>
-                </div>
-            `;
+    let html = '';
+    
+    html += `<div class="jugador-imagen-container">`;
+    if (personaje.imagen) {
+        let imagenUrl = personaje.imagen;
+        if (!imagenUrl.startsWith('http') && !imagenUrl.startsWith('/')) {
+            imagenUrl = '/' + imagenUrl;
         }
-        html += `</div>`;
-        
-        html += `<h2 class="jugador-titulo">${personaje.nombre || 'Sin nombre'}</h2>`;
-        
+        html += `
+            <div class="jugador-imagen-wrapper">
+                <img src="${imagenUrl}" alt="${personaje.nombre || 'Personaje'}" class="jugador-imagen"
+                     onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\\'jugador-imagen-placeholder\\'><i class=\\'fas fa-user\\'></i><span>${personaje.nombre || '?'}</span></div>';">
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="jugador-imagen-placeholder">
+                <i class="fas fa-user"></i>
+                <span>${personaje.nombre || 'Personaje'}</span>
+            </div>
+        `;
+    }
+    html += `</div>`;
+    
+    html += `<h2 class="jugador-titulo">${personaje.nombre || 'Sin nombre'}</h2>`;
+    
+    // === SECCIÓN INFORMACIÓN (MODIFICADA) ===
+    html += `<div class="jugador-seccion">`;
+    html += `<h3><i class="fas fa-info-circle"></i> Información</h3>`;
+    html += `<div class="jugador-info-grid">`;
+    html += `<div class="jugador-info-item"><span class="info-label">Clase:</span> <span class="info-valor">${personaje.clase || '?'}</span></div>`;
+    html += `<div class="jugador-info-item"><span class="info-label">Raza:</span> <span class="info-valor">${personaje.raza || '?'}</span></div>`;
+    html += `<div class="jugador-info-item"><span class="info-label">Nivel:</span> <span class="info-valor">${personaje.nivel || '?'}</span></div>`;
+    html += `<div class="jugador-info-item"><span class="info-label">Jugador:</span> <span class="info-valor">${personaje.jugador || '?'}</span></div>`;
+    
+    // Velocidad (desde stats)
+    if (personaje.stats?.velocidad) {
+        html += `<div class="jugador-info-item"><span class="info-label">Velocidad:</span> <span class="info-valor">${personaje.stats.velocidad} pies</span></div>`;
+    }
+    
+    // Trasfondo (desde notas o directamente)
+    const trasfondo = personaje.notas?.trasfondo || personaje.trasfondo || personaje.background || '?';
+    html += `<div class="jugador-info-item"><span class="info-label">Trasfondo:</span> <span class="info-valor">${trasfondo}</span></div>`;
+    
+    // Alineamiento
+    const alineamiento = personaje.alineamiento || personaje.alignment || '?';
+    html += `<div class="jugador-info-item"><span class="info-label">Alineamiento:</span> <span class="info-valor">${alineamiento}</span></div>`;
+    
+    if (personaje.stats) {
+        html += `<div class="jugador-info-item"><span class="info-label">CA:</span> <span class="info-valor">${personaje.stats.ca || '?'}</span></div>`;
+        html += `<div class="jugador-info-item"><span class="info-label">Iniciativa:</span> <span class="info-valor">${personaje.stats.iniciativa || '?'}</span></div>`;
+    }
+    html += `</div>`;
+    html += `</div>`;
+    
+    // === ATRIBUTOS ===
+    if (personaje.stats?.atributos?.length > 0) {
         html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-info-circle"></i> Información</h3>`;
-        html += `<div class="jugador-info-grid">`;
-        html += `<div class="jugador-info-item"><span class="info-label">Clase:</span> <span class="info-valor">${personaje.clase || '?'}</span></div>`;
-        html += `<div class="jugador-info-item"><span class="info-label">Raza:</span> <span class="info-valor">${personaje.raza || '?'}</span></div>`;
-        html += `<div class="jugador-info-item"><span class="info-label">Nivel:</span> <span class="info-valor">${personaje.nivel || '?'}</span></div>`;
-        html += `<div class="jugador-info-item"><span class="info-label">Jugador:</span> <span class="info-valor">${personaje.jugador || '?'}</span></div>`;
-        
-        if (personaje.stats) {
-            html += `<div class="jugador-info-item"><span class="info-label">CA:</span> <span class="info-valor">${personaje.stats.ca || '?'}</span></div>`;
-            html += `<div class="jugador-info-item"><span class="info-label">Iniciativa:</span> <span class="info-valor">${personaje.stats.iniciativa || '?'}</span></div>`;
-        }
+        html += `<h3><i class="fas fa-dumbbell"></i> Atributos</h3>`;
+        html += `<div class="atributos-grid">`;
+        personaje.stats.atributos.forEach(attr => {
+            let modificador = attr.modificador ?? Math.floor((attr.valor - 10) / 2);
+            const signo = modificador >= 0 ? '+' : '';
+            html += `
+                <div class="atributo-card">
+                    <div class="atributo-nombre">${attr.nombre || 'ATRIBUTO'}</div>
+                    <div class="atributo-valor">${attr.valor || 10}</div>
+                    <div class="atributo-modificador ${modificador >= 0 ? 'positivo' : 'negativo'}">${signo}${modificador}</div>
+                </div>
+            `;
+        });
         html += `</div>`;
         html += `</div>`;
+    }
+    
+    // === COMBATE ===
+    if (personaje.stats?.hp || personaje.stats?.mana || personaje.spellSlots) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-heart"></i> Combate</h3>`;
+        html += `<div class="stats-combate-grid">`;
         
-        if (personaje.stats?.atributos?.length > 0) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-dumbbell"></i> Atributos</h3>`;
-            html += `<div class="atributos-grid">`;
-            personaje.stats.atributos.forEach(attr => {
-                let modificador = attr.modificador ?? Math.floor((attr.valor - 10) / 2);
-                const signo = modificador >= 0 ? '+' : '';
-                html += `
-                    <div class="atributo-card">
-                        <div class="atributo-nombre">${attr.nombre || 'ATRIBUTO'}</div>
-                        <div class="atributo-valor">${attr.valor || 10}</div>
-                        <div class="atributo-modificador ${modificador >= 0 ? 'positivo' : 'negativo'}">${signo}${modificador}</div>
-                    </div>
-                `;
-            });
-            html += `</div>`;
-            html += `</div>`;
-        }
-        
-        if (personaje.stats?.hp || personaje.stats?.mana) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-heart"></i> Combate</h3>`;
-            html += `<div class="stats-combate-grid">`;
+        if (personaje.stats?.hp) {
+            const hp = personaje.stats.hp;
+            const porcentajeVida = hp.max > 0 ? (hp.current / hp.max) * 100 : 0;
+            const colorVida = porcentajeVida < 25 ? '#f44336' : porcentajeVida < 50 ? '#ff9800' : '#4CAF50';
             
-            if (personaje.stats?.hp) {
-                const hp = personaje.stats.hp;
-                const porcentajeVida = hp.max > 0 ? (hp.current / hp.max) * 100 : 0;
-                const colorVida = porcentajeVida < 25 ? '#f44336' : porcentajeVida < 50 ? '#ff9800' : '#4CAF50';
-                
-                html += `
-                    <div class="stat-combate-card">
-                        <div class="stat-icon"><i class="fas fa-heart" style="color: ${colorVida};"></i></div>
-                        <div class="stat-contenido">
-                            <div class="stat-label">Puntos de Golpe</div>
-                            <div class="stat-valor-principal">${hp.current || 0}/${hp.max || 0}</div>
-                            ${hp.temp ? `<div class="stat-temp">+${hp.temp} temporal</div>` : ''}
-                            <div class="stat-barra">
-                                <div class="stat-barra-fill" style="width: ${porcentajeVida}%; background: ${colorVida};"></div>
-                            </div>
+            html += `
+                <div class="stat-combate-card">
+                    <div class="stat-icon"><i class="fas fa-heart" style="color: ${colorVida};"></i></div>
+                    <div class="stat-contenido">
+                        <div class="stat-label">Puntos de Golpe</div>
+                        <div class="stat-valor-principal">${hp.current || 0}/${hp.max || 0}</div>
+                        ${hp.temp ? `<div class="stat-temp">+${hp.temp} temporal</div>` : ''}
+                        <div class="stat-barra">
+                            <div class="stat-barra-fill" style="width: ${porcentajeVida}%; background: ${colorVida};"></div>
                         </div>
                     </div>
-                `;
-            }
-            
-            if (personaje.stats?.mana) {
-                const mana = personaje.stats.mana;
-                const porcentajeMana = mana.max > 0 ? (mana.current / mana.max) * 100 : 0;
-                html += `
-                    <div class="stat-combate-card">
-                        <div class="stat-icon"><i class="fas fa-bolt" style="color: #4169e1;"></i></div>
-                        <div class="stat-contenido">
-                            <div class="stat-label">Maná</div>
-                            <div class="stat-valor-principal">${mana.current || 0}/${mana.max || 0}</div>
-                            <div class="stat-barra">
-                                <div class="stat-barra-fill" style="width: ${porcentajeMana}%; background: #4169e1;"></div>
-                            </div>
+                </div>
+            `;
+        }
+        
+        if (personaje.stats?.mana) {
+            const mana = personaje.stats.mana;
+            const porcentajeMana = mana.max > 0 ? (mana.current / mana.max) * 100 : 0;
+            html += `
+                <div class="stat-combate-card">
+                    <div class="stat-icon"><i class="fas fa-bolt" style="color: #4169e1;"></i></div>
+                    <div class="stat-contenido">
+                        <div class="stat-label">Maná</div>
+                        <div class="stat-valor-principal">${mana.current || 0}/${mana.max || 0}</div>
+                        <div class="stat-barra">
+                            <div class="stat-barra-fill" style="width: ${porcentajeMana}%; background: #4169e1;"></div>
                         </div>
                     </div>
-                `;
-            }
-            
-            html += `</div>`;
-            html += `</div>`;
+                </div>
+            `;
         }
         
-        if (personaje.savingThrows && personaje.savingThrows.length > 0) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-shield-alt"></i> Tiradas de Salvación</h3>`;
-            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">`;
+        // === SLOTS DE CONJUROS ===
+        if (personaje.spellSlots) {
+            const slots = personaje.spellSlots;
+            const nivel = slots.level || 1;
+            const total = slots.total || 0;
+            const usados = slots.used || 0;
+            const disponibles = total - usados;
+            const porcentajeUsados = total > 0 ? (usados / total) * 100 : 0;
+            const colorSlots = porcentajeUsados > 75 ? '#ff4444' : porcentajeUsados > 50 ? '#ffaa00' : '#4CAF50';
             
-            personaje.savingThrows.sort((a, b) => a.name.localeCompare(b.name)).forEach(st => {
-                const valorClass = st.value > 0 ? 'positivo' : (st.value < 0 ? 'negativo' : '');
-                const profIcon = st.proficient ? 'fa-check-circle' : 'fa-circle';
-                html += `
-                    <div style="background: rgba(255,255,255,0.5); border: 1px solid var(--accent-gold); border-radius: 6px; padding: 8px; display: flex; align-items: center; gap: 8px;">
-                        <span style="font-weight: bold; color: var(--accent-purple); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${st.name}">${st.name}</span>
-                        <span style="font-weight: bold; ${st.value > 0 ? 'color: #4CAF50;' : st.value < 0 ? 'color: #ff4444;' : ''}">${st.value > 0 ? '+' : ''}${st.value}</span>
-                        <span style="color: ${st.proficient ? '#4CAF50' : 'var(--accent-gold)'};"><i class="fas ${profIcon}"></i></span>
+            html += `
+                <div class="stat-combate-card">
+                    <div class="stat-icon"><i class="fas fa-gem" style="color: var(--accent-gold);"></i></div>
+                    <div class="stat-contenido">
+                        <div class="stat-label">Slots de Conjuros (Nivel ${nivel})</div>
+                        <div class="stat-valor-principal">${usados}/${total}</div>
+                        <div class="stat-temp" style="color: ${colorSlots};">${disponibles} disponibles</div>
+                        <div class="stat-barra">
+                            <div class="stat-barra-fill" style="width: ${porcentajeUsados}%; background: var(--slot-color, #9370db);"></div>
+                        </div>
                     </div>
-                `;
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+    // === TIROADAS DE SALVACIÓN ===
+    if (personaje.savingThrows && personaje.savingThrows.length > 0) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-shield-alt"></i> Tiradas de Salvación</h3>`;
+        html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">`;
+        
+        personaje.savingThrows.sort((a, b) => a.name.localeCompare(b.name)).forEach(st => {
+            const profIcon = st.proficient ? 'fa-check-circle' : 'fa-circle';
+            html += `
+                <div style="background: rgba(255,255,255,0.5); border: 1px solid var(--accent-gold); border-radius: 6px; padding: 8px; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: bold; color: var(--accent-purple); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${st.name}">${st.name}</span>
+                    <span style="font-weight: bold; ${st.value > 0 ? 'color: #4CAF50;' : st.value < 0 ? 'color: #ff4444;' : ''}">${st.value > 0 ? '+' : ''}${st.value}</span>
+                    <span style="color: ${st.proficient ? '#4CAF50' : 'var(--accent-gold)'};"><i class="fas ${profIcon}"></i></span>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+    // === HABILIDADES ===
+    if (personaje.skills && personaje.skills.length > 0) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-brain"></i> Habilidades</h3>`;
+        html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">`;
+        
+        personaje.skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
+            html += `
+                <div style="background: white; border: 1px solid var(--parchment-dark); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="color: var(--ink-dark);">${skill.name}</span>
+                    <span style="font-weight: bold; ${skill.bonus > 0 ? 'color: #4CAF50;' : skill.bonus < 0 ? 'color: #ff4444;' : ''}">${skill.bonus > 0 ? '+' : ''}${skill.bonus}</span>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+    // === COMPETENCIAS E IDIOMAS ===
+    if (personaje.proficiencies && personaje.proficiencies.length > 0) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-language"></i> Competencias & Idiomas</h3>`;
+        
+        const armaduras = personaje.proficiencies.filter(p => p.type === 'armor');
+        const armas = personaje.proficiencies.filter(p => p.type === 'weapon');
+        const herramientas = personaje.proficiencies.filter(p => p.type === 'tool');
+        const idiomas = personaje.proficiencies.filter(p => p.type === 'language');
+        const otros = personaje.proficiencies.filter(p => !['armor', 'weapon', 'tool', 'language'].includes(p.type));
+        
+        if (armaduras.length > 0) {
+            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-shield-alt"></i> Armaduras</h4>`;
+            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+            armaduras.forEach(p => {
+                html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #5d3a9b); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
             });
-            
-            html += `</div>`;
             html += `</div>`;
         }
         
-        if (personaje.skills && personaje.skills.length > 0) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-brain"></i> Habilidades</h3>`;
-            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">`;
-            
-            personaje.skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
-                html += `
-                    <div style="background: white; border: 1px solid var(--parchment-dark); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
-                        <span style="color: var(--ink-dark);">${skill.name}</span>
-                        <span style="font-weight: bold; ${skill.bonus > 0 ? 'color: #4CAF50;' : skill.bonus < 0 ? 'color: #ff4444;' : ''}">${skill.bonus > 0 ? '+' : ''}${skill.bonus}</span>
-                    </div>
-                `;
+        if (armas.length > 0) {
+            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-crosshairs"></i> Armas</h4>`;
+            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+            armas.forEach(p => {
+                html += `<span style="background: linear-gradient(135deg, #B22222, #8B0000); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
             });
-            
-            html += `</div>`;
             html += `</div>`;
         }
         
-        if (personaje.proficiencies && personaje.proficiencies.length > 0) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-language"></i> Competencias & Idiomas</h3>`;
-            
-            const armaduras = personaje.proficiencies.filter(p => p.type === 'armor');
-            const armas = personaje.proficiencies.filter(p => p.type === 'weapon');
-            const herramientas = personaje.proficiencies.filter(p => p.type === 'tool');
-            const idiomas = personaje.proficiencies.filter(p => p.type === 'language');
-            const otros = personaje.proficiencies.filter(p => !['armor', 'weapon', 'tool', 'language'].includes(p.type));
-            
-            if (armaduras.length > 0) {
-                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-shield-alt"></i> Armaduras</h4>`;
-                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-                armaduras.forEach(p => {
-                    html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #5d3a9b); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-                });
-                html += `</div>`;
-            }
-            
-            if (armas.length > 0) {
-                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-crosshairs"></i> Armas</h4>`;
-                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-                armas.forEach(p => {
-                    html += `<span style="background: linear-gradient(135deg, #B22222, #8B0000); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-                });
-                html += `</div>`;
-            }
-            
-            if (herramientas.length > 0) {
-                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tools"></i> Herramientas</h4>`;
-                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-                herramientas.forEach(p => {
-                    html += `<span style="background: linear-gradient(135deg, #2F4F4F, #1C3A3A); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-                });
-                html += `</div>`;
-            }
-            
-            if (idiomas.length > 0) {
-                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-language"></i> Idiomas</h4>`;
-                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-                idiomas.forEach(p => {
-                    html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #4B0082); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-                });
-                html += `</div>`;
-            }
-            
-            if (otros.length > 0) {
-                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tag"></i> Otros</h4>`;
-                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-                otros.forEach(p => {
-                    html += `<span style="background: linear-gradient(135deg, #666, #444); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-                });
-                html += `</div>`;
-            }
-            
-            html += `</div>`;
-        }
-        
-        if (personaje.passivePerception !== undefined) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-eye"></i> Percepción Pasiva</h3>`;
-            html += `<div style="text-align: center;">`;
-            html += `<div style="font-size: 3rem; font-weight: bold; color: var(--accent-blue); width: 100px; height: 100px; border: 4px solid var(--accent-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: white;">${personaje.passivePerception}</div>`;
-            html += `<div style="font-size: 0.9rem; color: var(--ink-light); margin-top: 10px;">10 + Mod. Sabiduría + Bonif. Competencia</div>`;
-            html += `</div>`;
-            html += `</div>`;
-        }
-        
-        if (personaje.deathSaves) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-skull"></i> Salvaciones de Muerte</h3>`;
-            html += `<div style="display: flex; gap: 30px; justify-content: center;">`;
-            
-            const successes = personaje.deathSaves.successes || [false, false, false];
-            const fails = personaje.deathSaves.fails || [false, false, false];
-            const successCount = successes.filter(Boolean).length;
-            const failCount = fails.filter(Boolean).length;
-            
-            html += `<div style="text-align: center;">`;
-            html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-check-circle" style="color: #4CAF50;"></i> Éxitos (${successCount}/3)</label>`;
-            html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
-            successes.forEach(() => {
-                html += `<span style="width: 40px; height: 40px; border: 3px solid var(--accent-gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: ${successes ? 'rgba(255,255,255,0.5)' : ''}"></span>`;
+        if (herramientas.length > 0) {
+            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tools"></i> Herramientas</h4>`;
+            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+            herramientas.forEach(p => {
+                html += `<span style="background: linear-gradient(135deg, #2F4F4F, #1C3A3A); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
             });
-            html += `</div></div>`;
-            
-            html += `<div style="text-align: center;">`;
-            html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-times-circle" style="color: #ff4444;"></i> Fallos (${failCount}/3)</label>`;
-            html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
-            fails.forEach(() => {
-                html += `<span style="width: 40px; height: 40px; border: 3px solid var(--accent-gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: ${fails ? 'rgba(255,255,255,0.5)' : ''}"></span>`;
-            });
-            html += `</div></div>`;
-            html += `</div>`;
-            
-            if (successCount >= 3) {
-                html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid #4CAF50; border-radius: 8px;"><i class="fas fa-check-circle"></i> ¡Personaje estable!</div>`;
-            } else if (failCount >= 3) {
-                html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444; border-radius: 8px;"><i class="fas fa-skull-crossbones"></i> ¡Personaje ha muerto!</div>`;
-            }
-            
             html += `</div>`;
         }
         
-        if (personaje.inventario) {
-            const inv = personaje.inventario;
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-box-open"></i> Inventario</h3>`;
-            
+        if (idiomas.length > 0) {
+            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-language"></i> Idiomas</h4>`;
+            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+            idiomas.forEach(p => {
+                html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #4B0082); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+            });
+            html += `</div>`;
+        }
+        
+        if (otros.length > 0) {
+            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tag"></i> Otros</h4>`;
+            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+            otros.forEach(p => {
+                html += `<span style="background: linear-gradient(135deg, #666, #444); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+            });
+            html += `</div>`;
+        }
+        
+        html += `</div>`;
+    }
+    
+    // === PERCEPCIÓN PASIVA ===
+    if (personaje.passivePerception !== undefined) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-eye"></i> Percepción Pasiva</h3>`;
+        html += `<div style="text-align: center;">`;
+        html += `<div style="font-size: 3rem; font-weight: bold; color: var(--accent-blue); width: 100px; height: 100px; border: 4px solid var(--accent-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: white;">${personaje.passivePerception}</div>`;
+        html += `<div style="font-size: 0.9rem; color: var(--ink-light); margin-top: 10px;">10 + Mod. Sabiduría + Bonif. Competencia</div>`;
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+   // === SALVACIONES DE MUERTE ===
+    if (personaje.deathSaves) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-skull"></i> Salvaciones de Muerte</h3>`;
+        html += `<div style="display: flex; gap: 30px; justify-content: center;">`;
+        
+        const successes = personaje.deathSaves.successes || [false, false, false];
+        const fails = personaje.deathSaves.fails || [false, false, false];
+        const successCount = successes.filter(Boolean).length;
+        const failCount = fails.filter(Boolean).length;
+        
+        // Éxitos - con cambio de color según el estado
+        html += `<div style="text-align: center;">`;
+        html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-check-circle" style="color: #4CAF50;"></i> Éxitos</label>`;
+        html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
+        
+        successes.forEach((checked, index) => {
+            // Color: verde si true, gris transparente si false
+            const bgColor = checked ? '#4CAF50' : 'rgba(255, 255, 255, 0.2)';
+            const icon = checked ? '<i class="fas fa-check"></i>' : '';
+            html += `
+                <div class="death-save-check success-check" readonly
+                    data-type="success" 
+                    data-index="${index}" 
+                    style="
+                        width: 40px; 
+                        height: 40px; 
+                        border: 3px solid var(--accent-gold, #d4af37); 
+                        border-radius: 8px; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        background: ${bgColor};
+                        transition: all 0.2s ease;
+                        color: white;
+                        font-size: 18px;
+                    ">
+                    ${icon}
+                </div>
+            `;
+        });
+        
+        html += `</div></div>`;
+        
+        // Fallos - con cambio de color según el estado
+        html += `<div style="text-align: center;">`;
+        html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-times-circle" style="color: #ff4444;"></i> Fallos</label>`;
+        html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
+        
+        fails.forEach((checked, index) => {
+            // Color: rojo si true, gris transparente si false
+            const bgColor = checked ? '#ff4444' : 'rgba(254, 254, 254, 0.2)';
+            const icon = checked ? '<i class="fas fa-times"></i>' : '';
+            html += `
+                <div class="death-save-check fail-check"  readonly
+                    data-type="fail" 
+                    data-index="${index}" 
+                    style="
+                        width: 40px; 
+                        height: 40px; 
+                        border: 3px solid var(--accent-gold, #d4af37); 
+                        border-radius: 8px; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        background: ${bgColor};
+                        transition: all 0.2s ease;
+                        color: white;
+                        font-size: 18px;
+                    ">
+                    ${icon}
+                </div>
+            `;
+        });
+        
+        html += `</div></div>`;
+        html += `</div>`;
+        
+        // Mensaje de estado
+        if (successCount >= 3) {
+            html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid #4CAF50; border-radius: 8px;"><i class="fas fa-check-circle"></i> ¡Personaje estable!</div>`;
+        } else if (failCount >= 3) {
+            html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444; border-radius: 8px;"><i class="fas fa-skull-crossbones"></i> ¡Personaje ha muerto!</div>`;
+        }
+        
+        html += `</div>`;
+    }
+    
+    // === INVENTARIO ===
+    if (personaje.inventario) {
+        const inv = personaje.inventario;
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-box-open"></i> Inventario</h3>`;
+        
         if (inv.monedas) {
             const monedas = inv.monedas;
             html += `
@@ -840,130 +1054,206 @@ class DMScreen {
                 </div>
             `;
         }
-            
-            if (inv.tesoros?.length > 0) {
-                html += `<div class="inventario-subseccion"><h4><i class="fas fa-gem"></i> Tesoros</h4><div class="items-lista">`;
-                inv.tesoros.forEach(tesoro => {
-                    const icono = this.getTreasureIcon(tesoro.type);
-                    html += `
-                        <div class="item-card tesoro-item">
-                            <div class="item-icono"><i class="fas ${icono}" style="color: var(--accent-gold);"></i></div>
-                            <div class="item-info">
-                                <div class="item-nombre">${tesoro.name || 'Tesoro'}</div>
-                                <div class="item-detalle">Valor: ${tesoro.value || 0} ${inv.monedas?.name || 'monedas'}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            }
-            
-            if (inv.pociones?.length > 0) {
-                html += `<div class="inventario-subseccion"><h4><i class="fas fa-flask"></i> Pociones</h4><div class="items-lista">`;
-                inv.pociones.forEach(pocion => {
-                    const icono = pocion.type === 'life' ? 'fa-heart' : 'fa-bolt';
-                    const color = pocion.type === 'life' ? '#dc143c' : '#4169e1';
-                    html += `
-                        <div class="item-card pocion-item">
-                            <div class="item-icono" style="color: ${color};"><i class="fas ${icono}"></i></div>
-                            <div class="item-info">
-                                <div class="item-nombre">${pocion.name || 'Poción'}</div>
-                                <div class="item-detalle">+${pocion.amount || 0} • ${pocion.value || 0}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            }
-            
-            if (inv.equipo?.length > 0) {
-                html += `<div class="inventario-subseccion"><h4><i class="fas fa-chess-board"></i> Equipo</h4><div class="items-lista">`;
-                inv.equipo.forEach(item => {
-                    let bonusHtml = '';
-                    if (item.attribute && item.bonus !== 0) {
-                        bonusHtml = `<span class="item-bonus" style="color: ${item.bonus > 0 ? '#4CAF50' : '#ff4444'};">${item.bonus > 0 ? '+' : ''}${item.bonus} a ${item.attribute}</span>`;
-                    }
-                    
-                    html += `
-                        <div class="item-card equipo-item">
-                            <div class="item-icono"><i class="fas fa-shield-alt" style="color: var(--accent-purple);"></i></div>
-                            <div class="item-info">
-                                <div class="item-nombre">${item.name || 'Equipo'}</div>
-                                <div class="item-detalle">
-                                    <span><i class="fas fa-coins"></i> ${item.cost || 0}</span>
-                                    <span><i class="fas fa-weight-hanging"></i> ${item.weight || 0}</span>
-                                    ${bonusHtml}
-                                </div>
-                                ${item.description ? `<div class="item-descripcion">${item.description}</div>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            }
-            
-            html += `</div>`;
-        }
         
-        if (personaje.ataques?.length > 0) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-crosshairs"></i> Ataques</h3>`;
-            html += `<div class="ataques-lista">`;
-            personaje.ataques.forEach(atk => {
-                if (atk.name) {
-                    html += `
-                        <div class="ataque-item">
-                            <div class="ataque-nombre">${atk.name}</div>
-                            <div class="ataque-detalle">
-                                <span class="ataque-bonus">${atk.bonus || '?'}</span>
-                                <span class="ataque-dano">${atk.damage || '?'}</span>
-                            </div>
+        if (inv.tesoros?.length > 0) {
+            html += `<div class="inventario-subseccion"><h4><i class="fas fa-gem"></i> Tesoros</h4><div class="items-lista">`;
+            inv.tesoros.forEach(tesoro => {
+                const icono = this.getTreasureIcon(tesoro.type);
+                html += `
+                    <div class="item-card tesoro-item">
+                        <div class="item-icono"><i class="fas ${icono}" style="color: var(--accent-gold);"></i></div>
+                        <div class="item-info">
+                            <div class="item-nombre">${tesoro.name || 'Tesoro'}</div>
+                            <div class="item-detalle">Valor: ${tesoro.value || 0} ${inv.monedas?.name || 'monedas'}</div>
                         </div>
-                    `;
-                }
+                    </div>
+                `;
             });
-            html += `</div>`;
-            html += `</div>`;
+            html += `</div></div>`;
         }
         
-        if (personaje.conjuros?.length > 0) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-magic"></i> Conjuros</h3>`;
-            html += `<div class="conjuros-lista">`;
-            personaje.conjuros.forEach(spell => {
-                if (spell.name) {
-                    html += `
-                        <div class="conjuro-item">
-                            <div class="conjuro-header">
-                                <span class="conjuro-nombre">${spell.name}</span>
-                                <span class="conjuro-nivel">${spell.level || '?'}</span>
-                            </div>
-                            ${spell.description ? `<div class="conjuro-descripcion">${spell.description}</div>` : ''}
+        if (inv.pociones?.length > 0) {
+            html += `<div class="inventario-subseccion"><h4><i class="fas fa-flask"></i> Pociones</h4><div class="items-lista">`;
+            inv.pociones.forEach(pocion => {
+                const icono = pocion.type === 'life' ? 'fa-heart' : 'fa-bolt';
+                const color = pocion.type === 'life' ? '#dc143c' : '#4169e1';
+                html += `
+                    <div class="item-card pocion-item">
+                        <div class="item-icono" style="color: ${color};"><i class="fas ${icono}"></i></div>
+                        <div class="item-info">
+                            <div class="item-nombre">${pocion.name || 'Poción'}</div>
+                            <div class="item-detalle">+${pocion.amount || 0} • ${pocion.value || 0}</div>
                         </div>
-                    `;
-                }
+                    </div>
+                `;
             });
-            html += `</div>`;
-            html += `</div>`;
+            html += `</div></div>`;
         }
         
-        if (personaje.notas && Object.values(personaje.notas).some(v => v)) {
-            html += `<div class="jugador-seccion">`;
-            html += `<h3><i class="fas fa-feather-alt"></i> Notas</h3>`;
-            html += `<div class="notas-grid">`;
-            
-            if (personaje.notas.personalidad) html += `<div class="nota-item"><span class="nota-label">Personalidad:</span> ${personaje.notas.personalidad}</div>`;
-            if (personaje.notas.ideales) html += `<div class="nota-item"><span class="nota-label">Ideales:</span> ${personaje.notas.ideales}</div>`;
-            if (personaje.notas.vinculos) html += `<div class="nota-item"><span class="nota-label">Vínculos:</span> ${personaje.notas.vinculos}</div>`;
-            if (personaje.notas.defectos) html += `<div class="nota-item"><span class="nota-label">Defectos:</span> ${personaje.notas.defectos}</div>`;
-            if (personaje.notas.rasgos) html += `<div class="nota-item"><span class="nota-label">Rasgos:</span> ${personaje.notas.rasgos}</div>`;
-            
-            html += `</div>`;
-            html += `</div>`;
+        if (inv.equipo?.length > 0) {
+            html += `<div class="inventario-subseccion"><h4><i class="fas fa-chess-board"></i> Equipo</h4><div class="items-lista">`;
+            inv.equipo.forEach(item => {
+                let bonusHtml = '';
+                if (item.attribute && item.bonus !== 0) {
+                    bonusHtml = `<span class="item-bonus" style="color: ${item.bonus > 0 ? '#4CAF50' : '#ff4444'};">${item.bonus > 0 ? '+' : ''}${item.bonus} a ${item.attribute}</span>`;
+                }
+                
+                html += `
+                    <div class="item-card equipo-item">
+                        <div class="item-icono"><i class="fas fa-shield-alt" style="color: var(--accent-purple);"></i></div>
+                        <div class="item-info">
+                            <div class="item-nombre">${item.name || 'Equipo'}</div>
+                            <div class="item-detalle">
+                                <span><i class="fas fa-coins"></i> ${item.cost || 0}</span>
+                                <span><i class="fas fa-weight-hanging"></i> ${item.weight || 0}</span>
+                                ${bonusHtml}
+                            </div>
+                            ${item.description ? `<div class="item-descripcion">${item.description}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
         }
         
-        return html;
+        html += `</div>`;
     }
+    
+    // === ATAQUES ===
+    if (personaje.ataques?.length > 0) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-crosshairs"></i> Ataques</h3>`;
+        html += `<div class="ataques-lista">`;
+        personaje.ataques.forEach(atk => {
+            if (atk.name) {
+                html += `
+                    <div class="ataque-item">
+                        <div class="ataque-nombre">${atk.name}</div>
+                        <div class="ataque-detalle">
+                            <span class="ataque-bonus">${atk.bonus || '?'}</span>
+                            <span class="ataque-dano">${atk.damage || '?'}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+    // === ESTADÍSTICAS DE CONJUROS ===
+if (personaje.spellStats) {
+    const stats = personaje.spellStats;
+    html += `<div class="jugador-seccion">`;
+    html += `<h3><i class="fas fa-book-spells"></i> Estadísticas de Conjuros</h3>`;
+    html += `<div class="spell-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">`;
+    
+    // Característica mágica
+    html += `
+        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                <i class="fas fa-magic"></i> Característica Mágica
+            </div>
+            <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
+                ${stats.spellcastingAbility || 'Sabiduría'}
+            </div>
+        </div>
+    `;
+    
+    // CD Salvación Conjuros
+    html += `
+        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                <i class="fas fa-shield-alt"></i> CD Salvación
+            </div>
+            <div style="font-size: 1.3rem; font-weight: bold; color: #4CAF50;">
+                ${stats.spellSaveDC || 10}
+            </div>
+        </div>
+    `;
+    
+    // Bonificación Ataque Conjuros
+    const attackBonus = stats.spellAttackBonus || 0;
+    const attackBonusClass = attackBonus >= 0 ? 'positivo' : 'negativo';
+    html += `
+        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                <i class="fas fa-crosshairs"></i> Ataque Conjuros
+            </div>
+            <div style="font-size: 1.3rem; font-weight: bold; ${attackBonus >= 0 ? 'color: #4CAF50;' : 'color: #ff4444;'}">
+                ${attackBonus >= 0 ? '+' : ''}${attackBonus}
+            </div>
+        </div>
+    `;
+    
+    // Conjuros Preparados
+    html += `
+        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                <i class="fas fa-book"></i> Conjuros Preparados
+            </div>
+            <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
+                ${stats.preparedSpells || 0} / ${stats.maxPreparedSpells || 0}
+            </div>
+        </div>
+    `;
+    
+    // Trucos Conocidos
+    html += `
+        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                <i class="fas fa-star"></i> Trucos Conocidos
+            </div>
+            <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
+                ${stats.cantripsKnown || 0}
+            </div>
+        </div>
+    `;
+    
+    html += `</div>`;
+    html += `</div>`;
+}
+
+    // === CONJUROS ===
+    if (personaje.conjuros?.length > 0) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-magic"></i> Conjuros</h3>`;
+        html += `<div class="conjuros-lista">`;
+        personaje.conjuros.forEach(spell => {
+            if (spell.name) {
+                html += `
+                    <div class="conjuro-item">
+                        <div class="conjuro-header">
+                            <span class="conjuro-nombre">${spell.name}</span>
+                            <span class="conjuro-nivel">${spell.level || '?'}</span>
+                        </div>
+                        ${spell.description ? `<div class="conjuro-descripcion">${spell.description}</div>` : ''}
+                    </div>
+                `;
+            }
+        });
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+    // === NOTAS ===
+    if (personaje.notas && Object.values(personaje.notas).some(v => v)) {
+        html += `<div class="jugador-seccion">`;
+        html += `<h3><i class="fas fa-feather-alt"></i> Notas</h3>`;
+        html += `<div class="notas-grid">`;
+        
+        if (personaje.notas.personalidad) html += `<div class="nota-item"><span class="nota-label">Personalidad:</span> ${personaje.notas.personalidad}</div>`;
+        if (personaje.notas.ideales) html += `<div class="nota-item"><span class="nota-label">Ideales:</span> ${personaje.notas.ideales}</div>`;
+        if (personaje.notas.vinculos) html += `<div class="nota-item"><span class="nota-label">Vínculos:</span> ${personaje.notas.vinculos}</div>`;
+        if (personaje.notas.defectos) html += `<div class="nota-item"><span class="nota-label">Defectos:</span> ${personaje.notas.defectos}</div>`;
+        if (personaje.notas.rasgos) html += `<div class="nota-item"><span class="nota-label">Rasgos:</span> ${personaje.notas.rasgos}</div>`;
+        
+        html += `</div>`;
+        html += `</div>`;
+    }
+    
+    return html;
+}
 
     getTreasureIcon(type) {
         switch(type) {

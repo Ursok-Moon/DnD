@@ -10,6 +10,7 @@ export class CurrencyManager {
         this.silverName = 'Plata';
         this.copperName = 'Cobre';
         this.listeners = [];
+        this.saveTimeout = null;
         this.load();
     }
 
@@ -43,46 +44,46 @@ export class CurrencyManager {
         return this.gold * 100 + this.silver * 10 + this.copper;
     }
 
+    // Método interno para guardar con debounce
+    _scheduleSaveAndNotify() {
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+        }
+        this.saveTimeout = setTimeout(() => {
+            this.save();
+            this.notify();
+            this.eventBus.emit('currencyChanged', this.getData());
+        }, 300); // Espera 300ms después del último cambio
+    }
+
     setGold(value) {
         this.gold = Math.max(0, value);
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     setSilver(value) {
         this.silver = Math.max(0, value);
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     setCopper(value) {
         this.copper = Math.max(0, value);
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     addGold(amount) {
         this.gold = Math.max(0, this.gold + amount);
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     addSilver(amount) {
         this.silver = Math.max(0, this.silver + amount);
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     addCopper(amount) {
         this.copper = Math.max(0, this.copper + amount);
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     updateNames(names) {
@@ -90,9 +91,7 @@ export class CurrencyManager {
         if (names.goldName) this.goldName = names.goldName;
         if (names.silverName) this.silverName = names.silverName;
         if (names.copperName) this.copperName = names.copperName;
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     reset() {
@@ -103,9 +102,7 @@ export class CurrencyManager {
         this.goldName = 'Oro';
         this.silverName = 'Plata';
         this.copperName = 'Cobre';
-        this.save();
-        this.notify();
-        this.eventBus.emit('currencyChanged', this.getData());
+        this._scheduleSaveAndNotify();
     }
 
     subscribe(listener) {
@@ -116,7 +113,6 @@ export class CurrencyManager {
     notify() {
         const data = this.getData();
         this.listeners.forEach(listener => listener(data));
-        this.eventBus.emit('currencyChanged', data);
     }
 
     save() {

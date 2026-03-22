@@ -5,6 +5,7 @@ export class DeathSavesManager {
         this.successes = [false, false, false];
         this.fails = [false, false, false];
         this.listeners = [];
+        this.saveTimeout = null;
         this.load();
     }
 
@@ -25,13 +26,23 @@ export class DeathSavesManager {
         };
     }
 
+    // Método interno para guardar con debounce
+    _scheduleSaveAndNotify() {
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+        }
+        this.saveTimeout = setTimeout(() => {
+            this.save();
+            this.notify();
+            this.eventBus.emit('deathSavesChanged', this.getData());
+        }, 300);
+    }
+
     setSuccess(index, value) {
         if (index >= 0 && index < 3) {
             this.successes[index] = value;
             this.checkStatus();
-            this.save();
-            this.notify();
-            this.eventBus.emit('deathSavesChanged', this.getData());
+            this._scheduleSaveAndNotify();
         }
     }
 
@@ -39,18 +50,14 @@ export class DeathSavesManager {
         if (index >= 0 && index < 3) {
             this.fails[index] = value;
             this.checkStatus();
-            this.save();
-            this.notify();
-            this.eventBus.emit('deathSavesChanged', this.getData());
+            this._scheduleSaveAndNotify();
         }
     }
 
     reset() {
         this.successes = [false, false, false];
         this.fails = [false, false, false];
-        this.save();
-        this.notify();
-        this.eventBus.emit('deathSavesChanged', this.getData());
+        this._scheduleSaveAndNotify();
         this.eventBus.emit('deathSavesReset');
     }
 
@@ -73,7 +80,6 @@ export class DeathSavesManager {
     notify() {
         const data = this.getData();
         this.listeners.forEach(listener => listener(data));
-        this.eventBus.emit('deathSavesChanged', data);
     }
 
     save() {

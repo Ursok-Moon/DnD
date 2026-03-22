@@ -30,6 +30,7 @@ import { EquipmentManager } from '../modules/inventory/EquipmentManager.js';
 import { SpellSlotsManager } from '../modules/spells/SpellSlotsManager.js';
 import { SpellManager } from '../modules/spells/SpellManager.js';
 import { SpellUI } from '../modules/spells/SpellUI.js';
+import { SpellStatsManager } from '../modules/spells/SpellStatsManager.js'; // <-- IMPORTAR
 
 export class CharacterSheet {
     constructor() {
@@ -64,8 +65,8 @@ export class CharacterSheet {
 
         const savedName = localStorage.getItem('jugadorNombre');
         if (savedName === 'Aventurero' || savedName === 'Anónimo' || !savedName) {
-        localStorage.removeItem('jugadorNombre');
-    }
+            localStorage.removeItem('jugadorNombre');
+        }
     }
 
     waitForWebSocket() {
@@ -94,7 +95,7 @@ export class CharacterSheet {
         setTimeout(() => clearInterval(checkInterval), 5000);
     }
 
-  async ensureUserIsSet() {
+    async ensureUserIsSet() {
         // Esperar a que el DOM esté listo
         if (document.readyState === 'loading') {
             await new Promise(resolve => {
@@ -117,13 +118,11 @@ export class CharacterSheet {
     updatePlayerNameDisplay() {
         const userName = this.userManager.getUserName();
         if (userName) {
-            // Si hay algún elemento que muestre el nombre del jugador, actualizarlo
             const playerNameElements = document.querySelectorAll('.player-name-display, .jugador-nombre, [data-player-name]');
             playerNameElements.forEach(el => {
                 el.textContent = userName;
             });
             
-            // También actualizar cualquier input oculto que pueda contener el nombre
             const playerNameInputs = document.querySelectorAll('input[name="jugadorNombre"], input[name="playerName"]');
             playerNameInputs.forEach(input => {
                 input.value = userName;
@@ -139,15 +138,14 @@ export class CharacterSheet {
         const alineamiento = document.getElementById('char-align')?.value || '';
         const jugadorNombre = this.getPlayerName();
         if (jugadorNombre === 'Aventurero' || jugadorNombre === 'Anónimo') {
-        console.warn('⚠️ Jugador sin registrar, mostrando prompt');
-        await this.userManager.showUserPrompt();
-        // Recargar el nombre después del registro
-        const nuevoNombre = this.getPlayerName();
-        if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
-            Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
-            return;
+            console.warn('⚠️ Jugador sin registrar, mostrando prompt');
+            await this.userManager.showUserPrompt();
+            const nuevoNombre = this.getPlayerName();
+            if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
+                Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
+                return;
+            }
         }
-    }
 
         const inventoryCard = document.getElementById('card-inventory');
         const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
@@ -208,6 +206,8 @@ export class CharacterSheet {
             raza: raza,
             nivel: this.expManager?.getData().level || 1,
             jugador: this.getPlayerName(),
+            trasfondo: trasfondo,
+            alineamiento: alineamiento, 
             imagen: imagenUrl,
             colores_personalizados: {
                 background: coloresGuardados.background || null,
@@ -226,6 +226,8 @@ export class CharacterSheet {
                 iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
                 atributos: atributosDOM
             },
+            spellSlots: this.spellSlotsManager.getData(),
+            spellStats: this.spellStatsManager.getData(),
             ataques: this.getAttacks(),
             conjuros: this.getSpells(),
             inventario: {
@@ -237,7 +239,7 @@ export class CharacterSheet {
             },
             deathSaves: this.deathSavesManager.getData(),
             skills: this.skillsManager.getAll(),
-            passivePerception: this.passivePerception || 10,
+            passivePerception: this.calcularPercepcionPasiva() || 10,
             proficiencies: this.proficiencyManager.getAll(),
             savingThrows: this.savingThrowsManager.getAll(),
             notas: notas,
@@ -279,7 +281,11 @@ export class CharacterSheet {
                 clase: clase,
                 nivel: characterData.nivel,
                 raza: raza,
+                trasfondo: trasfondo,
+                alineamiento: alineamiento,
                 stats: characterData.stats,
+                spellSlots: characterData.spellSlots,
+                spellStats: characterData.spellStats,
                 inventario: characterData.inventario,
                 ataques: characterData.ataques,
                 conjuros: characterData.conjuros,
@@ -353,7 +359,7 @@ export class CharacterSheet {
             
             if (personajeRecibido?.nombre === this.getCharacterName() && 
                 personajeRecibido?.jugador === this.getPlayerName()) {
-                
+                // Actualización recibida
             }
         });
 
@@ -388,6 +394,7 @@ export class CharacterSheet {
         
         this.spellSlotsManager = new SpellSlotsManager(this.storage, this.eventBus);
         this.spellManager = new SpellManager(this.storage, this.eventBus);
+        this.spellStatsManager = new SpellStatsManager(this.storage, this.eventBus, this.attributeManager, this.expManager);
         
         this.imageManager = new ImageManager(this.api, this.eventBus);
         this.dragDropManager = new DragDropManager(this.storage);
@@ -408,11 +415,228 @@ export class CharacterSheet {
         this.setupAttributeEvents();
         this.setupAttackEvents();
         this.setupSpellEvents();
+        this.setupCurrencyEvents();
+        this.setupDeathSavesEvents();
+        this.setupSpellStatsEvents();
         this.loadTraitsFromStorage();
     }
 
+    setupSpellStatsEvents() {
+    const spellcastingAbilitySelect = document.getElementById('spellcastingAbility');
+    const preparedSpellsInput = document.getElementById('preparedSpells');
+    const cantripsKnownInput = document.getElementById('cantripsKnown');
+    
+    // Poblar el select de Característica Mágica con los atributos actuales
+    this.populateSpellcastingAbilitySelect();
+    
+    // Escuchar cambios en atributos para actualizar el select
+    this.eventBus.on('attributeChanged', () => {
+        this.populateSpellcastingAbilitySelect();
+        this.spellStatsManager.calculateStats();
+        this.updateSpellStatsDisplay();
+    });
+    
+    this.eventBus.on('attributeNameChanged', () => {
+        this.populateSpellcastingAbilitySelect();
+        this.spellStatsManager.calculateStats();
+        this.updateSpellStatsDisplay();
+    });
+    
+    this.eventBus.on('attributeRemoved', () => {
+        this.populateSpellcastingAbilitySelect();
+        this.spellStatsManager.calculateStats();
+        this.updateSpellStatsDisplay();
+    });
+    
+    if (spellcastingAbilitySelect) {
+        spellcastingAbilitySelect.addEventListener('change', (e) => {
+            this.spellStatsManager.setSpellcastingAbility(e.target.value);
+            this.updateSpellStatsDisplay();
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+    }
+    
+    if (preparedSpellsInput) {
+        preparedSpellsInput.addEventListener('change', (e) => {
+            const value = parseInt(e.target.value) || 0;
+            this.spellStatsManager.setPreparedSpells(value);
+            this.updateSpellStatsDisplay();
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+    }
+    
+    if (cantripsKnownInput) {
+        cantripsKnownInput.addEventListener('change', (e) => {
+            const value = parseInt(e.target.value) || 0;
+            this.spellStatsManager.setCantripsKnown(value);
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+    }
+    
+    // Suscribirse a cambios para actualizar UI
+    this.spellStatsManager.subscribe(() => {
+        this.updateSpellStatsDisplay();
+    });
+    
+    // Recalcular cuando cambien atributos o nivel
+    this.eventBus.on('attributeChanged', () => {
+        this.spellStatsManager.calculateStats();
+        this.updateSpellStatsDisplay();
+    });
+    
+    this.eventBus.on('expChanged', () => {
+        this.spellStatsManager.calculateStats();
+        this.updateSpellStatsDisplay();
+    });
+    
+    // Actualizar display inicial
+    this.updateSpellStatsDisplay();
+}
+
+populateSpellcastingAbilitySelect() {
+    const select = document.getElementById('spellcastingAbility');
+    if (!select) return;
+    
+    const attributes = this.attributeManager.getAll();
+    const currentValue = this.spellStatsManager.getData().spellcastingAbility;
+    
+    // Guardar el valor seleccionado actualmente
+    let selectedValue = currentValue;
+    
+    // Verificar si el valor seleccionado aún existe
+    const attributeExists = attributes.some(attr => attr.name === currentValue);
+    if (!attributeExists && attributes.length > 0) {
+        // Si no existe, seleccionar el primer atributo
+        selectedValue = attributes[0].name;
+        if (selectedValue !== currentValue) {
+            this.spellStatsManager.setSpellcastingAbility(selectedValue);
+        }
+    }
+    
+    // Limpiar y repoblar el select
+    select.innerHTML = '';
+    
+    if (attributes.length === 0) {
+        select.innerHTML = '<option value="">No hay atributos</option>';
+        return;
+    }
+    
+    attributes.forEach(attr => {
+        const option = document.createElement('option');
+        option.value = attr.name;
+        option.textContent = attr.name;
+        if (attr.name === selectedValue) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+}
+
+    updateSpellStatsDisplay() {
+    const stats = this.spellStatsManager.getData();
+    
+    const saveDC = document.getElementById('spellSaveDC');
+    const attackBonus = document.getElementById('spellAttackBonus');
+    const preparedSpellsInput = document.getElementById('preparedSpells');
+    const maxPreparedSpan = document.getElementById('maxPreparedSpells');
+    const cantripsKnownInput = document.getElementById('cantripsKnown');
+    const spellcastingAbilitySelect = document.getElementById('spellcastingAbility');
+    
+    if (saveDC) saveDC.textContent = stats.spellSaveDC;
+    if (attackBonus) attackBonus.textContent = stats.spellAttackBonus > 0 ? `+${stats.spellAttackBonus}` : stats.spellAttackBonus;
+    if (maxPreparedSpan) maxPreparedSpan.textContent = stats.maxPreparedSpells;
+    
+    if (preparedSpellsInput && preparedSpellsInput.value != stats.preparedSpells) {
+        preparedSpellsInput.value = stats.preparedSpells;
+        preparedSpellsInput.max = stats.maxPreparedSpells;
+    }
+    
+    if (cantripsKnownInput && cantripsKnownInput.value != stats.cantripsKnown) {
+        cantripsKnownInput.value = stats.cantripsKnown;
+    }
+    
+    // Actualizar el select sin disparar evento change
+    if (spellcastingAbilitySelect && spellcastingAbilitySelect.value != stats.spellcastingAbility) {
+        // Verificar si la opción existe en el select
+        let optionExists = false;
+        for (let i = 0; i < spellcastingAbilitySelect.options.length; i++) {
+            if (spellcastingAbilitySelect.options[i].value === stats.spellcastingAbility) {
+                optionExists = true;
+                break;
+            }
+        }
+        
+        if (optionExists) {
+            spellcastingAbilitySelect.value = stats.spellcastingAbility;
+        }
+    }
+}
+
+    setupDeathSavesEvents() {
+        const successCheckboxes = document.querySelectorAll('.death-save-success');
+        const failCheckboxes = document.querySelectorAll('.death-save-fail');
+        
+        successCheckboxes.forEach((checkbox, index) => {
+            const newCheckbox = checkbox.cloneNode(true);
+            checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+            
+            newCheckbox.addEventListener('change', (e) => {
+                console.log('✅ Éxito de muerte cambiado:', index, e.target.checked);
+                this.deathSavesManager.setSuccess(index, e.target.checked);
+            });
+        });
+        
+        failCheckboxes.forEach((checkbox, index) => {
+            const newCheckbox = checkbox.cloneNode(true);
+            checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+            
+            newCheckbox.addEventListener('change', (e) => {
+                console.log('❌ Fallo de muerte cambiado:', index, e.target.checked);
+                this.deathSavesManager.setFail(index, e.target.checked);
+            });
+        });
+    }
+
+    setupCurrencyEvents() {
+        const goldInput = document.getElementById('goldAmount');
+        const silverInput = document.getElementById('silverAmount');
+        const copperInput = document.getElementById('copperAmount');
+        
+        if (goldInput) {
+            const newGold = goldInput.cloneNode(true);
+            goldInput.parentNode.replaceChild(newGold, goldInput);
+            
+            newGold.addEventListener('change', (e) => {
+                const value = parseInt(e.target.value) || 0;
+                console.log('💰 Oro cambiado a:', value);
+                this.currencyManager.setGold(value);
+            });
+        }
+        
+        if (silverInput) {
+            const newSilver = silverInput.cloneNode(true);
+            silverInput.parentNode.replaceChild(newSilver, silverInput);
+            
+            newSilver.addEventListener('change', (e) => {
+                const value = parseInt(e.target.value) || 0;
+                console.log('💰 Plata cambiado a:', value);
+                this.currencyManager.setSilver(value);
+            });
+        }
+        
+        if (copperInput) {
+            const newCopper = copperInput.cloneNode(true);
+            copperInput.parentNode.replaceChild(newCopper, copperInput);
+            
+            newCopper.addEventListener('change', (e) => {
+                const value = parseInt(e.target.value) || 0;
+                console.log('💰 Cobre cambiado a:', value);
+                this.currencyManager.setCopper(value);
+            });
+        }
+    }
+
     setupAttributeEvents() {
-        // Escuchar cambios en los atributos usando el eventBus del AttributeUI
         this.eventBus.on('attributeChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
@@ -423,7 +647,6 @@ export class CharacterSheet {
     }
 
     setupAttackEvents() {
-        // Usar MutationObserver para detectar nuevos ataques
         const attacksList = document.querySelector('.attacks-list');
         if (attacksList) {
             const observer = new MutationObserver((mutations) => {
@@ -441,7 +664,6 @@ export class CharacterSheet {
             observer.observe(attacksList, { childList: true, subtree: true });
         }
         
-        // Configurar eventos para ataques existentes
         document.querySelectorAll('.attack-item').forEach(item => {
             this.setupAttackItemEvents(item);
         });
@@ -450,7 +672,6 @@ export class CharacterSheet {
     setupAttackItemEvents(attackItem) {
         const inputs = attackItem.querySelectorAll('input');
         inputs.forEach(input => {
-            // Usar 'change' en lugar de 'input' para guardar solo cuando se complete el cambio
             input.addEventListener('change', () => {
                 this.saveAttacksToStorage();
                 if (this.hasValidCharacterName()) this.saveCharacter();
@@ -469,7 +690,6 @@ export class CharacterSheet {
     }
 
     setupSpellEvents() {
-        // Usar MutationObserver para detectar nuevos conjuros
         const spellsList = document.getElementById('spellsList');
         if (spellsList) {
             const observer = new MutationObserver((mutations) => {
@@ -487,12 +707,10 @@ export class CharacterSheet {
             observer.observe(spellsList, { childList: true, subtree: true });
         }
         
-        // Configurar eventos para conjuros existentes
         document.querySelectorAll('#spellsList .spell-item').forEach(item => {
             this.setupSpellItemEvents(item);
         });
         
-        // Escuchar eventos del SpellManager
         this.eventBus.on('spellsChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
@@ -501,7 +719,6 @@ export class CharacterSheet {
     setupSpellItemEvents(spellItem) {
         const inputs = spellItem.querySelectorAll('input, textarea');
         inputs.forEach(input => {
-            // Usar 'change' en lugar de 'input' para guardar solo cuando se complete el cambio
             input.addEventListener('change', () => {
                 if (this.hasValidCharacterName()) this.saveCharacter();
             });
@@ -518,23 +735,22 @@ export class CharacterSheet {
     }
 
     setupAutoSave() {
-
-         let saveTimeout;
-    const debouncedSave = () => {
-        if (!this.hasValidCharacterName()) return;
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            this.saveCharacter();
-        }, 300); 
-    };
-    
-    this.eventBus.on('attributeChanged', () => {
-        debouncedSave();
-    });
-    
-    this.eventBus.on('attributeNameChanged', () => {
-        debouncedSave();
-    });
+        let saveTimeout;
+        const debouncedSave = () => {
+            if (!this.hasValidCharacterName()) return;
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                this.saveCharacter();
+            }, 300); 
+        };
+        
+        this.eventBus.on('attributeChanged', () => {
+            debouncedSave();
+        });
+        
+        this.eventBus.on('attributeNameChanged', () => {
+            debouncedSave();
+        });
 
         this.eventBus.on('healthChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
@@ -570,6 +786,9 @@ export class CharacterSheet {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
         this.eventBus.on('spellSlotsChanged', () => {
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        this.eventBus.on('spellStatsChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
         });
         this.eventBus.on('imageChanged', () => {
@@ -687,17 +906,11 @@ export class CharacterSheet {
         this.savingThrowsManager.subscribe((savingThrows) => {
             this.renderSavingThrows(savingThrows);
         });
-
-        const perceptionInput = document.getElementById('passivePerception');
-        if (perceptionInput) {
-            perceptionInput.addEventListener('change', (e) => {
-                this.passivePerception = parseInt(e.target.value) || 10;
-                if (this.hasValidCharacterName()) this.saveCharacter();
-            });
-        }
         
         this.expManager.subscribe((data) => {
             this.updateExpDisplay(data);
+            this.calcularPercepcionPasiva();
+            if (this.hasValidCharacterName()) this.saveCharacter();
         });
         
         this.currencyManager.subscribe((data) => {
@@ -735,6 +948,11 @@ export class CharacterSheet {
         this.eventBus.on('requestProficiencyBonus', () => {
             const bonus = this.expManager.getProficiencyBonus();
             this.eventBus.emit('proficiencyBonusResponse', bonus);
+        });
+
+        this.eventBus.on('attributeChanged', () => {
+            this.calcularPercepcionPasiva();
+            if (this.hasValidCharacterName()) this.saveCharacter();
         });
     }
 
@@ -1001,6 +1219,9 @@ export class CharacterSheet {
             const perceptionInput = document.getElementById('passivePerception');
             if (perceptionInput) perceptionInput.value = saved;
         }
+        setTimeout(() => {
+            this.calcularPercepcionPasiva();
+        }, 500);
     }
 
     updateExpDisplay(data) {
@@ -1051,73 +1272,83 @@ export class CharacterSheet {
             copperLabel.innerHTML = `<i class="fas fa-circle" style="color: #b87333;"></i> ${data.copperName}`;
         }
         
-        document.getElementById('goldAmount').value = data.gold;
-        document.getElementById('silverAmount').value = data.silver;
-        document.getElementById('copperAmount').value = data.copper;
+        const goldInput = document.getElementById('goldAmount');
+        const silverInput = document.getElementById('silverAmount');
+        const copperInput = document.getElementById('copperAmount');
+        
+        if (goldInput && goldInput.value != data.gold) goldInput.value = data.gold;
+        if (silverInput && silverInput.value != data.silver) silverInput.value = data.silver;
+        if (copperInput && copperInput.value != data.copper) copperInput.value = data.copper;
     }
 
     renderSkills(skills) {
-        const container = document.getElementById('skillsContainer');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (skills.length === 0) {
-            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay habilidades</p>';
-            return;
-        }
-        
-        skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
-            const item = document.createElement('div');
-            item.className = 'skill-item';
-            
-            const bonusClass = skill.bonus > 0 ? 'positive' : (skill.bonus < 0 ? 'negative' : '');
-            
-            const profIcon = skill.proficient ? (skill.expertise ? 'fa-star' : 'fa-check-circle') : 'fa-circle';
-            const profTitle = skill.expertise ? 'Experto' : (skill.proficient ? 'Competente' : 'Sin competencia');
-            
-            let attributeText = '—';
-            let attributeTitle = 'Sin atributo asociado';
-            
-            if (skill.attribute) {
-                attributeText = 'ⓘ';
-                attributeTitle = `Atributo: ${skill.attribute}`;
-            }
-            
-            item.innerHTML = `
-                <div class="skill-header">
-                    <span class="skill-prof" title="${profTitle}" style="color: var(--accent-gold);">
-                        <i class="fas ${profIcon}"></i>
-                    </span>
-                    <span class="skill-name">${skill.name}</span>
-                    <span class="skill-bonus ${bonusClass}">${Helpers.formatModifier(skill.bonus)}</span>
-                    <span class="skill-attribute-info" title="${attributeTitle}" style="cursor: help; margin: 0 5px; color: var(--accent-gold);">
-                        ${attributeText}
-                    </span>
-                    <button class="btn-remove-skill" title="Eliminar"><i class="fas fa-times"></i></button>
-                </div>
-            `;
-            
-            container.appendChild(item);
-            
-            const profSpan = item.querySelector('.skill-prof');
-            profSpan.addEventListener('click', () => {
-                if (!skill.proficient) {
-                    this.skillsManager.toggleProficient(skill.id);
-                } else if (!skill.expertise) {
-                    this.skillsManager.toggleExpertise(skill.id);
-                } else {
-                    this.skillsManager.toggleProficient(skill.id);
-                }
-            });
-            
-            item.querySelector('.btn-remove-skill').addEventListener('click', () => {
-                if (confirm('¿Eliminar esta habilidad?')) {
-                    this.skillsManager.remove(skill.id);
-                }
-            });
-        });
+    const container = document.getElementById('skillsContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (skills.length === 0) {
+        container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay habilidades</p>';
+        return;
     }
+    
+    skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
+        const item = document.createElement('div');
+        item.className = 'skill-item';
+        item.dataset.id = skill.id;
+        
+        const bonusClass = skill.bonus > 0 ? 'positive' : (skill.bonus < 0 ? 'negative' : '');
+        
+        const profIcon = skill.proficient ? (skill.expertise ? 'fa-star' : 'fa-check-circle') : 'fa-circle';
+        const profTitle = skill.expertise ? 'Experto' : (skill.proficient ? 'Competente' : 'Sin competencia');
+        
+        const attributeText = skill.attribute && skill.attribute !== '' ? skill.attribute : 'Sin atributo';
+        
+        item.innerHTML = `
+            <div class="skill-header">
+                <span class="skill-prof" title="${profTitle}" style="color: var(--accent-gold); cursor: pointer;">
+                    <i class="fas ${profIcon}"></i>
+                </span>
+                <span class="skill-name">${skill.name}</span>
+                <span class="skill-bonus ${bonusClass}">${Helpers.formatModifier(skill.bonus)}</span>
+                <button class="skill-edit-btn" data-id="${skill.id}" title="Editar habilidad" style="background: none; border: none; cursor: pointer; color: var(--accent-gold); margin: 0 5px;">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-remove-skill" title="Eliminar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="skill-attribute-info" style="font-size: 0.7rem; color: var(--ink-light); margin-top: 4px; padding-left: 28px;">
+                <i class="fas fa-dice-d20"></i> ${attributeText}
+            </div>
+        `;
+        
+        container.appendChild(item);
+        
+        // Evento para competencia
+        const profSpan = item.querySelector('.skill-prof');
+        profSpan.addEventListener('click', () => {
+            if (!skill.proficient) {
+                this.skillsManager.toggleProficient(skill.id);
+            } else if (!skill.expertise) {
+                this.skillsManager.toggleExpertise(skill.id);
+            } else {
+                this.skillsManager.toggleProficient(skill.id);
+            }
+        });
+        
+        // Evento para editar
+        const editBtn = item.querySelector('.skill-edit-btn');
+        editBtn.addEventListener('click', () => {
+            this.showEditSkillModal(skill);
+        });
+        
+        // Evento para eliminar
+        item.querySelector('.btn-remove-skill').addEventListener('click', () => {
+            if (confirm('¿Eliminar esta habilidad?')) {
+                this.skillsManager.remove(skill.id);
+            }
+        });
+    });
+}
 
     renderSavingThrows(savingThrows) {
         const container = document.getElementById('savingThrowsContainer');
@@ -1493,13 +1724,44 @@ export class CharacterSheet {
         });
     }
 
+    calcularPercepcionPasiva() {
+        let sabiduriaMod = 0;
+        const atributos = this.attributeManager.getAll();
+        
+        const sabiduriaAttr = atributos.find(attr => 
+            attr.name.toUpperCase() === 'SABIDURÍA' || 
+            attr.name.toUpperCase() === 'SABIDURIA' ||
+            attr.name.toUpperCase() === 'WISDOM' ||
+            attr.name.toUpperCase() === 'WIS'
+        );
+        
+        if (sabiduriaAttr) {
+            sabiduriaMod = sabiduriaAttr.modifier;
+        }
+        
+        const proficiencyBonus = this.expManager?.getProficiencyBonus() || 2;
+        
+        const passivePerception = 10 + sabiduriaMod + proficiencyBonus;
+        
+        const perceptionInput = document.getElementById('passivePerception');
+        if (perceptionInput && perceptionInput.value != passivePerception) {
+            perceptionInput.value = passivePerception;
+        }
+        
+        this.passivePerception = passivePerception;
+        
+        return passivePerception;
+    }
+
     saveBasicInfo() {
         const basicInfo = {
             name: document.getElementById('char-name')?.value || '',
             class: document.getElementById('char-class')?.value || '',
             race: document.getElementById('char-race')?.value || '',
             background: document.getElementById('char-bg')?.value || '',
-            alignment: document.getElementById('char-align')?.value || ''
+            trasfondo: document.getElementById('char-bg')?.value || '',
+            alignment: document.getElementById('char-align')?.value || '',
+            alineamiento: document.getElementById('char-align')?.value || ''
         };
         this.storage.save('basicInfo', basicInfo);
     }
@@ -1635,6 +1897,173 @@ export class CharacterSheet {
         
         return spells;
     }
+
+    showEditSkillModal(skill) {
+    const existingModal = document.getElementById('editSkillModal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'editSkillModal';
+    modal.style.display = 'flex';
+    
+    // Obtener lista de atributos para el select
+    const attributes = this.attributeManager.getAll();
+    let attributeOptions = '<option value="">Sin atributo</option>';
+    attributes.forEach(attr => {
+        const selected = skill.attribute === attr.name ? 'selected' : '';
+        attributeOptions += `<option value="${attr.name}" ${selected}>${attr.name}</option>`;
+    });
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Habilidad</h3>
+                <button class="modal-close" id="closeSkillModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Nombre de la habilidad</label>
+                    <input type="text" id="editSkillName" value="${skill.name.replace(/"/g, '&quot;')}" placeholder="Ej: Atletismo">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-dice-d20"></i> Atributo asociado</label>
+                    <select id="editSkillAttribute">
+                        ${attributeOptions}
+                    </select>
+                    <small style="color: var(--ink-light); font-size: 0.7rem;">El modificador de este atributo se sumará al bonus</small>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-star"></i> Competencia</label>
+                    <div style="display: flex; gap: 15px; margin-top: 5px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="proficiency" value="none" ${!skill.proficient ? 'checked' : ''}>
+                            <span>Sin competencia</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="proficiency" value="proficient" ${skill.proficient && !skill.expertise ? 'checked' : ''}>
+                            <span>Competente</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="proficiency" value="expertise" ${skill.expertise ? 'checked' : ''}>
+                            <span>Experto</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-plus-circle"></i> Bonificador adicional</label>
+                    <input type="number" id="editSkillMisc" value="${skill.misc || 0}" step="1" min="-10" max="10">
+                    <small style="color: var(--ink-light); font-size: 0.7rem;">Bonificador extra (se suma al total)</small>
+                </div>
+                <div class="skill-preview" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; text-align: center;">
+                    <span style="font-size: 0.8rem; color: var(--ink-light);">Vista previa:</span>
+                    <span style="font-weight: bold; margin-left: 5px;" id="skillPreviewBonus">+0</span>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px; padding: 15px;">
+                <button type="button" class="btn-secondary btn-cancel" id="cancelSkillBtn">
+                    Cancelar
+                </button>
+                <button type="button" class="btn-secondary" id="saveSkillBtn" style="background: #4CAF50;">
+                    <i class="fas fa-check"></i> Guardar cambios
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Función para actualizar vista previa
+    const updatePreview = () => {
+        const attributeName = document.getElementById('editSkillAttribute').value;
+        const proficiencyRadio = document.querySelector('input[name="proficiency"]:checked');
+        const misc = parseInt(document.getElementById('editSkillMisc').value) || 0;
+        
+        let proficiencyBonus = 0;
+        if (proficiencyRadio) {
+            const profValue = proficiencyRadio.value;
+            if (profValue === 'proficient') {
+                proficiencyBonus = this.expManager?.getProficiencyBonus() || 2;
+            } else if (profValue === 'expertise') {
+                proficiencyBonus = (this.expManager?.getProficiencyBonus() || 2) * 2;
+            }
+        }
+        
+        let attributeMod = 0;
+        if (attributeName) {
+            const attribute = this.attributeManager.getByName(attributeName);
+            if (attribute) {
+                attributeMod = attribute.modifier;
+            }
+        }
+        
+        const totalBonus = attributeMod + proficiencyBonus + misc;
+        const sign = totalBonus >= 0 ? '+' : '';
+        const previewSpan = document.getElementById('skillPreviewBonus');
+        if (previewSpan) {
+            previewSpan.textContent = `${sign}${totalBonus}`;
+            previewSpan.style.color = totalBonus >= 0 ? '#4CAF50' : '#ff4444';
+        }
+    };
+    
+    const nameInput = document.getElementById('editSkillName');
+    const attributeSelect = document.getElementById('editSkillAttribute');
+    const miscInput = document.getElementById('editSkillMisc');
+    const radioButtons = document.querySelectorAll('input[name="proficiency"]');
+    
+    nameInput?.addEventListener('input', updatePreview);
+    attributeSelect?.addEventListener('change', updatePreview);
+    miscInput?.addEventListener('input', updatePreview);
+    radioButtons.forEach(radio => radio.addEventListener('change', updatePreview));
+    
+    updatePreview();
+    
+    // Cerrar modal
+    const closeModal = () => modal.remove();
+    document.getElementById('closeSkillModal')?.addEventListener('click', closeModal);
+    document.getElementById('cancelSkillBtn')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    
+    // Guardar cambios
+    document.getElementById('saveSkillBtn')?.addEventListener('click', () => {
+        const newName = document.getElementById('editSkillName').value.trim();
+        const newAttribute = document.getElementById('editSkillAttribute').value;
+        const newMisc = parseInt(document.getElementById('editSkillMisc').value) || 0;
+        const proficiencyRadio = document.querySelector('input[name="proficiency"]:checked');
+        
+        if (!newName) {
+            Helpers.showMessage('El nombre de la habilidad no puede estar vacío', 'warning');
+            return;
+        }
+        
+        let newProficient = false;
+        let newExpertise = false;
+        
+        if (proficiencyRadio) {
+            if (proficiencyRadio.value === 'proficient') {
+                newProficient = true;
+                newExpertise = false;
+            } else if (proficiencyRadio.value === 'expertise') {
+                newProficient = true;
+                newExpertise = true;
+            }
+        }
+        
+        // Actualizar la habilidad
+        this.skillsManager.update(skill.id, {
+            name: newName,
+            attribute: newAttribute || '',
+            proficient: newProficient,
+            expertise: newExpertise,
+            misc: newMisc
+        });
+        
+        closeModal();
+        Helpers.showMessage('Habilidad actualizada', 'info');
+    });
+}
 
     showManaConfig() {
         const modal = document.getElementById('configModal');
@@ -2409,6 +2838,11 @@ export class CharacterSheet {
             this.spellSlotsManager.setUsed(data.spellSlots.used || 0);
         }
         
+        if (data.spellStats) {
+            this.spellStatsManager.spellStats = { ...this.spellStatsManager.spellStats, ...data.spellStats };
+            this.spellStatsManager.calculateStats();
+        }
+        
         if (data.stats) {
             document.getElementById('armor-class').value = data.stats.ca || 12;
             document.getElementById('speed').value = data.stats.velocidad || 30;
@@ -2596,6 +3030,8 @@ export class CharacterSheet {
         setTimeout(() => {
             this.skillsManager.updateAllBonuses();
             this.savingThrowsManager.updateFromAttributes();
+            this.calcularPercepcionPasiva();
+            this.updateSpellStatsDisplay();
             this.syncCharacterWithWebSocket();
         }, 500);
         

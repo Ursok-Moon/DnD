@@ -172,7 +172,7 @@
 
                 </section>
 
-                 <!-- Percepción Pasiva -->
+                <!-- Percepción Pasiva -->
                 <section class="card passive-perception" id="card-passive-perception">
                     <h3 class="card-title">
                         <i class="fas fa-eye"></i>
@@ -180,7 +180,7 @@
                     </h3>
                     <div class="passive-perception-container">
                         <div class="passive-perception-display">
-                            <input type="number" id="passivePerception" value="10" min="1" max="30" class="passive-perception-input">
+                            <input type="number" id="passivePerception" value="10" min="1" max="30" class="passive-perception-input" readonly>
                             <span class="passive-perception-label">Total</span>
                         </div>
                         <div class="passive-perception-formula">
@@ -349,7 +349,7 @@
                         </div>
                     </div>
                 </section>
-                 <!-- Competencias e Idiomas -->
+                <!-- Competencias e Idiomas -->
                 <section class="card proficiencies" id="card-proficiencies">
                     <div class="section-header">
                         <h3 class="card-title">
@@ -372,6 +372,85 @@
                         <button type="button" class="proficiency-tab" data-type="language">Idiomas</button>
                     </div>
                 </section>
+                  <!-- Tarjeta de Inventario -->
+<section class="card inventory-section collapsible-card" id="card-inventory">
+    <div class="card-header-with-toggle"> <!-- NUEVO: Contenedor para título y botón -->
+        <h3 class="card-title">
+            <i class="fas fa-box-open"></i>
+            INVENTARIO
+        </h3>
+        <button type="button" class="btn-collapse" id="toggleInventoryBtn" title="Enrollar/Desplegar inventario">
+            <i class="fas fa-chevron-up"></i> <!-- Icono de flecha hacia arriba (desplegado) -->
+        </button>
+    </div>
+    
+    <!-- NUEVO: Envolvemos todo el contenido en un div para poder ocultarlo fácilmente -->
+    <div class="inventory-content">
+        <!-- Sistema monetario personalizable -->
+        <div class="currency-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-coins"></i> <span id="currencyName">Monedas</span></h4>
+                <button type="button" class="btn-config-resource" id="configCurrencyBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+            
+            <div class="currency-grid" id="currencyGrid">
+                <div class="currency-item">
+                    <label><i class="fas fa-circle" style="color: #ffd700;"></i> Oro</label>
+                    <input type="number" id="goldAmount" value="0" min="0" class="currency-input">
+                </div>
+                <div class="currency-item">
+                    <label><i class="fas fa-circle" style="color: #c0c0c0;"></i> Plata</label>
+                    <input type="number" id="silverAmount" value="0" min="0" class="currency-input">
+                </div>
+                <div class="currency-item">
+                    <label><i class="fas fa-circle" style="color: #b87333;"></i> Cobre</label>
+                    <input type="number" id="copperAmount" value="0" min="0" class="currency-input">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tesoros y Gemas -->
+        <div class="treasure-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-gem"></i> TESOROS & GEMAS</h4>
+                <button type="button" class="btn-secondary btn-small" id="addTreasureBtn">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div class="treasure-list" id="treasureList">
+                <!-- Los tesoros se generan dinámicamente -->
+            </div>
+        </div>
+        
+        <!-- Pociones -->
+        <div class="potions-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-flask"></i> POCIONES</h4>
+                <button type="button" class="btn-secondary btn-small" id="addPotionBtn">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div class="potions-list" id="potionsList">
+                <!-- Las pociones se generan dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Equipo -->
+        <div class="equipment-section">
+            <div class="resource-header">
+                <h4><i class="fas fa-chess-board"></i> EQUIPO</h4>
+                <button type="button" class="btn-secondary btn-small" id="addEquipmentBtn">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+            <div class="equipment-list" id="equipmentList">
+                <!-- El equipo se generará dinámicamente -->
+            </div>
+        </div>
+    </div> <!-- Cierre del nuevo div inventory-content -->
+</section>
 
             </div>
 
@@ -494,85 +573,6 @@
                         </button>
                     </div>
                 </section>
-                <!-- Tarjeta de Inventario -->
-<section class="card inventory-section collapsible-card" id="card-inventory">
-    <div class="card-header-with-toggle"> <!-- NUEVO: Contenedor para título y botón -->
-        <h3 class="card-title">
-            <i class="fas fa-box-open"></i>
-            INVENTARIO
-        </h3>
-        <button type="button" class="btn-collapse" id="toggleInventoryBtn" title="Enrollar/Desplegar inventario">
-            <i class="fas fa-chevron-up"></i> <!-- Icono de flecha hacia arriba (desplegado) -->
-        </button>
-    </div>
-    
-    <!-- NUEVO: Envolvemos todo el contenido en un div para poder ocultarlo fácilmente -->
-    <div class="inventory-content">
-        <!-- Sistema monetario personalizable -->
-        <div class="currency-section">
-            <div class="resource-header">
-                <h4><i class="fas fa-coins"></i> <span id="currencyName">Monedas</span></h4>
-                <button type="button" class="btn-config-resource" id="configCurrencyBtn">
-                    <i class="fas fa-cog"></i>
-                </button>
-            </div>
-            
-            <div class="currency-grid" id="currencyGrid">
-                <div class="currency-item">
-                    <label><i class="fas fa-circle" style="color: #ffd700;"></i> Oro</label>
-                    <input type="number" id="goldAmount" value="0" min="0" class="currency-input">
-                </div>
-                <div class="currency-item">
-                    <label><i class="fas fa-circle" style="color: #c0c0c0;"></i> Plata</label>
-                    <input type="number" id="silverAmount" value="0" min="0" class="currency-input">
-                </div>
-                <div class="currency-item">
-                    <label><i class="fas fa-circle" style="color: #b87333;"></i> Cobre</label>
-                    <input type="number" id="copperAmount" value="0" min="0" class="currency-input">
-                </div>
-            </div>
-        </div>
-        
-        <!-- Tesoros y Gemas -->
-        <div class="treasure-section">
-            <div class="resource-header">
-                <h4><i class="fas fa-gem"></i> TESOROS & GEMAS</h4>
-                <button type="button" class="btn-secondary btn-small" id="addTreasureBtn">
-                    <i class="fas fa-plus"></i> Añadir
-                </button>
-            </div>
-            <div class="treasure-list" id="treasureList">
-                <!-- Los tesoros se generan dinámicamente -->
-            </div>
-        </div>
-        
-        <!-- Pociones -->
-        <div class="potions-section">
-            <div class="resource-header">
-                <h4><i class="fas fa-flask"></i> POCIONES</h4>
-                <button type="button" class="btn-secondary btn-small" id="addPotionBtn">
-                    <i class="fas fa-plus"></i> Añadir
-                </button>
-            </div>
-            <div class="potions-list" id="potionsList">
-                <!-- Las pociones se generan dinámicamente -->
-            </div>
-        </div>
-
-        <!-- Equipo -->
-        <div class="equipment-section">
-            <div class="resource-header">
-                <h4><i class="fas fa-chess-board"></i> EQUIPO</h4>
-                <button type="button" class="btn-secondary btn-small" id="addEquipmentBtn">
-                    <i class="fas fa-plus"></i> Añadir
-                </button>
-            </div>
-            <div class="equipment-list" id="equipmentList">
-                <!-- El equipo se generará dinámicamente -->
-            </div>
-        </div>
-    </div> <!-- Cierre del nuevo div inventory-content -->
-</section>
             </div>
             <!-- Sección inferior: Características y equipo -->
             <div class="full-width">
@@ -607,7 +607,8 @@
                 </section>
 
                 <!-- Conjuros -->
-               <section class="card spells" id="card-spells">
+            <!-- Sección de Conjuros - Agregar esto dentro de card-spells -->
+<section class="card spells" id="card-spells">
     <div class="section-header">
         <h3 class="card-title">
             <i class="fas fa-book-spells"></i>
@@ -618,8 +619,42 @@
         </button>
     </div>
     
+    <!-- Estadísticas de Conjuros -->
+    <div class="spell-stats-section">
+        <div class="spell-stats-grid">
+            <div class="spell-stat-item">
+                <label><i class="fas fa-magic"></i> Característica Mágica</label>
+                <select id="spellcastingAbility" class="spell-stat-select">
+                </select>
+            </div>
+            
+            <div class="spell-stat-item">
+                <label><i class="fas fa-shield-alt"></i> CD Salvación Conjuros</label>
+                <div class="spell-stat-value" id="spellSaveDC">10</div>
+            </div>
+            
+            <div class="spell-stat-item">
+                <label><i class="fas fa-crosshairs"></i> Bonif. Ataque Conjuros</label>
+                <div class="spell-stat-value" id="spellAttackBonus">+0</div>
+            </div>
+            
+            <div class="spell-stat-item">
+                <label><i class="fas fa-book"></i> Conjuros Preparados</label>
+                <div class="spell-stat-input-group">
+                    <input type="number" id="preparedSpells" class="spell-stat-input" min="0" value="0">
+                    <span class="spell-stat-max">/ <span id="maxPreparedSpells">0</span></span>
+                </div>
+            </div>
+            
+            <div class="spell-stat-item">
+                <label><i class="fas fa-star"></i> Trucos Conocidos</label>
+                <input type="number" id="cantripsKnown" class="spell-stat-input" min="0" value="0">
+            </div>
+        </div>
+    </div>
+    
     <div class="spells-list" id="spellsList">
-        <!-- Los conjuros se generan dinámicamente por JS -->
+        <!-- Los conjuros se generan dinámicamente -->
     </div>
 </section>
             </div>

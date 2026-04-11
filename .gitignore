@@ -4,6 +4,7 @@ node_modules/
 # Archivos de entorno
 .env
 .env.local
+.env.production
 
 # Archivos de sistema
 .DS_Store

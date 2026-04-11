@@ -13,7 +13,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Sidebar (SIEMPRE visible, incluso para jugadores) -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a class="sidebar-logo">
@@ -468,6 +467,7 @@
                     </div>
 
                     <div class="tools-grid">
+                        <!-- Lanzador de Dados existente -->
                         <div class="tool-card">
                             <div class="tool-icon">
                                 <i class="fas fa-dice"></i>
@@ -493,6 +493,7 @@
                             </div>
                         </div>
 
+                        <!-- Temporizador existente -->
                         <div class="tool-card">
                             <div class="tool-icon">
                                 <i class="fas fa-clock"></i>
@@ -514,6 +515,7 @@
                             </div>
                         </div>
                         
+                        <!-- Pizarra de Dibujo existente -->
                         <div class="tool-card">
                             <div class="tool-icon">
                                 <i class="fas fa-paint-brush"></i>
@@ -537,6 +539,41 @@
                                     <span style="color: var(--ink-light); font-size: 0.9rem;">
                                         <i class="fas fa-pencil-alt"></i> Dibuja haciendo clic y arrastrando
                                     </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Asistente IA  -->
+                        <div class="tool-card ai-chat-card" style="grid-column: span 2;">
+                            <div class="tool-icon" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h3>El Erudito</h3>
+                            <!-- <div class="ai-chat-status" id="aiChatStatus" style="text-align: center; margin-bottom: 10px; font-size: 0.8rem; color: var(--accent-gold);">
+                                <i class="fas fa-spinner fa-spin"></i> Conectando...
+                            </div>-->
+                            
+                            <!-- Contenedor del chat similar a notas -->
+                            <div class="ai-chat-container-inline">
+                                <div class="ai-chat-messages-inline" id="aiChatMessagesInline">
+                                    <div class="ai-message system-message">
+                                        <i class="fas fa-robot"></i> ¡Hola! Soy el erudito, guarde mi conciencia en este pergamino. ¿En qué puedo ayudarte?
+                                    </div>
+                                </div>
+                                
+                                <div class="ai-chat-input-area-inline">
+                                    <textarea id="aiChatInputInline" placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)" rows="2"></textarea>
+                                    <div class="ai-chat-controls-inline">
+                                        <div class="ai-chat-options">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="aiStreamToggle" checked>
+                                                <span>Streaming</span>
+                                            </label>
+                                        </div>
+                                        <button class="tool-btn" id="aiSendBtnInline">
+                                            <i class="fas fa-paper-plane"></i> Enviar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -578,7 +615,8 @@
     <script src="/src/JS/websocket.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="/src/JS/tutorial.js"></script>
-    <script src="/src/JS/sidebar.js"></script>
-    <script src="/src/JS/DMS.js"></script>
+    <script type="module" src="/src/JS/sidebar.js"></script>
+    <script type="module" src="/src/JS/DMS.js"></script>
+    <script type="module" src="/src/JS/ai/DMChat.js"></script>
 </body>
 </html>

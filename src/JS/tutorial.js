@@ -1,10 +1,9 @@
-// js/tutorial.js - Versión módulo
-export class TutorialSystem {
+class TutorialSystem {
     constructor() {
         this.isActive = false;
         this.currentModal = null;
         this.tutorialElements = [];
-        // NO inicializar automáticamente - lo hará main.js
+        this.init();
     }
 
     init() {
@@ -43,7 +42,7 @@ export class TutorialSystem {
         toggleWrapper.innerHTML = `
             <label class="tutorial-toggle-label">
                 <i class="fas fa-graduation-cap"></i>
-                <span>Modo Tutorial</span>
+                <span>Tutorial</span>
                 <div class="tutorial-switch">
                     <input type="checkbox" id="tutorialSwitch">
                     <span class="tutorial-switch-slider"></span>
@@ -326,8 +325,8 @@ export class TutorialSystem {
             <ul>
                 <li><strong>Nombre:</strong> Identificador del jugador</li>
                 <li><strong>Iniciativa:</strong> Valor numérico</li>
-                <li><strong>CA:</strong> Clase de Armadura o defensa, dependiendo de tu edición</li>
-                <li><strong>Vida:</strong> Puntos de golpe o hp máximo</li>
+                <li><strong>CA:</strong> Clase de Armadura o defensa, depeniendo de tu edicion</li>
+                <li><strong>Vida:</strong> Puntos de golpe o hp maximo</li>
             </ul>
         `;
     }
@@ -341,7 +340,7 @@ export class TutorialSystem {
                 <li><strong>Campo de búsqueda:</strong> Busca en el bestiario cargado</li>
                 <li><strong>CA:</strong> Clase de Armadura</li>
                 <li><strong>Vida:</strong> Puntos de golpe actuales</li>
-                <li><strong>Iniciativa:</strong> Su destreza será tomada en cuenta al tirar los dados</li>
+                <li><strong>Iniciativa:</strong>Su destreza será tomada en cuenta al tirar los dados</li>
             </ul>
             <div class="tutorial-tip">
                 <i class="fas fa-lightbulb"></i>
@@ -408,8 +407,9 @@ export class TutorialSystem {
             <h3><i class="fas fa-file-code"></i> Cargar Bestiario JSON</h3>
             <p>Importa tu propio bestiario personalizado.</p>
             <ul>
-                <li>El JSON debe tener el siguiente formato para que sea funcional</li>
-                <li><a href="https://tse4.mm.bing.net/th/id/OIP.OFV6FdyHeLvsQf8r5ooSDwHaFj?rs=1&pid=ImgDetMain&o=7&rm=3" target="_blank" rel="noopener noreferrer">Ver ejemplo</a></li>
+                <li>el json debe tener el siguiente formato para que sea funcional</li>
+                <a href="https://tse4.mm.bing.net/th/id/OIP.OFV6FdyHeLvsQf8r5ooSDwHaFj?rs=1&pid=ImgDetMain&o=7&rm=3" target="_blank" rel="noopener noreferrer">revisar</a>
+
             </ul>
         `;
     }
@@ -661,12 +661,29 @@ export class TutorialSystem {
             });
         }
     }
-
-    // Método para manejar cambios en el sidebar
-    handleSidebarStateChange(expanded) {
-        // Aquí puedes añadir lógica si es necesario
-        console.log('Sidebar estado cambiado:', expanded ? 'expandido' : 'colapsado');
-    }
 }
 
-// NO inicializar automáticamente
+// Inicializar el sistema de tutorial cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    // Pequeño retraso para asegurar que el sidebar está cargado
+    setTimeout(() => {
+        window.tutorialSystem = new TutorialSystem();
+        
+        // Observar cambios en el DOM para añadir tutoriales a elementos dinámicos
+        const observer = new MutationObserver((mutations) => {
+            if (window.tutorialSystem && window.tutorialSystem.isActive) {
+                window.tutorialSystem.refreshTutorials();
+            }
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }, 500);
+});
+
+// Exportar para uso en otros módulos
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TutorialSystem;
+}

@@ -1,5 +1,4 @@
-// js/sidebar.js - Versión módulo
-export class SidebarManager {
+class SidebarManager {
     constructor() {
         this.sidebar = document.getElementById('sidebar');
         this.currentPage = this.getCurrentPage();
@@ -8,40 +7,97 @@ export class SidebarManager {
     }
     
     init() {
+        if (!this.sidebar) return;
+        
         // Añadir clase al body
         document.body.classList.add('with-sidebar');
         
         // Marcar página activa
         this.setActivePage();
         
-        // Event listeners para hover
+        // Configurar hover listeners
         this.setupHoverListeners();
+        
+        // Configurar tutorial toggle - esperar a que tutorialSystem esté disponible
+        this.setupTutorialToggle();
         
         // Cargar estado inicial
         this.loadInitialState();
+        
+        console.log('Sidebar inicializado correctamente');
     }
     
     setupHoverListeners() {
+        if (!this.sidebar) return;
+        
         // Abrir sidebar al hacer hover
         this.sidebar.addEventListener('mouseenter', () => {
-            this.expandSidebar();
+            if (window.innerWidth > 768) {
+                this.expandSidebar();
+            }
         });
         
         // Cerrar sidebar al salir el cursor
         this.sidebar.addEventListener('mouseleave', () => {
-            this.collapseSidebar();
+            if (window.innerWidth > 768) {
+                this.collapseSidebar();
+            }
         });
         
-        // Prevenir cierre si el cursor está sobre el sidebar en móvil
+        // Manejo táctil para móvil
         if (window.innerWidth <= 768) {
+            let touchTimeout;
             this.sidebar.addEventListener('touchstart', (e) => {
                 e.stopPropagation();
-                this.expandSidebar();
+                touchTimeout = setTimeout(() => {
+                    this.expandSidebar();
+                }, 300);
+            });
+            
+            document.body.addEventListener('touchstart', (e) => {
+                if (!this.sidebar.contains(e.target)) {
+                    clearTimeout(touchTimeout);
+                    this.collapseSidebar();
+                }
             });
         }
     }
     
+    setupTutorialToggle() {
+        // Esperar un poco para que tutorialSystem se inicialice
+        const checkTutorialSystem = () => {
+            if (window.tutorialSystem) {
+                const tutorialToggle = document.getElementById('tutorialSwitch');
+                if (tutorialToggle) {
+                    // Cargar estado guardado
+                    const tutorialEnabled = localStorage.getItem('tutorialMode') === 'true';
+                    tutorialToggle.checked = tutorialEnabled;
+                    
+                    // Aplicar estado inicial
+                    if (tutorialEnabled && window.tutorialSystem) {
+                        window.tutorialSystem.toggleTutorial(true);
+                    } else if (window.tutorialSystem) {
+                        window.tutorialSystem.toggleTutorial(false);
+                    }
+                    
+                    // Event listener
+                    tutorialToggle.addEventListener('change', (e) => {
+                        if (window.tutorialSystem) {
+                            window.tutorialSystem.toggleTutorial(e.target.checked);
+                        }
+                    });
+                }
+            } else {
+                // Si no está disponible, esperar y reintentar
+                setTimeout(checkTutorialSystem, 100);
+            }
+        };
+        
+        checkTutorialSystem();
+    }
+    
     expandSidebar() {
+        if (!this.sidebar) return;
         this.sidebar.classList.add('expanded');
         this.sidebar.style.width = '220px';
         
@@ -52,15 +108,17 @@ export class SidebarManager {
             text.style.visibility = 'visible';
         });
         
-        // Notificar al sistema de tutorial si existe
+        // Notificar al sistema de tutorial
         if (window.tutorialSystem) {
             window.tutorialSystem.handleSidebarStateChange(true);
         }
     }
     
     collapseSidebar() {
-        // No colapsar si estamos en móvil
-        if (window.innerWidth <= 768) {
+        if (!this.sidebar) return;
+        
+        // No colapsar si estamos en móvil y está expandido manualmente
+        if (window.innerWidth <= 768 && this.sidebar.classList.contains('manually-expanded')) {
             return;
         }
         
@@ -74,13 +132,15 @@ export class SidebarManager {
             text.style.visibility = 'hidden';
         });
         
-        // Notificar al sistema de tutorial si existe
+        // Notificar al sistema de tutorial
         if (window.tutorialSystem) {
             window.tutorialSystem.handleSidebarStateChange(false);
         }
     }
     
     loadInitialState() {
+        if (!this.sidebar) return;
+        
         if (window.innerWidth > 768) {
             this.sidebar.style.width = '70px';
             // Asegurar que los textos estén ocultos inicialmente
@@ -91,10 +151,13 @@ export class SidebarManager {
             });
         } else {
             this.sidebar.style.width = '0';
+            this.sidebar.classList.remove('expanded');
         }
     }
     
     setActivePage() {
+        if (!this.sidebar) return;
+        
         // Remover activo de todos
         const links = this.sidebar.querySelectorAll('.sidebar-link');
         links.forEach(link => {
@@ -113,19 +176,33 @@ export class SidebarManager {
         
         if (path.includes('hoja.html')) return 'hoja';
         if (path.includes('Cartas.html')) return 'cartas';
-        if (path.includes('bestias')) return 'bestias';
-        if (path.includes('mapa')) return 'mapa';
-        if (path.includes('dados')) return 'dados';
-        if (path.includes('ajustes')) return 'ajustes';
+        if (path.includes('DMS.html')) return 'bestias';
+        if (path.includes('mapa.html')) return 'mapa';
+        if (path.includes('dados.html')) return 'dados';
+        if (path.includes('admin.html')) return 'ajustes';
         
         return 'hoja'; // Por defecto
     }
     
-    // Método para cerrar sidebar manualmente (para móvil)
-    closeSidebar() {
-        if (window.innerWidth <= 768) {
-            this.sidebar.style.width = '0';
-            this.sidebar.classList.remove('expanded');
+    // Método para abrir/cerrar sidebar manualmente
+    toggleSidebar() {
+        if (this.sidebar.style.width === '220px' || 
+            (window.innerWidth > 768 && this.sidebar.style.width === '70px')) {
+            this.collapseSidebar();
+        } else {
+            this.expandSidebar();
         }
     }
 }
+
+// Esperar a que el DOM esté completamente cargado
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        window.sidebarManager = new SidebarManager();
+    });
+} else {
+    window.sidebarManager = new SidebarManager();
+}
+
+// Exportar para uso en otros módulos
+export default SidebarManager;

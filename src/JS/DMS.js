@@ -45,12 +45,13 @@ class DMScreen {
         this.timerInterval = null;
         this.timerSeconds = 0;
         
-        // Propiedades para el bestiario
-        this.bestiarioData = [];
-        this.bestiarioOriginal = null;
+        // Propiedades para el bestiario - MODIFICADO
+        this.bestiarioOriginal = null;      // Referencia original, nunca se modifica
+        this.bestiarioPersonalizado = null; // Bestiario cargado por el usuario
+        this.bestiarioActual = null;        // Fuente activa actual
+        this.fuenteBestiarioActual = 'original'; // 'original' o 'personalizado'
         this.bestiaryDenominaciones = [];
         this.currentBestiaryEntry = null;
-        this.bestiaryCustomLoaded = false;
 
         this.baseUrl = (typeof CONFIG !== 'undefined' && CONFIG.SERVER_URL) 
             ? CONFIG.SERVER_URL 
@@ -100,66 +101,64 @@ class DMScreen {
     }
 
     manejarActualizacionPersonaje(personajeActualizado) {
-    if (!personajeActualizado || !personajeActualizado.nombre) return;
-    
-    const index = this.personajesHoy.findIndex(p => 
-        p.nombre === personajeActualizado.nombre || p.id === personajeActualizado.id
-    );
-    
-    if (index !== -1) {
-        this.personajesHoy[index] = {
-            ...this.personajesHoy[index],
-            ...personajeActualizado,
-            trasfondo: personajeActualizado.trasfondo || this.personajesHoy[index].trasfondo,
-            alineamiento: personajeActualizado.alineamiento || this.personajesHoy[index].alineamiento,
-            stats: personajeActualizado.stats || this.personajesHoy[index].stats,
-            spellSlots: personajeActualizado.spellSlots || this.personajesHoy[index].spellSlots,
-            spellStats: personajeActualizado.spellStats || this.personajesHoy[index].spellStats,
-            savingThrows: personajeActualizado.savingThrows || this.personajesHoy[index].savingThrows,
-            passivePerception: personajeActualizado.passivePerception || this.personajesHoy[index].passivePerception,
-            deathSaves: personajeActualizado.deathSaves || this.personajesHoy[index].deathSaves,
-            inventario: personajeActualizado.inventario || this.personajesHoy[index].inventario, 
-            ataques: personajeActualizado.ataques || this.personajesHoy[index].ataques,          
-            conjuros: personajeActualizado.conjuros || this.personajesHoy[index].conjuros,        
-            notas: personajeActualizado.notas || this.personajesHoy[index].notas              
-        };
-    } else {
-        this.personajesHoy.push(personajeActualizado);
+        if (!personajeActualizado || !personajeActualizado.nombre) return;
+        
+        const index = this.personajesHoy.findIndex(p => 
+            p.nombre === personajeActualizado.nombre || p.id === personajeActualizado.id
+        );
+        
+        if (index !== -1) {
+            this.personajesHoy[index] = {
+                ...this.personajesHoy[index],
+                ...personajeActualizado,
+                trasfondo: personajeActualizado.trasfondo || this.personajesHoy[index].trasfondo,
+                alineamiento: personajeActualizado.alineamiento || this.personajesHoy[index].alineamiento,
+                stats: personajeActualizado.stats || this.personajesHoy[index].stats,
+                spellSlots: personajeActualizado.spellSlots || this.personajesHoy[index].spellSlots,
+                spellStats: personajeActualizado.spellStats || this.personajesHoy[index].spellStats,
+                savingThrows: personajeActualizado.savingThrows || this.personajesHoy[index].savingThrows,
+                passivePerception: personajeActualizado.passivePerception || this.personajesHoy[index].passivePerception,
+                deathSaves: personajeActualizado.deathSaves || this.personajesHoy[index].deathSaves,
+                inventario: personajeActualizado.inventario || this.personajesHoy[index].inventario, 
+                ataques: personajeActualizado.ataques || this.personajesHoy[index].ataques,          
+                conjuros: personajeActualizado.conjuros || this.personajesHoy[index].conjuros,        
+                notas: personajeActualizado.notas || this.personajesHoy[index].notas              
+            };
+        } else {
+            this.personajesHoy.push(personajeActualizado);
+        }
+        
+        this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
+            text: pj.nombre,
+            value: pj.nombre,
+            jugador: pj.jugador,
+            clase: pj.clase,
+            nivel: pj.nivel,
+            raza: pj.raza,
+            trasfondo: pj.trasfondo,
+            alineamiento: pj.alineamiento,
+            stats: pj.stats,
+            spellSlots: pj.spellSlots,
+            spellStats: pj.spellStats,
+            ataques: pj.ataques,
+            conjuros: pj.conjuros,
+            inventario: pj.inventario,
+            notas: pj.notas,    
+            imagen: pj.imagen,
+            colores_personalizados: pj.colores_personalizados,
+            savingThrows: pj.savingThrows,
+            passivePerception: pj.passivePerception,
+            deathSaves: pj.deathSaves  
+        }));
+        
+        if (this.modalAbierto && (this.modalAbierto.nombre === personajeActualizado.nombre)) {
+            console.log(`🔄 Actualizando modal para ${personajeActualizado.nombre} por WebSocket`);
+            this.modalAbierto = personajeActualizado;
+            this.actualizarModalConDatos(personajeActualizado);
+        }
+        
+        this.actualizarJugadoresEnListas();
     }
-    
-    this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
-        text: pj.nombre,
-        value: pj.nombre,
-        jugador: pj.jugador,
-        clase: pj.clase,
-        nivel: pj.nivel,
-        raza: pj.raza,
-        trasfondo: pj.trasfondo,
-        alineamiento: pj.alineamiento,
-        stats: pj.stats,
-        spellSlots: pj.spellSlots,
-        spellStats: pj.spellStats,
-        ataques: pj.ataques,
-        conjuros: pj.conjuros,
-        inventario: pj.inventario,
-        notas: pj.notas,    
-        inventario: pj.inventario,
-        notas: pj.notas,
-        imagen: pj.imagen,
-        colores_personalizados: pj.colores_personalizados,
-        savingThrows: pj.savingThrows,
-        passivePerception: pj.passivePerception,
-        deathSaves: pj.deathSaves  
-    }));
-    
-    if (this.modalAbierto && (this.modalAbierto.nombre === personajeActualizado.nombre)) {
-        console.log(`🔄 Actualizando modal para ${personajeActualizado.nombre} por WebSocket`);
-        this.modalAbierto = personajeActualizado;
-        this.actualizarModalConDatos(personajeActualizado);
-    }
-    
-    this.actualizarJugadoresEnListas();
-}
 
     actualizarJugadoresEnListas() {
         this.players.forEach(player => {
@@ -178,46 +177,46 @@ class DMScreen {
     }
     
     async cargarPersonajesHoy() {
-    try {
-        const url = `${this.baseUrl}/api/personajes/hoy`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error('Error al cargar personajes');
+        try {
+            const url = `${this.baseUrl}/api/personajes/hoy`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('Error al cargar personajes');
+            }
+            
+            const data = await response.json();
+            this.personajesHoy = data.personajes || [];
+            
+            this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
+                text: pj.nombre,
+                value: pj.nombre,
+                jugador: pj.jugador,
+                clase: pj.clase,
+                nivel: pj.nivel,
+                raza: pj.raza,
+                trasfondo: pj.trasfondo,
+                alineamiento: pj.alineamiento,
+                stats: pj.stats,
+                spellSlots: pj.spellSlots,
+                spellStats: pj.spellStats,
+                ataques: pj.ataques,
+                conjuros: pj.conjuros,
+                inventario: pj.inventario,    
+                notas: pj.notas,              
+                imagen: pj.imagen,
+                colores_personalizados: pj.colores_personalizados,
+                savingThrows: pj.savingThrows,
+                passivePerception: pj.passivePerception,
+                deathSaves: pj.deathSaves
+            }));
+            
+        } catch (error) {
+            console.warn('Error cargando personajes:', error);
+            this.personajesHoy = [];
+            this.jugadoresDenominaciones = [];
         }
-        
-        const data = await response.json();
-        this.personajesHoy = data.personajes || [];
-        
-        this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
-            text: pj.nombre,
-            value: pj.nombre,
-            jugador: pj.jugador,
-            clase: pj.clase,
-            nivel: pj.nivel,
-            raza: pj.raza,
-            trasfondo: pj.trasfondo,
-            alineamiento: pj.alineamiento,
-            stats: pj.stats,
-            spellSlots: pj.spellSlots,
-            spellStats: pj.spellStats,
-            ataques: pj.ataques,
-            conjuros: pj.conjuros,
-            inventario: pj.inventario,    
-            notas: pj.notas,              
-            imagen: pj.imagen,
-            colores_personalizados: pj.colores_personalizados,
-            savingThrows: pj.savingThrows,
-            passivePerception: pj.passivePerception,
-            deathSaves: pj.deathSaves
-        }));
-        
-    } catch (error) {
-        console.warn('Error cargando personajes:', error);
-        this.personajesHoy = [];
-        this.jugadoresDenominaciones = [];
     }
-}
 
     setupJugadoresAutocomplete() {
         const playerNameInput = document.getElementById('playerNameInput');
@@ -351,55 +350,55 @@ class DMScreen {
     }
 
     async actualizarPersonajesPeriodicamente() {
-    try {
-        const response = await fetch(`${this.baseUrl}/api/personajes/hoy`);
-        const data = await response.json();
-        const nuevosPersonajes = data.personajes || [];
-        
-        const cambios = this.detectarCambiosPersonajes(nuevosPersonajes, this.personajesHoy);
-        
-        if (cambios.hayCambios) {
-            console.log('🔄 Cambios detectados en personajes:', cambios);
+        try {
+            const response = await fetch(`${this.baseUrl}/api/personajes/hoy`);
+            const data = await response.json();
+            const nuevosPersonajes = data.personajes || [];
             
-            this.personajesHoy = nuevosPersonajes;
+            const cambios = this.detectarCambiosPersonajes(nuevosPersonajes, this.personajesHoy);
             
-            this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
-                text: pj.nombre,
-                value: pj.nombre,
-                jugador: pj.jugador,
-                clase: pj.clase,
-                nivel: pj.nivel,
-                raza: pj.raza,
-                trasfondo: pj.trasfondo,
-                alineamiento: pj.alineamiento,
-                stats: pj.stats,
-                spellStats: pj.spellStats,
-                ataques: pj.ataques,
-                conjuros: pj.conjuros,
-                inventario: pj.inventario,
-                notas: pj.notas,
-                imagen: pj.imagen,
-                colores_personalizados: pj.colores_personalizados,
-                savingThrows: pj.savingThrows,
-                passivePerception: pj.passivePerception,
-                deathSaves: pj.deathSaves 
-            }));
-            
-            if (cambios.nuevos.length > 0) {
-                cambios.nuevos.forEach(pj => {
-                    this.showNotification(`✨ Nuevo personaje: ${pj.nombre}`, 'info');
-                });
+            if (cambios.hayCambios) {
+                console.log('🔄 Cambios detectados en personajes:', cambios);
+                
+                this.personajesHoy = nuevosPersonajes;
+                
+                this.jugadoresDenominaciones = this.personajesHoy.map(pj => ({
+                    text: pj.nombre,
+                    value: pj.nombre,
+                    jugador: pj.jugador,
+                    clase: pj.clase,
+                    nivel: pj.nivel,
+                    raza: pj.raza,
+                    trasfondo: pj.trasfondo,
+                    alineamiento: pj.alineamiento,
+                    stats: pj.stats,
+                    spellStats: pj.spellStats,
+                    ataques: pj.ataques,
+                    conjuros: pj.conjuros,
+                    inventario: pj.inventario,
+                    notas: pj.notas,
+                    imagen: pj.imagen,
+                    colores_personalizados: pj.colores_personalizados,
+                    savingThrows: pj.savingThrows,
+                    passivePerception: pj.passivePerception,
+                    deathSaves: pj.deathSaves 
+                }));
+                
+                if (cambios.nuevos.length > 0) {
+                    cambios.nuevos.forEach(pj => {
+                        this.showNotification(`✨ Nuevo personaje: ${pj.nombre}`, 'info');
+                    });
+                }
+                
+                if (cambios.modificados.length > 0 && this.modalAbierto) {
+                    await this.verificarCambiosPersonaje();
+                }
             }
             
-            if (cambios.modificados.length > 0 && this.modalAbierto) {
-                await this.verificarCambiosPersonaje();
-            }
+        } catch (error) {
+            console.error('Error actualizando personajes:', error);
         }
-        
-    } catch (error) {
-        console.error('Error actualizando personajes:', error);
     }
-}
 
     detectarCambiosPersonajes(nuevos, viejos) {
         const resultado = {
@@ -539,106 +538,99 @@ class DMScreen {
     }
 
     setupDeathSavesClickEvents(personaje) {
-    const modalBody = document.getElementById('jugadorModalBody');
-    if (!modalBody) return;
-    
-    const successChecks = modalBody.querySelectorAll('.success-check');
-    const failChecks = modalBody.querySelectorAll('.fail-check');
-    
-    successChecks.forEach(check => {
-        check.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const index = parseInt(check.dataset.index);
-            
-            // Obtener el personaje actualizado
-            const personajeActual = this.personajesHoy.find(p => p.nombre === personaje.nombre);
-            if (!personajeActual) return;
-            
-            // Crear una copia de deathSaves
-            const nuevosDeathSaves = { ...personajeActual.deathSaves };
-            if (!nuevosDeathSaves.successes) nuevosDeathSaves.successes = [false, false, false];
-            
-            // Alternar el estado
-            nuevosDeathSaves.successes[index] = !nuevosDeathSaves.successes[index];
-            
-            // Si hay 3 éxitos, resetear fallos
-            if (nuevosDeathSaves.successes.filter(Boolean).length >= 3) {
-                nuevosDeathSaves.successes = [true, true, true];
-                nuevosDeathSaves.fails = [false, false, false];
-            }
-            
-            // Actualizar en la lista local
-            const idx = this.personajesHoy.findIndex(p => p.nombre === personaje.nombre);
-            if (idx !== -1) {
-                this.personajesHoy[idx].deathSaves = nuevosDeathSaves;
-            }
-            
-            // Enviar actualización al servidor
-            await this.actualizarDeathSavesEnServidor(personaje.nombre, nuevosDeathSaves);
-            
-            // Actualizar el modal
-            this.modalAbierto = { ...personajeActual, deathSaves: nuevosDeathSaves };
-            this.actualizarModalConDatos(this.modalAbierto);
-        });
-    });
-    
-    failChecks.forEach(check => {
-        check.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const index = parseInt(check.dataset.index);
-            
-            const personajeActual = this.personajesHoy.find(p => p.nombre === personaje.nombre);
-            if (!personajeActual) return;
-            
-            const nuevosDeathSaves = { ...personajeActual.deathSaves };
-            if (!nuevosDeathSaves.fails) nuevosDeathSaves.fails = [false, false, false];
-            
-            nuevosDeathSaves.fails[index] = !nuevosDeathSaves.fails[index];
-            
-            if (nuevosDeathSaves.fails.filter(Boolean).length >= 3) {
-                nuevosDeathSaves.fails = [true, true, true];
-                nuevosDeathSaves.successes = [false, false, false];
-            }
-            
-            const idx = this.personajesHoy.findIndex(p => p.nombre === personaje.nombre);
-            if (idx !== -1) {
-                this.personajesHoy[idx].deathSaves = nuevosDeathSaves;
-            }
-            
-            await this.actualizarDeathSavesEnServidor(personaje.nombre, nuevosDeathSaves);
-            
-            this.modalAbierto = { ...personajeActual, deathSaves: nuevosDeathSaves };
-            this.actualizarModalConDatos(this.modalAbierto);
-        });
-    });
-}
-
-async actualizarDeathSavesEnServidor(nombrePersonaje, deathSaves) {
-    try {
-        const personaje = this.personajesHoy.find(p => p.nombre === nombrePersonaje);
-        if (!personaje) return;
+        const modalBody = document.getElementById('jugadorModalBody');
+        if (!modalBody) return;
         
-        const updatedPersonaje = { ...personaje, deathSaves };
+        const successChecks = modalBody.querySelectorAll('.success-check');
+        const failChecks = modalBody.querySelectorAll('.fail-check');
         
-        const response = await fetch(`${this.baseUrl}/api/personajes/guardar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedPersonaje)
+        successChecks.forEach(check => {
+            check.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const index = parseInt(check.dataset.index);
+                
+                const personajeActual = this.personajesHoy.find(p => p.nombre === personaje.nombre);
+                if (!personajeActual) return;
+                
+                const nuevosDeathSaves = { ...personajeActual.deathSaves };
+                if (!nuevosDeathSaves.successes) nuevosDeathSaves.successes = [false, false, false];
+                
+                nuevosDeathSaves.successes[index] = !nuevosDeathSaves.successes[index];
+                
+                if (nuevosDeathSaves.successes.filter(Boolean).length >= 3) {
+                    nuevosDeathSaves.successes = [true, true, true];
+                    nuevosDeathSaves.fails = [false, false, false];
+                }
+                
+                const idx = this.personajesHoy.findIndex(p => p.nombre === personaje.nombre);
+                if (idx !== -1) {
+                    this.personajesHoy[idx].deathSaves = nuevosDeathSaves;
+                }
+                
+                await this.actualizarDeathSavesEnServidor(personaje.nombre, nuevosDeathSaves);
+                
+                this.modalAbierto = { ...personajeActual, deathSaves: nuevosDeathSaves };
+                this.actualizarModalConDatos(this.modalAbierto);
+            });
         });
         
-        if (response.ok) {
-            console.log(`✅ Salvaciones de muerte actualizadas para ${nombrePersonaje}`);
-            
-            if (window.wsClient && window.wsClient.isConectado()) {
-                window.wsClient.emit('personaje-guardado', {
-                    personaje: updatedPersonaje
-                });
-            }
-        }
-    } catch (error) {
-        console.error('Error actualizando death saves:', error);
+        failChecks.forEach(check => {
+            check.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const index = parseInt(check.dataset.index);
+                
+                const personajeActual = this.personajesHoy.find(p => p.nombre === personaje.nombre);
+                if (!personajeActual) return;
+                
+                const nuevosDeathSaves = { ...personajeActual.deathSaves };
+                if (!nuevosDeathSaves.fails) nuevosDeathSaves.fails = [false, false, false];
+                
+                nuevosDeathSaves.fails[index] = !nuevosDeathSaves.fails[index];
+                
+                if (nuevosDeathSaves.fails.filter(Boolean).length >= 3) {
+                    nuevosDeathSaves.fails = [true, true, true];
+                    nuevosDeathSaves.successes = [false, false, false];
+                }
+                
+                const idx = this.personajesHoy.findIndex(p => p.nombre === personaje.nombre);
+                if (idx !== -1) {
+                    this.personajesHoy[idx].deathSaves = nuevosDeathSaves;
+                }
+                
+                await this.actualizarDeathSavesEnServidor(personaje.nombre, nuevosDeathSaves);
+                
+                this.modalAbierto = { ...personajeActual, deathSaves: nuevosDeathSaves };
+                this.actualizarModalConDatos(this.modalAbierto);
+            });
+        });
     }
-}
+
+    async actualizarDeathSavesEnServidor(nombrePersonaje, deathSaves) {
+        try {
+            const personaje = this.personajesHoy.find(p => p.nombre === nombrePersonaje);
+            if (!personaje) return;
+            
+            const updatedPersonaje = { ...personaje, deathSaves };
+            
+            const response = await fetch(`${this.baseUrl}/api/personajes/guardar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedPersonaje)
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Salvaciones de muerte actualizadas para ${nombrePersonaje}`);
+                
+                if (window.wsClient && window.wsClient.isConectado()) {
+                    window.wsClient.emit('personaje-guardado', {
+                        personaje: updatedPersonaje
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error actualizando death saves:', error);
+        }
+    }
 
     async mostrarInfoJugador(personaje) {
         let modal = document.getElementById('jugadorModal');
@@ -681,579 +673,551 @@ async actualizarDeathSavesEnServidor(nombrePersonaje, deathSaves) {
     }
 
     generarHTMLModal(personaje) {
-    let html = '';
-    
-    html += `<div class="jugador-imagen-container">`;
-    if (personaje.imagen) {
-        let imagenUrl = personaje.imagen;
-        if (!imagenUrl.startsWith('http') && !imagenUrl.startsWith('/')) {
-            imagenUrl = '/' + imagenUrl;
+        let html = '';
+        
+        html += `<div class="jugador-imagen-container">`;
+        if (personaje.imagen) {
+            let imagenUrl = personaje.imagen;
+            if (!imagenUrl.startsWith('http') && !imagenUrl.startsWith('/')) {
+                imagenUrl = '/' + imagenUrl;
+            }
+            html += `
+                <div class="jugador-imagen-wrapper">
+                    <img src="${imagenUrl}" alt="${personaje.nombre || 'Personaje'}" class="jugador-imagen"
+                         onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\\'jugador-imagen-placeholder\\'><i class=\\'fas fa-user\\'></i><span>${personaje.nombre || '?'}</span></div>';">
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="jugador-imagen-placeholder">
+                    <i class="fas fa-user"></i>
+                    <span>${personaje.nombre || 'Personaje'}</span>
+                </div>
+            `;
         }
-        html += `
-            <div class="jugador-imagen-wrapper">
-                <img src="${imagenUrl}" alt="${personaje.nombre || 'Personaje'}" class="jugador-imagen"
-                     onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\\'jugador-imagen-placeholder\\'><i class=\\'fas fa-user\\'></i><span>${personaje.nombre || '?'}</span></div>';">
-            </div>
-        `;
-    } else {
-        html += `
-            <div class="jugador-imagen-placeholder">
-                <i class="fas fa-user"></i>
-                <span>${personaje.nombre || 'Personaje'}</span>
-            </div>
-        `;
-    }
-    html += `</div>`;
-    
-    html += `<h2 class="jugador-titulo">${personaje.nombre || 'Sin nombre'}</h2>`;
-    
-    // === SECCIÓN INFORMACIÓN (MODIFICADA) ===
-    html += `<div class="jugador-seccion">`;
-    html += `<h3><i class="fas fa-info-circle"></i> Información</h3>`;
-    html += `<div class="jugador-info-grid">`;
-    html += `<div class="jugador-info-item"><span class="info-label">Clase:</span> <span class="info-valor">${personaje.clase || '?'}</span></div>`;
-    html += `<div class="jugador-info-item"><span class="info-label">Raza:</span> <span class="info-valor">${personaje.raza || '?'}</span></div>`;
-    html += `<div class="jugador-info-item"><span class="info-label">Nivel:</span> <span class="info-valor">${personaje.nivel || '?'}</span></div>`;
-    html += `<div class="jugador-info-item"><span class="info-label">Jugador:</span> <span class="info-valor">${personaje.jugador || '?'}</span></div>`;
-    
-    // Velocidad (desde stats)
-    if (personaje.stats?.velocidad) {
-        html += `<div class="jugador-info-item"><span class="info-label">Velocidad:</span> <span class="info-valor">${personaje.stats.velocidad} pies</span></div>`;
-    }
-    
-    // Trasfondo (desde notas o directamente)
-    const trasfondo = personaje.notas?.trasfondo || personaje.trasfondo || personaje.background || '?';
-    html += `<div class="jugador-info-item"><span class="info-label">Trasfondo:</span> <span class="info-valor">${trasfondo}</span></div>`;
-    
-    // Alineamiento
-    const alineamiento = personaje.alineamiento || personaje.alignment || '?';
-    html += `<div class="jugador-info-item"><span class="info-label">Alineamiento:</span> <span class="info-valor">${alineamiento}</span></div>`;
-    
-    if (personaje.stats) {
-        html += `<div class="jugador-info-item"><span class="info-label">CA:</span> <span class="info-valor">${personaje.stats.ca || '?'}</span></div>`;
-        html += `<div class="jugador-info-item"><span class="info-label">Iniciativa:</span> <span class="info-valor">${personaje.stats.iniciativa || '?'}</span></div>`;
-    }
-    html += `</div>`;
-    html += `</div>`;
-    
-    // === ATRIBUTOS ===
-    if (personaje.stats?.atributos?.length > 0) {
+        html += `</div>`;
+        
+        html += `<h2 class="jugador-titulo">${personaje.nombre || 'Sin nombre'}</h2>`;
+        
         html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-dumbbell"></i> Atributos</h3>`;
-        html += `<div class="atributos-grid">`;
-        personaje.stats.atributos.forEach(attr => {
-            let modificador = attr.modificador ?? Math.floor((attr.valor - 10) / 2);
-            const signo = modificador >= 0 ? '+' : '';
-            html += `
-                <div class="atributo-card">
-                    <div class="atributo-nombre">${attr.nombre || 'ATRIBUTO'}</div>
-                    <div class="atributo-valor">${attr.valor || 10}</div>
-                    <div class="atributo-modificador ${modificador >= 0 ? 'positivo' : 'negativo'}">${signo}${modificador}</div>
-                </div>
-            `;
-        });
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
-    // === COMBATE ===
-    if (personaje.stats?.hp || personaje.stats?.mana || personaje.spellSlots) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-heart"></i> Combate</h3>`;
-        html += `<div class="stats-combate-grid">`;
+        html += `<h3><i class="fas fa-info-circle"></i> Información</h3>`;
+        html += `<div class="jugador-info-grid">`;
+        html += `<div class="jugador-info-item"><span class="info-label">Clase:</span> <span class="info-valor">${personaje.clase || '?'}</span></div>`;
+        html += `<div class="jugador-info-item"><span class="info-label">Raza:</span> <span class="info-valor">${personaje.raza || '?'}</span></div>`;
+        html += `<div class="jugador-info-item"><span class="info-label">Nivel:</span> <span class="info-valor">${personaje.nivel || '?'}</span></div>`;
+        html += `<div class="jugador-info-item"><span class="info-label">Jugador:</span> <span class="info-valor">${personaje.jugador || '?'}</span></div>`;
         
-        if (personaje.stats?.hp) {
-            const hp = personaje.stats.hp;
-            const porcentajeVida = hp.max > 0 ? (hp.current / hp.max) * 100 : 0;
-            const colorVida = porcentajeVida < 25 ? '#f44336' : porcentajeVida < 50 ? '#ff9800' : '#4CAF50';
-            
-            html += `
-                <div class="stat-combate-card">
-                    <div class="stat-icon"><i class="fas fa-heart" style="color: ${colorVida};"></i></div>
-                    <div class="stat-contenido">
-                        <div class="stat-label">Puntos de Golpe</div>
-                        <div class="stat-valor-principal">${hp.current || 0}/${hp.max || 0}</div>
-                        ${hp.temp ? `<div class="stat-temp">+${hp.temp} temporal</div>` : ''}
-                        <div class="stat-barra">
-                            <div class="stat-barra-fill" style="width: ${porcentajeVida}%; background: ${colorVida};"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
+        if (personaje.stats?.velocidad) {
+            html += `<div class="jugador-info-item"><span class="info-label">Velocidad:</span> <span class="info-valor">${personaje.stats.velocidad} pies</span></div>`;
         }
         
-        if (personaje.stats?.mana) {
-            const mana = personaje.stats.mana;
-            const porcentajeMana = mana.max > 0 ? (mana.current / mana.max) * 100 : 0;
-            html += `
-                <div class="stat-combate-card">
-                    <div class="stat-icon"><i class="fas fa-bolt" style="color: #4169e1;"></i></div>
-                    <div class="stat-contenido">
-                        <div class="stat-label">Maná</div>
-                        <div class="stat-valor-principal">${mana.current || 0}/${mana.max || 0}</div>
-                        <div class="stat-barra">
-                            <div class="stat-barra-fill" style="width: ${porcentajeMana}%; background: #4169e1;"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
+        const trasfondo = personaje.notas?.trasfondo || personaje.trasfondo || personaje.background || '?';
+        html += `<div class="jugador-info-item"><span class="info-label">Trasfondo:</span> <span class="info-valor">${trasfondo}</span></div>`;
+        
+        const alineamiento = personaje.alineamiento || personaje.alignment || '?';
+        html += `<div class="jugador-info-item"><span class="info-label">Alineamiento:</span> <span class="info-valor">${alineamiento}</span></div>`;
+        
+        if (personaje.stats) {
+            html += `<div class="jugador-info-item"><span class="info-label">CA:</span> <span class="info-valor">${personaje.stats.ca || '?'}</span></div>`;
+            html += `<div class="jugador-info-item"><span class="info-label">Iniciativa:</span> <span class="info-valor">${personaje.stats.iniciativa || '?'}</span></div>`;
         }
-        
-        // === SLOTS DE CONJUROS ===
-        if (personaje.spellSlots) {
-            const slots = personaje.spellSlots;
-            const nivel = slots.level || 1;
-            const total = slots.total || 0;
-            const usados = slots.used || 0;
-            const disponibles = total - usados;
-            const porcentajeUsados = total > 0 ? (usados / total) * 100 : 0;
-            const colorSlots = porcentajeUsados > 75 ? '#ff4444' : porcentajeUsados > 50 ? '#ffaa00' : '#4CAF50';
-            
-            html += `
-                <div class="stat-combate-card">
-                    <div class="stat-icon"><i class="fas fa-gem" style="color: var(--accent-gold);"></i></div>
-                    <div class="stat-contenido">
-                        <div class="stat-label">Slots de Conjuros (Nivel ${nivel})</div>
-                        <div class="stat-valor-principal">${usados}/${total}</div>
-                        <div class="stat-temp" style="color: ${colorSlots};">${disponibles} disponibles</div>
-                        <div class="stat-barra">
-                            <div class="stat-barra-fill" style="width: ${porcentajeUsados}%; background: var(--slot-color, #9370db);"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
         html += `</div>`;
         html += `</div>`;
-    }
-    
-    // === TIROADAS DE SALVACIÓN ===
-    if (personaje.savingThrows && personaje.savingThrows.length > 0) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-shield-alt"></i> Tiradas de Salvación</h3>`;
-        html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">`;
         
-        personaje.savingThrows.sort((a, b) => a.name.localeCompare(b.name)).forEach(st => {
-            const profIcon = st.proficient ? 'fa-check-circle' : 'fa-circle';
-            html += `
-                <div style="background: rgba(255,255,255,0.5); border: 1px solid var(--accent-gold); border-radius: 6px; padding: 8px; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: bold; color: var(--accent-purple); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${st.name}">${st.name}</span>
-                    <span style="font-weight: bold; ${st.value > 0 ? 'color: #4CAF50;' : st.value < 0 ? 'color: #ff4444;' : ''}">${st.value > 0 ? '+' : ''}${st.value}</span>
-                    <span style="color: ${st.proficient ? '#4CAF50' : 'var(--accent-gold)'};"><i class="fas ${profIcon}"></i></span>
-                </div>
-            `;
-        });
-        
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
-    // === HABILIDADES ===
-    if (personaje.skills && personaje.skills.length > 0) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-brain"></i> Habilidades</h3>`;
-        html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">`;
-        
-        personaje.skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
-            html += `
-                <div style="background: white; border: 1px solid var(--parchment-dark); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
-                    <span style="color: var(--ink-dark);">${skill.name}</span>
-                    <span style="font-weight: bold; ${skill.bonus > 0 ? 'color: #4CAF50;' : skill.bonus < 0 ? 'color: #ff4444;' : ''}">${skill.bonus > 0 ? '+' : ''}${skill.bonus}</span>
-                </div>
-            `;
-        });
-        
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
-    // === COMPETENCIAS E IDIOMAS ===
-    if (personaje.proficiencies && personaje.proficiencies.length > 0) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-language"></i> Competencias & Idiomas</h3>`;
-        
-        const armaduras = personaje.proficiencies.filter(p => p.type === 'armor');
-        const armas = personaje.proficiencies.filter(p => p.type === 'weapon');
-        const herramientas = personaje.proficiencies.filter(p => p.type === 'tool');
-        const idiomas = personaje.proficiencies.filter(p => p.type === 'language');
-        const otros = personaje.proficiencies.filter(p => !['armor', 'weapon', 'tool', 'language'].includes(p.type));
-        
-        if (armaduras.length > 0) {
-            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-shield-alt"></i> Armaduras</h4>`;
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-            armaduras.forEach(p => {
-                html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #5d3a9b); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        if (armas.length > 0) {
-            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-crosshairs"></i> Armas</h4>`;
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-            armas.forEach(p => {
-                html += `<span style="background: linear-gradient(135deg, #B22222, #8B0000); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        if (herramientas.length > 0) {
-            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tools"></i> Herramientas</h4>`;
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-            herramientas.forEach(p => {
-                html += `<span style="background: linear-gradient(135deg, #2F4F4F, #1C3A3A); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        if (idiomas.length > 0) {
-            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-language"></i> Idiomas</h4>`;
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-            idiomas.forEach(p => {
-                html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #4B0082); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        if (otros.length > 0) {
-            html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tag"></i> Otros</h4>`;
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
-            otros.forEach(p => {
-                html += `<span style="background: linear-gradient(135deg, #666, #444); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        html += `</div>`;
-    }
-    
-    // === PERCEPCIÓN PASIVA ===
-    if (personaje.passivePerception !== undefined) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-eye"></i> Percepción Pasiva</h3>`;
-        html += `<div style="text-align: center;">`;
-        html += `<div style="font-size: 3rem; font-weight: bold; color: var(--accent-blue); width: 100px; height: 100px; border: 4px solid var(--accent-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: white;">${personaje.passivePerception}</div>`;
-        html += `<div style="font-size: 0.9rem; color: var(--ink-light); margin-top: 10px;">10 + Mod. Sabiduría + Bonif. Competencia</div>`;
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
-   // === SALVACIONES DE MUERTE ===
-    if (personaje.deathSaves) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-skull"></i> Salvaciones de Muerte</h3>`;
-        html += `<div style="display: flex; gap: 30px; justify-content: center;">`;
-        
-        const successes = personaje.deathSaves.successes || [false, false, false];
-        const fails = personaje.deathSaves.fails || [false, false, false];
-        const successCount = successes.filter(Boolean).length;
-        const failCount = fails.filter(Boolean).length;
-        
-        // Éxitos - con cambio de color según el estado
-        html += `<div style="text-align: center;">`;
-        html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-check-circle" style="color: #4CAF50;"></i> Éxitos</label>`;
-        html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
-        
-        successes.forEach((checked, index) => {
-            // Color: verde si true, gris transparente si false
-            const bgColor = checked ? '#4CAF50' : 'rgba(255, 255, 255, 0.2)';
-            const icon = checked ? '<i class="fas fa-check"></i>' : '';
-            html += `
-                <div class="death-save-check success-check" readonly
-                    data-type="success" 
-                    data-index="${index}" 
-                    style="
-                        width: 40px; 
-                        height: 40px; 
-                        border: 3px solid var(--accent-gold, #d4af37); 
-                        border-radius: 8px; 
-                        display: flex; 
-                        align-items: center; 
-                        justify-content: center; 
-                        background: ${bgColor};
-                        transition: all 0.2s ease;
-                        color: white;
-                        font-size: 18px;
-                    ">
-                    ${icon}
-                </div>
-            `;
-        });
-        
-        html += `</div></div>`;
-        
-        // Fallos - con cambio de color según el estado
-        html += `<div style="text-align: center;">`;
-        html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-times-circle" style="color: #ff4444;"></i> Fallos</label>`;
-        html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
-        
-        fails.forEach((checked, index) => {
-            // Color: rojo si true, gris transparente si false
-            const bgColor = checked ? '#ff4444' : 'rgba(254, 254, 254, 0.2)';
-            const icon = checked ? '<i class="fas fa-times"></i>' : '';
-            html += `
-                <div class="death-save-check fail-check"  readonly
-                    data-type="fail" 
-                    data-index="${index}" 
-                    style="
-                        width: 40px; 
-                        height: 40px; 
-                        border: 3px solid var(--accent-gold, #d4af37); 
-                        border-radius: 8px; 
-                        display: flex; 
-                        align-items: center; 
-                        justify-content: center; 
-                        background: ${bgColor};
-                        transition: all 0.2s ease;
-                        color: white;
-                        font-size: 18px;
-                    ">
-                    ${icon}
-                </div>
-            `;
-        });
-        
-        html += `</div></div>`;
-        html += `</div>`;
-        
-        // Mensaje de estado
-        if (successCount >= 3) {
-            html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid #4CAF50; border-radius: 8px;"><i class="fas fa-check-circle"></i> ¡Personaje estable!</div>`;
-        } else if (failCount >= 3) {
-            html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444; border-radius: 8px;"><i class="fas fa-skull-crossbones"></i> ¡Personaje ha muerto!</div>`;
-        }
-        
-        html += `</div>`;
-    }
-    
-    // === INVENTARIO ===
-    if (personaje.inventario) {
-        const inv = personaje.inventario;
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-box-open"></i> Inventario</h3>`;
-        
-        if (inv.monedas) {
-            const monedas = inv.monedas;
-            html += `
-                <div class="inventario-subseccion">
-                    <h4><i class="fas fa-coins"></i> ${monedas.name || 'Monedas'}</h4>
-                    <div class="monedas-grid">
-                        <div class="moneda-item" style="background: linear-gradient(135deg, #ffd700, #b8860b);">
-                            <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.goldName || 'Oro'}</span>
-                            <span class="moneda-cantidad">${monedas.gold || 0}</span>
-                        </div>
-                        <div class="moneda-item" style="background: linear-gradient(135deg, #c0c0c0, #808080);">
-                            <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.silverName || 'Plata'}</span>
-                            <span class="moneda-cantidad">${monedas.silver || 0}</span>
-                        </div>
-                        <div class="moneda-item" style="background: linear-gradient(135deg, #b87333, #8b4513);">
-                            <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.copperName || 'Cobre'}</span>
-                            <span class="moneda-cantidad">${monedas.copper || 0}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        if (inv.tesoros?.length > 0) {
-            html += `<div class="inventario-subseccion"><h4><i class="fas fa-gem"></i> Tesoros</h4><div class="items-lista">`;
-            inv.tesoros.forEach(tesoro => {
-                const icono = this.getTreasureIcon(tesoro.type);
+        if (personaje.stats?.atributos?.length > 0) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-dumbbell"></i> Atributos</h3>`;
+            html += `<div class="atributos-grid">`;
+            personaje.stats.atributos.forEach(attr => {
+                let modificador = attr.modificador ?? Math.floor((attr.valor - 10) / 2);
+                const signo = modificador >= 0 ? '+' : '';
                 html += `
-                    <div class="item-card tesoro-item">
-                        <div class="item-icono"><i class="fas ${icono}" style="color: var(--accent-gold);"></i></div>
-                        <div class="item-info">
-                            <div class="item-nombre">${tesoro.name || 'Tesoro'}</div>
-                            <div class="item-detalle">Valor: ${tesoro.value || 0} ${inv.monedas?.name || 'monedas'}</div>
-                        </div>
+                    <div class="atributo-card">
+                        <div class="atributo-nombre">${attr.nombre || 'ATRIBUTO'}</div>
+                        <div class="atributo-valor">${attr.valor || 10}</div>
+                        <div class="atributo-modificador ${modificador >= 0 ? 'positivo' : 'negativo'}">${signo}${modificador}</div>
                     </div>
                 `;
             });
-            html += `</div></div>`;
+            html += `</div>`;
+            html += `</div>`;
         }
         
-        if (inv.pociones?.length > 0) {
-            html += `<div class="inventario-subseccion"><h4><i class="fas fa-flask"></i> Pociones</h4><div class="items-lista">`;
-            inv.pociones.forEach(pocion => {
-                const icono = pocion.type === 'life' ? 'fa-heart' : 'fa-bolt';
-                const color = pocion.type === 'life' ? '#dc143c' : '#4169e1';
-                html += `
-                    <div class="item-card pocion-item">
-                        <div class="item-icono" style="color: ${color};"><i class="fas ${icono}"></i></div>
-                        <div class="item-info">
-                            <div class="item-nombre">${pocion.name || 'Poción'}</div>
-                            <div class="item-detalle">+${pocion.amount || 0} • ${pocion.value || 0}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += `</div></div>`;
-        }
-        
-        if (inv.equipo?.length > 0) {
-            html += `<div class="inventario-subseccion"><h4><i class="fas fa-chess-board"></i> Equipo</h4><div class="items-lista">`;
-            inv.equipo.forEach(item => {
-                let bonusHtml = '';
-                if (item.attribute && item.bonus !== 0) {
-                    bonusHtml = `<span class="item-bonus" style="color: ${item.bonus > 0 ? '#4CAF50' : '#ff4444'};">${item.bonus > 0 ? '+' : ''}${item.bonus} a ${item.attribute}</span>`;
-                }
+        if (personaje.stats?.hp || personaje.stats?.mana || personaje.spellSlots) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-heart"></i> Combate</h3>`;
+            html += `<div class="stats-combate-grid">`;
+            
+            if (personaje.stats?.hp) {
+                const hp = personaje.stats.hp;
+                const porcentajeVida = hp.max > 0 ? (hp.current / hp.max) * 100 : 0;
+                const colorVida = porcentajeVida < 25 ? '#f44336' : porcentajeVida < 50 ? '#ff9800' : '#4CAF50';
                 
                 html += `
-                    <div class="item-card equipo-item">
-                        <div class="item-icono"><i class="fas fa-shield-alt" style="color: var(--accent-purple);"></i></div>
-                        <div class="item-info">
-                            <div class="item-nombre">${item.name || 'Equipo'}</div>
-                            <div class="item-detalle">
-                                <span><i class="fas fa-coins"></i> ${item.cost || 0}</span>
-                                <span><i class="fas fa-weight-hanging"></i> ${item.weight || 0}</span>
-                                ${bonusHtml}
+                    <div class="stat-combate-card">
+                        <div class="stat-icon"><i class="fas fa-heart" style="color: ${colorVida};"></i></div>
+                        <div class="stat-contenido">
+                            <div class="stat-label">Puntos de Golpe</div>
+                            <div class="stat-valor-principal">${hp.current || 0}/${hp.max || 0}</div>
+                            ${hp.temp ? `<div class="stat-temp">+${hp.temp} temporal</div>` : ''}
+                            <div class="stat-barra">
+                                <div class="stat-barra-fill" style="width: ${porcentajeVida}%; background: ${colorVida};"></div>
                             </div>
-                            ${item.description ? `<div class="item-descripcion">${item.description}</div>` : ''}
                         </div>
+                    </div>
+                `;
+            }
+            
+            if (personaje.stats?.mana) {
+                const mana = personaje.stats.mana;
+                const porcentajeMana = mana.max > 0 ? (mana.current / mana.max) * 100 : 0;
+                html += `
+                    <div class="stat-combate-card">
+                        <div class="stat-icon"><i class="fas fa-bolt" style="color: #4169e1;"></i></div>
+                        <div class="stat-contenido">
+                            <div class="stat-label">Maná</div>
+                            <div class="stat-valor-principal">${mana.current || 0}/${mana.max || 0}</div>
+                            <div class="stat-barra">
+                                <div class="stat-barra-fill" style="width: ${porcentajeMana}%; background: #4169e1;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (personaje.spellSlots) {
+                const slots = personaje.spellSlots;
+                const nivel = slots.level || 1;
+                const total = slots.total || 0;
+                const usados = slots.used || 0;
+                const disponibles = total - usados;
+                const porcentajeUsados = total > 0 ? (usados / total) * 100 : 0;
+                const colorSlots = porcentajeUsados > 75 ? '#ff4444' : porcentajeUsados > 50 ? '#ffaa00' : '#4CAF50';
+                
+                html += `
+                    <div class="stat-combate-card">
+                        <div class="stat-icon"><i class="fas fa-gem" style="color: var(--accent-gold);"></i></div>
+                        <div class="stat-contenido">
+                            <div class="stat-label">Slots de Conjuros (Nivel ${nivel})</div>
+                            <div class="stat-valor-principal">${usados}/${total}</div>
+                            <div class="stat-temp" style="color: ${colorSlots};">${disponibles} disponibles</div>
+                            <div class="stat-barra">
+                                <div class="stat-barra-fill" style="width: ${porcentajeUsados}%; background: var(--slot-color, #9370db);"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            html += `</div>`;
+        }
+        
+        if (personaje.savingThrows && personaje.savingThrows.length > 0) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-shield-alt"></i> Tiradas de Salvación</h3>`;
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">`;
+            
+            personaje.savingThrows.sort((a, b) => a.name.localeCompare(b.name)).forEach(st => {
+                const profIcon = st.proficient ? 'fa-check-circle' : 'fa-circle';
+                html += `
+                    <div style="background: rgba(255,255,255,0.5); border: 1px solid var(--accent-gold); border-radius: 6px; padding: 8px; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: bold; color: var(--accent-purple); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${st.name}">${st.name}</span>
+                        <span style="font-weight: bold; ${st.value > 0 ? 'color: #4CAF50;' : st.value < 0 ? 'color: #ff4444;' : ''}">${st.value > 0 ? '+' : ''}${st.value}</span>
+                        <span style="color: ${st.proficient ? '#4CAF50' : 'var(--accent-gold)'};"><i class="fas ${profIcon}"></i></span>
                     </div>
                 `;
             });
-            html += `</div></div>`;
+            
+            html += `</div>`;
+            html += `</div>`;
         }
         
-        html += `</div>`;
-    }
-    
-    // === ATAQUES ===
-    if (personaje.ataques?.length > 0) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-crosshairs"></i> Ataques</h3>`;
-        html += `<div class="ataques-lista">`;
-        personaje.ataques.forEach(atk => {
-            if (atk.name) {
+        if (personaje.skills && personaje.skills.length > 0) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-brain"></i> Habilidades</h3>`;
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">`;
+            
+            personaje.skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
                 html += `
-                    <div class="ataque-item">
-                        <div class="ataque-nombre">${atk.name}</div>
-                        <div class="ataque-detalle">
-                            <span class="ataque-bonus">${atk.bonus || '?'}</span>
-                            <span class="ataque-dano">${atk.damage || '?'}</span>
+                    <div style="background: white; border: 1px solid var(--parchment-dark); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="color: var(--ink-dark);">${skill.name}</span>
+                        <span style="font-weight: bold; ${skill.bonus > 0 ? 'color: #4CAF50;' : skill.bonus < 0 ? 'color: #ff4444;' : ''}">${skill.bonus > 0 ? '+' : ''}${skill.bonus}</span>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+            html += `</div>`;
+        }
+        
+        if (personaje.proficiencies && personaje.proficiencies.length > 0) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-language"></i> Competencias & Idiomas</h3>`;
+            
+            const armaduras = personaje.proficiencies.filter(p => p.type === 'armor');
+            const armas = personaje.proficiencies.filter(p => p.type === 'weapon');
+            const herramientas = personaje.proficiencies.filter(p => p.type === 'tool');
+            const idiomas = personaje.proficiencies.filter(p => p.type === 'language');
+            const otros = personaje.proficiencies.filter(p => !['armor', 'weapon', 'tool', 'language'].includes(p.type));
+            
+            if (armaduras.length > 0) {
+                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-shield-alt"></i> Armaduras</h4>`;
+                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+                armaduras.forEach(p => {
+                    html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #5d3a9b); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (armas.length > 0) {
+                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-crosshairs"></i> Armas</h4>`;
+                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+                armas.forEach(p => {
+                    html += `<span style="background: linear-gradient(135deg, #B22222, #8B0000); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (herramientas.length > 0) {
+                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tools"></i> Herramientas</h4>`;
+                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+                herramientas.forEach(p => {
+                    html += `<span style="background: linear-gradient(135deg, #2F4F4F, #1C3A3A); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (idiomas.length > 0) {
+                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-language"></i> Idiomas</h4>`;
+                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+                idiomas.forEach(p => {
+                    html += `<span style="background: linear-gradient(135deg, var(--accent-purple), #4B0082); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (otros.length > 0) {
+                html += `<h4 style="color: var(--accent-purple); margin: 10px 0 5px;"><i class="fas fa-tag"></i> Otros</h4>`;
+                html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">`;
+                otros.forEach(p => {
+                    html += `<span style="background: linear-gradient(135deg, #666, #444); color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold);">${p.name}</span>`;
+                });
+                html += `</div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        if (personaje.passivePerception !== undefined) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-eye"></i> Percepción Pasiva</h3>`;
+            html += `<div style="text-align: center;">`;
+            html += `<div style="font-size: 3rem; font-weight: bold; color: var(--accent-blue); width: 100px; height: 100px; border: 4px solid var(--accent-gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: white;">${personaje.passivePerception}</div>`;
+            html += `<div style="font-size: 0.9rem; color: var(--ink-light); margin-top: 10px;">10 + Mod. Sabiduría + Bonif. Competencia</div>`;
+            html += `</div>`;
+            html += `</div>`;
+        }
+        
+        if (personaje.deathSaves) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-skull"></i> Salvaciones de Muerte</h3>`;
+            html += `<div style="display: flex; gap: 30px; justify-content: center;">`;
+            
+            const successes = personaje.deathSaves.successes || [false, false, false];
+            const fails = personaje.deathSaves.fails || [false, false, false];
+            const successCount = successes.filter(Boolean).length;
+            const failCount = fails.filter(Boolean).length;
+            
+            html += `<div style="text-align: center;">`;
+            html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-check-circle" style="color: #4CAF50;"></i> Éxitos</label>`;
+            html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
+            
+            successes.forEach((checked, index) => {
+                const bgColor = checked ? '#4CAF50' : 'rgba(255, 255, 255, 0.2)';
+                const icon = checked ? '<i class="fas fa-check"></i>' : '';
+                html += `
+                    <div class="death-save-check success-check"
+                        data-type="success" 
+                        data-index="${index}" 
+                        style="
+                            width: 40px; 
+                            height: 40px; 
+                            border: 3px solid var(--accent-gold, #d4af37); 
+                            border-radius: 8px; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            background: ${bgColor};
+                            transition: all 0.2s ease;
+                            color: white;
+                            font-size: 18px;
+                        ">
+                        ${icon}
+                    </div>
+                `;
+            });
+            
+            html += `</div></div>`;
+            
+            html += `<div style="text-align: center;">`;
+            html += `<label style="display: block; margin-bottom: 10px; font-weight: bold;"><i class="fas fa-times-circle" style="color: #ff4444;"></i> Fallos</label>`;
+            html += `<div style="display: flex; gap: 10px; justify-content: center;">`;
+            
+            fails.forEach((checked, index) => {
+                const bgColor = checked ? '#ff4444' : 'rgba(254, 254, 254, 0.2)';
+                const icon = checked ? '<i class="fas fa-times"></i>' : '';
+                html += `
+                    <div class="death-save-check fail-check"
+                        data-type="fail" 
+                        data-index="${index}" 
+                        style="
+                            width: 40px; 
+                            height: 40px; 
+                            border: 3px solid var(--accent-gold, #d4af37); 
+                            border-radius: 8px; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            background: ${bgColor};
+                            transition: all 0.2s ease;
+                            color: white;
+                            font-size: 18px;
+                        ">
+                        ${icon}
+                    </div>
+                `;
+            });
+            
+            html += `</div></div>`;
+            html += `</div>`;
+            
+            if (successCount >= 3) {
+                html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid #4CAF50; border-radius: 8px;"><i class="fas fa-check-circle"></i> ¡Personaje estable!</div>`;
+            } else if (failCount >= 3) {
+                html += `<div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444; border-radius: 8px;"><i class="fas fa-skull-crossbones"></i> ¡Personaje ha muerto!</div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        if (personaje.inventario) {
+            const inv = personaje.inventario;
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-box-open"></i> Inventario</h3>`;
+            
+            if (inv.monedas) {
+                const monedas = inv.monedas;
+                html += `
+                    <div class="inventario-subseccion">
+                        <h4><i class="fas fa-coins"></i> ${monedas.name || 'Monedas'}</h4>
+                        <div class="monedas-grid">
+                            <div class="moneda-item" style="background: linear-gradient(135deg, #ffd700, #b8860b);">
+                                <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.goldName || 'Oro'}</span>
+                                <span class="moneda-cantidad">${monedas.gold || 0}</span>
+                            </div>
+                            <div class="moneda-item" style="background: linear-gradient(135deg, #c0c0c0, #808080);">
+                                <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.silverName || 'Plata'}</span>
+                                <span class="moneda-cantidad">${monedas.silver || 0}</span>
+                            </div>
+                            <div class="moneda-item" style="background: linear-gradient(135deg, #b87333, #8b4513);">
+                                <i class="fas fa-circle"></i> <span class="moneda-tipo">${monedas.copperName || 'Cobre'}</span>
+                                <span class="moneda-cantidad">${monedas.copper || 0}</span>
+                            </div>
                         </div>
                     </div>
                 `;
             }
-        });
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
-    // === ESTADÍSTICAS DE CONJUROS ===
-if (personaje.spellStats) {
-    const stats = personaje.spellStats;
-    html += `<div class="jugador-seccion">`;
-    html += `<h3><i class="fas fa-book-spells"></i> Estadísticas de Conjuros</h3>`;
-    html += `<div class="spell-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">`;
-    
-    // Característica mágica
-    html += `
-        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
-            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
-                <i class="fas fa-magic"></i> Característica Mágica
-            </div>
-            <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
-                ${stats.spellcastingAbility || 'Sabiduría'}
-            </div>
-        </div>
-    `;
-    
-    // CD Salvación Conjuros
-    html += `
-        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
-            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
-                <i class="fas fa-shield-alt"></i> CD Salvación
-            </div>
-            <div style="font-size: 1.3rem; font-weight: bold; color: #4CAF50;">
-                ${stats.spellSaveDC || 10}
-            </div>
-        </div>
-    `;
-    
-    // Bonificación Ataque Conjuros
-    const attackBonus = stats.spellAttackBonus || 0;
-    const attackBonusClass = attackBonus >= 0 ? 'positivo' : 'negativo';
-    html += `
-        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
-            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
-                <i class="fas fa-crosshairs"></i> Ataque Conjuros
-            </div>
-            <div style="font-size: 1.3rem; font-weight: bold; ${attackBonus >= 0 ? 'color: #4CAF50;' : 'color: #ff4444;'}">
-                ${attackBonus >= 0 ? '+' : ''}${attackBonus}
-            </div>
-        </div>
-    `;
-    
-    // Conjuros Preparados
-    html += `
-        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
-            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
-                <i class="fas fa-book"></i> Conjuros Preparados
-            </div>
-            <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
-                ${stats.preparedSpells || 0} / ${stats.maxPreparedSpells || 0}
-            </div>
-        </div>
-    `;
-    
-    // Trucos Conocidos
-    html += `
-        <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
-            <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
-                <i class="fas fa-star"></i> Trucos Conocidos
-            </div>
-            <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
-                ${stats.cantripsKnown || 0}
-            </div>
-        </div>
-    `;
-    
-    html += `</div>`;
-    html += `</div>`;
-}
-
-    // === CONJUROS ===
-    if (personaje.conjuros?.length > 0) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-magic"></i> Conjuros</h3>`;
-        html += `<div class="conjuros-lista">`;
-        personaje.conjuros.forEach(spell => {
-            if (spell.name) {
-                html += `
-                    <div class="conjuro-item">
-                        <div class="conjuro-header">
-                            <span class="conjuro-nombre">${spell.name}</span>
-                            <span class="conjuro-nivel">${spell.level || '?'}</span>
+            
+            if (inv.tesoros?.length > 0) {
+                html += `<div class="inventario-subseccion"><h4><i class="fas fa-gem"></i> Tesoros</h4><div class="items-lista">`;
+                inv.tesoros.forEach(tesoro => {
+                    const icono = this.getTreasureIcon(tesoro.type);
+                    html += `
+                        <div class="item-card tesoro-item">
+                            <div class="item-icono"><i class="fas ${icono}" style="color: var(--accent-gold);"></i></div>
+                            <div class="item-info">
+                                <div class="item-nombre">${tesoro.name || 'Tesoro'}</div>
+                                <div class="item-detalle">Valor: ${tesoro.value || 0} ${inv.monedas?.name || 'monedas'}</div>
+                            </div>
                         </div>
-                        ${spell.description ? `<div class="conjuro-descripcion">${spell.description}</div>` : ''}
-                    </div>
-                `;
+                    `;
+                });
+                html += `</div></div>`;
             }
-        });
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
-    // === NOTAS ===
-    if (personaje.notas && Object.values(personaje.notas).some(v => v)) {
-        html += `<div class="jugador-seccion">`;
-        html += `<h3><i class="fas fa-feather-alt"></i> Notas</h3>`;
-        html += `<div class="notas-grid">`;
+            
+            if (inv.pociones?.length > 0) {
+                html += `<div class="inventario-subseccion"><h4><i class="fas fa-flask"></i> Pociones</h4><div class="items-lista">`;
+                inv.pociones.forEach(pocion => {
+                    const icono = pocion.type === 'life' ? 'fa-heart' : 'fa-bolt';
+                    const color = pocion.type === 'life' ? '#dc143c' : '#4169e1';
+                    html += `
+                        <div class="item-card pocion-item">
+                            <div class="item-icono" style="color: ${color};"><i class="fas ${icono}"></i></div>
+                            <div class="item-info">
+                                <div class="item-nombre">${pocion.name || 'Poción'}</div>
+                                <div class="item-detalle">+${pocion.amount || 0} • ${pocion.value || 0}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            }
+            
+            if (inv.equipo?.length > 0) {
+                html += `<div class="inventario-subseccion"><h4><i class="fas fa-chess-board"></i> Equipo</h4><div class="items-lista">`;
+                inv.equipo.forEach(item => {
+                    let bonusHtml = '';
+                    if (item.attribute && item.bonus !== 0) {
+                        bonusHtml = `<span class="item-bonus" style="color: ${item.bonus > 0 ? '#4CAF50' : '#ff4444'};">${item.bonus > 0 ? '+' : ''}${item.bonus} a ${item.attribute}</span>`;
+                    }
+                    
+                    html += `
+                        <div class="item-card equipo-item">
+                            <div class="item-icono"><i class="fas fa-shield-alt" style="color: var(--accent-purple);"></i></div>
+                            <div class="item-info">
+                                <div class="item-nombre">${item.name || 'Equipo'}</div>
+                                <div class="item-detalle">
+                                    <span><i class="fas fa-coins"></i> ${item.cost || 0}</span>
+                                    <span><i class="fas fa-weight-hanging"></i> ${item.weight || 0}</span>
+                                    ${bonusHtml}
+                                </div>
+                                ${item.description ? `<div class="item-descripcion">${item.description}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            }
+            
+            html += `</div>`;
+        }
         
-        if (personaje.notas.personalidad) html += `<div class="nota-item"><span class="nota-label">Personalidad:</span> ${personaje.notas.personalidad}</div>`;
-        if (personaje.notas.ideales) html += `<div class="nota-item"><span class="nota-label">Ideales:</span> ${personaje.notas.ideales}</div>`;
-        if (personaje.notas.vinculos) html += `<div class="nota-item"><span class="nota-label">Vínculos:</span> ${personaje.notas.vinculos}</div>`;
-        if (personaje.notas.defectos) html += `<div class="nota-item"><span class="nota-label">Defectos:</span> ${personaje.notas.defectos}</div>`;
-        if (personaje.notas.rasgos) html += `<div class="nota-item"><span class="nota-label">Rasgos:</span> ${personaje.notas.rasgos}</div>`;
+        if (personaje.ataques?.length > 0) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-crosshairs"></i> Ataques</h3>`;
+            html += `<div class="ataques-lista">`;
+            personaje.ataques.forEach(atk => {
+                if (atk.name) {
+                    html += `
+                        <div class="ataque-item">
+                            <div class="ataque-nombre">${atk.name}</div>
+                            <div class="ataque-detalle">
+                                <span class="ataque-bonus">${atk.bonus || '?'}</span>
+                                <span class="ataque-dano">${atk.damage || '?'}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            html += `</div>`;
+            html += `</div>`;
+        }
         
-        html += `</div>`;
-        html += `</div>`;
+        if (personaje.spellStats) {
+            const stats = personaje.spellStats;
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-book-spells"></i> Estadísticas de Conjuros</h3>`;
+            html += `<div class="spell-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">`;
+            
+            html += `
+                <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+                    <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                        <i class="fas fa-magic"></i> Característica Mágica
+                    </div>
+                    <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
+                        ${stats.spellcastingAbility || 'Sabiduría'}
+                    </div>
+                </div>
+            `;
+            
+            html += `
+                <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+                    <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                        <i class="fas fa-shield-alt"></i> CD Salvación
+                    </div>
+                    <div style="font-size: 1.3rem; font-weight: bold; color: #4CAF50;">
+                        ${stats.spellSaveDC || 10}
+                    </div>
+                </div>
+            `;
+            
+            const attackBonus = stats.spellAttackBonus || 0;
+            html += `
+                <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+                    <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                        <i class="fas fa-crosshairs"></i> Ataque Conjuros
+                    </div>
+                    <div style="font-size: 1.3rem; font-weight: bold; ${attackBonus >= 0 ? 'color: #4CAF50;' : 'color: #ff4444;'}">
+                        ${attackBonus >= 0 ? '+' : ''}${attackBonus}
+                    </div>
+                </div>
+            `;
+            
+            html += `
+                <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+                    <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                        <i class="fas fa-book"></i> Conjuros Preparados
+                    </div>
+                    <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
+                        ${stats.preparedSpells || 0} / ${stats.maxPreparedSpells || 0}
+                    </div>
+                </div>
+            `;
+            
+            html += `
+                <div class="spell-stat-card" style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--accent-gold);">
+                    <div style="font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 5px;">
+                        <i class="fas fa-star"></i> Trucos Conocidos
+                    </div>
+                    <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-purple);">
+                        ${stats.cantripsKnown || 0}
+                    </div>
+                </div>
+            `;
+            
+            html += `</div>`;
+            html += `</div>`;
+        }
+        
+        if (personaje.conjuros?.length > 0) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-magic"></i> Conjuros</h3>`;
+            html += `<div class="conjuros-lista">`;
+            personaje.conjuros.forEach(spell => {
+                if (spell.name) {
+                    html += `
+                        <div class="conjuro-item">
+                            <div class="conjuro-header">
+                                <span class="conjuro-nombre">${spell.name}</span>
+                                <span class="conjuro-nivel">${spell.level || '?'}</span>
+                            </div>
+                            ${spell.description ? `<div class="conjuro-descripcion">${spell.description}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+            html += `</div>`;
+            html += `</div>`;
+        }
+        
+        if (personaje.notas && Object.values(personaje.notas).some(v => v)) {
+            html += `<div class="jugador-seccion">`;
+            html += `<h3><i class="fas fa-feather-alt"></i> Notas</h3>`;
+            html += `<div class="notas-grid">`;
+            
+            if (personaje.notas.personalidad) html += `<div class="nota-item"><span class="nota-label">Personalidad:</span> ${personaje.notas.personalidad}</div>`;
+            if (personaje.notas.ideales) html += `<div class="nota-item"><span class="nota-label">Ideales:</span> ${personaje.notas.ideales}</div>`;
+            if (personaje.notas.vinculos) html += `<div class="nota-item"><span class="nota-label">Vínculos:</span> ${personaje.notas.vinculos}</div>`;
+            if (personaje.notas.defectos) html += `<div class="nota-item"><span class="nota-label">Defectos:</span> ${personaje.notas.defectos}</div>`;
+            if (personaje.notas.rasgos) html += `<div class="nota-item"><span class="nota-label">Rasgos:</span> ${personaje.notas.rasgos}</div>`;
+            
+            html += `</div>`;
+            html += `</div>`;
+        }
+        
+        return html;
     }
-    
-    return html;
-}
 
     getTreasureIcon(type) {
         switch(type) {
@@ -1419,6 +1383,8 @@ if (personaje.spellStats) {
         this.updateNotesStats();
     }
 
+    // ========== MÉTODOS MODIFICADOS DEL BESTIARIO ==========
+    
     async loadBestiarioOriginal() {
         try {
             const url = `${this.baseUrl}${this.apiEndpoints.BESTIARIO}`;
@@ -1431,9 +1397,12 @@ if (personaje.spellStats) {
             }
             
             const data = await response.json();
+            // Guardar el original como referencia que nunca se modifica
             this.bestiarioOriginal = data;
-            this.bestiarioData = data;
-            console.log('✅ Bestiario cargado desde servidor');
+            // La fuente activa es el original por defecto
+            this.bestiarioActual = data;
+            this.fuenteBestiarioActual = 'original';
+            console.log('✅ Bestiario original cargado desde servidor');
             
         } catch (error) {
             console.warn('⚠️ Error cargando desde servidor:', error);
@@ -1442,8 +1411,9 @@ if (personaje.spellStats) {
                 const fallbackResponse = await fetch('/data/bestiario.json');
                 const data = await fallbackResponse.json();
                 this.bestiarioOriginal = data;
-                this.bestiarioData = data;
-                console.log(' Bestiario cargado en modo fallback');
+                this.bestiarioActual = data;
+                this.fuenteBestiarioActual = 'original';
+                console.log('✅ Bestiario cargado en modo fallback');
             } catch (fallbackError) {
                 console.error('Error al cargar bestiario:', fallbackError);
                 this.showNotification('Error al cargar el bestiario original', 'error');
@@ -1465,17 +1435,22 @@ if (personaje.spellStats) {
                     throw new Error('El archivo debe contener un array');
                 }
                 
-                this.bestiarioData = customData;
-                this.bestiaryCustomLoaded = true;
+                // Guardar el bestiario personalizado en una variable separada
+                // NO se modifica el original
+                this.bestiarioPersonalizado = customData;
+                // Cambiar la fuente activa al personalizado
+                this.bestiarioActual = customData;
+                this.fuenteBestiarioActual = 'personalizado';
                 
                 try {
-                    const url = `${this.baseUrl}${this.apiEndpoints.BESTIARIO}`;
+                    // Opcional: guardar en servidor como respaldo
+                    const url = `${this.baseUrl}/api/json/bestiario-personalizado`;
                     await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(customData)
                     });
-                    console.log('✅ Bestiario guardado en servidor');
+                    console.log('✅ Bestiario personalizado guardado en servidor');
                 } catch (serverError) {
                     console.warn('⚠️ No se pudo guardar en servidor:', serverError);
                     localStorage.setItem('customBestiary', JSON.stringify(customData));
@@ -1485,7 +1460,7 @@ if (personaje.spellStats) {
                 this.generateBestiaryDenominaciones();
                 this.setupBestiaryAutocomplete();
                 this.updateBestiaryStatus('custom', file.name);
-                this.showNotification(`Bestiario cargado: ${customData.length} criaturas`, 'success');
+                this.showNotification(`Bestiario personalizado cargado: ${customData.length} criaturas`, 'success');
                 
             } catch (error) {
                 console.error('❌ Error:', error);
@@ -1494,12 +1469,14 @@ if (personaje.spellStats) {
         };
         
         reader.readAsText(file);
-    }    
+    }
     
     restaurarBestiarioOriginal() {
         if (this.bestiarioOriginal) {
-            this.bestiarioData = [...this.bestiarioOriginal];
-            this.bestiaryCustomLoaded = false;
+            // Restaurar desde la copia original (hacer copia para no modificar la referencia)
+            this.bestiarioActual = JSON.parse(JSON.stringify(this.bestiarioOriginal));
+            this.bestiarioPersonalizado = null;
+            this.fuenteBestiarioActual = 'original';
             this.generateBestiaryDenominaciones();
             this.setupBestiaryAutocomplete();
             this.updateBestiaryStatus('original');
@@ -1510,6 +1487,27 @@ if (personaje.spellStats) {
             this.showNotification('Bestiario original restaurado', 'info');
         } else {
             this.loadBestiarioOriginal();
+        }
+    }
+    
+    // Método para cambiar entre fuentes sin perder datos
+    cambiarFuenteBestiario(fuente) {
+        if (fuente === 'original' && this.bestiarioOriginal) {
+            this.bestiarioActual = JSON.parse(JSON.stringify(this.bestiarioOriginal));
+            this.fuenteBestiarioActual = 'original';
+            this.generateBestiaryDenominaciones();
+            this.setupBestiaryAutocomplete();
+            this.updateBestiaryStatus('original');
+            this.showNotification('Cambiado a bestiario original', 'info');
+        } else if (fuente === 'personalizado' && this.bestiarioPersonalizado) {
+            this.bestiarioActual = JSON.parse(JSON.stringify(this.bestiarioPersonalizado));
+            this.fuenteBestiarioActual = 'personalizado';
+            this.generateBestiaryDenominaciones();
+            this.setupBestiaryAutocomplete();
+            this.updateBestiaryStatus('custom', 'Bestiario personalizado');
+            this.showNotification('Cambiado a bestiario personalizado', 'info');
+        } else {
+            this.showNotification('Fuente de bestiario no disponible', 'warning');
         }
     }
     
@@ -1527,11 +1525,18 @@ if (personaje.spellStats) {
     }
     
     generateBestiaryDenominaciones() {
-        this.bestiaryDenominaciones = this.bestiarioData.map(entry => ({
+        // Usar la fuente actual para generar denominaciones
+        if (!this.bestiarioActual) {
+            this.bestiaryDenominaciones = [];
+            return;
+        }
+        
+        this.bestiaryDenominaciones = this.bestiarioActual.map(entry => ({
             text: entry.nombre,
-            value: entry.nombre
+            value: entry.nombre,
+            entry: entry
         }));
-        console.log('Denominaciones generadas:', this.bestiaryDenominaciones.length);
+        console.log(`Denominaciones generadas desde fuente: ${this.fuenteBestiarioActual} - ${this.bestiaryDenominaciones.length} criaturas`);
     }
     
     setupBestiaryAutocomplete() {
@@ -1696,19 +1701,20 @@ if (personaje.spellStats) {
     loadBestiaryDataForInput(creatureName) {
         const searchTerm = creatureName.toUpperCase().trim();
         
-        let bestiaryEntry = this.bestiarioData.find(entry => 
+        // Buscar en la fuente actual del bestiario
+        let bestiaryEntry = this.bestiarioActual.find(entry => 
             entry.nombre === searchTerm
         );
         
         if (!bestiaryEntry) {
-            bestiaryEntry = this.bestiarioData.find(entry => 
+            bestiaryEntry = this.bestiarioActual.find(entry => 
                 entry.nombre.startsWith(searchTerm)
             );
         }
         
         if (!bestiaryEntry) {
             const searchWords = searchTerm.split(/\s+/);
-            bestiaryEntry = this.bestiarioData.find(entry => {
+            bestiaryEntry = this.bestiarioActual.find(entry => {
                 const entryWords = entry.nombre.split(/\s+/);
                 return searchWords.some(searchWord => 
                     entryWords.some(entryWord => entryWord === searchWord)
@@ -1717,7 +1723,7 @@ if (personaje.spellStats) {
         }
         
         if (!bestiaryEntry && searchTerm.length >= 4) {
-            bestiaryEntry = this.bestiarioData.find(entry => 
+            bestiaryEntry = this.bestiarioActual.find(entry => 
                 entry.nombre.includes(searchTerm)
             );
         }
@@ -1741,10 +1747,365 @@ if (personaje.spellStats) {
                 }
             }
             
-            const bestiaryType = this.bestiaryCustomLoaded ? 'personalizado' : 'original';
-            this.showNotification(`Datos de ${bestiaryEntry.nombre} precargados (bestiario ${bestiaryType})`, 'success');
+            const fuenteLabel = this.fuenteBestiarioActual === 'original' ? 'original' : 'personalizado';
+            this.showNotification(`Datos de ${bestiaryEntry.nombre} precargados (bestiario ${fuenteLabel})`, 'success');
         }
     }
+    
+    getBestiaryImage(creatureName) {
+        const searchTerm = creatureName.toUpperCase().trim();
+        
+        // Buscar en la fuente actual del bestiario
+        let bestiaryEntry = this.bestiarioActual.find(entry => 
+            entry.nombre === searchTerm
+        );
+        
+        if (!bestiaryEntry) {
+            bestiaryEntry = this.bestiarioActual.find(entry => 
+                entry.nombre.startsWith(searchTerm)
+            );
+        }
+        
+        if (!bestiaryEntry) {
+            const searchWords = searchTerm.split(/\s+/);
+            bestiaryEntry = this.bestiarioActual.find(entry => {
+                const entryWords = entry.nombre.split(/\s+/);
+                return searchWords.some(searchWord => 
+                    entryWords.some(entryWord => entryWord === searchWord)
+                );
+            });
+        }
+        
+        if (bestiaryEntry && bestiaryEntry.img_url) {
+            return bestiaryEntry.img_url;
+        }
+        
+        return null;
+    }
+    
+    async renderBestiaryModal(entry, entity = null) {
+        let modal = document.getElementById('bestiaryModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'bestiaryModal';
+            modal.className = 'bestiary-modal';
+            modal.innerHTML = `
+                <div class="bestiary-modal-content">
+                    <span class="close-modal">&times;</span>
+                    <div id="bestiaryModalBody"></div>
+                    <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                        <div class="image-credit" style="font-size: 0.8rem; color: var(--ink-light); opacity: 0.7;">
+                            <span id="imageSource"></span>
+                        </div>
+                        <div>
+                            <button class="control-btn" id="applyBestiaryDataBtn" style="display: none;">
+                                <i class="fas fa-check"></i> Aplicar a este enemigo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.querySelector('.close-modal').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            
+            window.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+        
+        const modalBody = document.getElementById('bestiaryModalBody');
+        const applyBtn = document.getElementById('applyBestiaryDataBtn');
+        const imageSource = document.getElementById('imageSource');
+        
+        if (!modalBody) return;
+        
+        modalBody.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: var(--accent-gold);"></i>
+                <p>Cargando información...</p>
+            </div>
+        `;
+        
+        let imageUrl = this.getBestiaryImage(entry.nombre);
+        
+        let html = '';
+        
+        html += `<div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">`;
+        if (imageUrl) {
+            html += `
+                <div style="width: 100%; max-height: 300px; overflow: hidden; border-radius: 8px; border: 2px solid var(--accent-gold); margin-bottom: 10px;">
+                    <img src="${imageUrl}" alt="${entry.nombre}" style="width: 100%; height: auto; object-fit: contain; max-height: 300px;">
+                </div>
+            `;
+        } else {
+            html += `
+                <div style="width: 100%; height: 200px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; margin-bottom: 10px; border: 2px solid var(--accent-gold);">
+                    <i class="fas fa-dragon" style="font-size: 4rem; margin-bottom: 10px; opacity: 0.8;"></i>
+                    <p style="font-family: 'MedievalSharp', cursive;">${entry.nombre}</p>
+                    <p style="font-size: 0.9rem; opacity: 0.7;">Imagen no disponible en el JSON</p>
+                </div>
+            `;
+            if (imageSource) imageSource.textContent = 'No se encontró imagen en el JSON';
+        }
+        html += `</div>`;
+        
+        // Indicador de fuente del bestiario
+        
+        html += `<h2>${entry.nombre}</h2>`;
+        
+        if (entry.descripcion) {
+            html += `<p><em>${entry.descripcion}</em></p>`;
+        }
+        
+        if (entry.estadisticas && Object.keys(entry.estadisticas).length > 0) {
+            const stats = entry.estadisticas;
+            
+            html += `<div class="stat-block">`;
+            html += `<h3>Estadísticas</h3>`;
+            
+            if (stats.tipo) html += `<p><strong>Tipo:</strong> ${stats.tipo}</p>`;
+            if (stats.ca) html += `<p><strong>CA:</strong> ${stats.ca}</p>`;
+            if (stats.pg) html += `<p><strong>PG:</strong> ${stats.pg}</p>`;
+            if (stats.velocidad) html += `<p><strong>Velocidad:</strong> ${stats.velocidad}</p>`;
+            
+            html += `<div class="stat-grid">`;
+            if (stats.FUE) html += `<div class="stat-item"><strong>FUE:</strong> ${stats.FUE}</div>`;
+            if (stats.DES) html += `<div class="stat-item"><strong>DES:</strong> ${stats.DES}</div>`;
+            if (stats.CON) html += `<div class="stat-item"><strong>CON:</strong> ${stats.CON}</div>`;
+            if (stats.INT) html += `<div class="stat-item"><strong>INT:</strong> ${stats.INT}</div>`;
+            if (stats.SAB) html += `<div class="stat-item"><strong>SAB:</strong> ${stats.SAB}</div>`;
+            if (stats.CAR) html += `<div class="stat-item"><strong>CAR:</strong> ${stats.CAR}</div>`;
+            html += `</div>`;
+            
+            if (stats.habilidades) html += `<p><strong>Habilidades:</strong> ${stats.habilidades}</p>`;
+            if (stats.resistencias) html += `<p><strong>Resistencias:</strong> ${stats.resistencias}</p>`;
+            if (stats.inmunidades_daño) html += `<p><strong>Inmunidades al daño:</strong> ${stats.inmunidades_daño}</p>`;
+            if (stats.inmunidades_estados) html += `<p><strong>Inmunidades a estados:</strong> ${stats.inmunidades_estados}</p>`;
+            if (stats.sentidos) html += `<p><strong>Sentidos:</strong> ${stats.sentidos}</p>`;
+            if (stats.idiomas) html += `<p><strong>Idiomas:</strong> ${stats.idiomas}</p>`;
+            if (stats.desafio) html += `<p><strong>Desafío:</strong> ${stats.desafio}</p>`;
+            
+            if (stats.atributos_especiales && stats.atributos_especiales.length > 0) {
+                html += `<h4>Atributos Especiales</h4>`;
+                stats.atributos_especiales.forEach(attr => {
+                    html += `<p><strong>${attr.nombre}:</strong> ${attr.descripcion}</p>`;
+                });
+            }
+            
+            if (stats.acciones && stats.acciones.length > 0) {
+                html += `<h4>Acciones</h4>`;
+                stats.acciones.forEach(action => {
+                    html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
+                });
+            }
+            
+            if (stats.acciones_legendarias && stats.acciones_legendarias.length > 0) {
+                html += `<h4>Acciones Legendarias</h4>`;
+                stats.acciones_legendarias.forEach(action => {
+                    html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
+                });
+            }
+            
+            if (stats.variantes && stats.variantes.length > 0) {
+                html += `<div class="variants-section">`;
+                html += `<h3 style="color: var(--accent-black); margin-top: 20px; border-top: 2px solid var(--accent-gold); padding-top: 15px;">Variantes</h3>`;
+                
+                stats.variantes.forEach((variante, index) => {
+                    html += `<div class="variant-block" style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid var(--accent-gold);">`;
+                    html += `<h4 style="color: var(--accent-black); margin-top: 0;">${variante.nombre}</h4>`;
+                    if (variante.descripcion) {
+                        html += `<p><em>${variante.descripcion}</em></p>`;
+                    }
+                    
+                    if (variante.atributos_especiales && variante.atributos_especiales.length > 0) {
+                        variante.atributos_especiales.forEach(attr => {
+                            html += `<p><strong>${attr.nombre}:</strong> ${attr.descripcion}</p>`;
+                        });
+                    }
+                    
+                    if (variante.acciones && variante.acciones.length > 0) {
+                        html += `<h5 style="margin-top: 10px;">Acciones</h5>`;
+                        variante.acciones.forEach(action => {
+                            html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
+                        });
+                    }
+                    
+                    html += `</div>`;
+                });
+                
+                html += `</div>`;
+            }
+            
+            html += `</div>`;
+        } else {
+            html += `<p class="not-found"><i class="fas fa-dragon"></i><br>No hay estadísticas detalladas para esta criatura</p>`;
+        }
+        
+        modalBody.innerHTML = html;
+        
+        if (entity && entity.type === 'enemy' && applyBtn) {
+            applyBtn.style.display = 'inline-flex';
+            
+            const newApplyBtn = applyBtn.cloneNode(true);
+            applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
+            
+            newApplyBtn.addEventListener('click', () => {
+                this.applyBestiaryDataToEntity(entry, entity);
+                modal.style.display = 'none';
+            });
+        } else if (applyBtn) {
+            applyBtn.style.display = 'none';
+        }
+        
+        modal.style.display = 'block';
+    }
+    
+    applyBestiaryDataToEntity(bestiaryEntry, entity) {
+        const stats = bestiaryEntry.estadisticas;
+        if (!stats) {
+            this.showNotification('El bestiario no tiene estadísticas para esta criatura', 'warning');
+            return;
+        }
+        
+        if (stats.ca) {
+            const caMatch = stats.ca.toString().match(/\d+/);
+            if (caMatch) {
+                entity.ca = parseInt(caMatch[0]);
+            }
+        }
+        
+        if (stats.pg) {
+            const pgMatch = stats.pg.toString().match(/\d+/);
+            if (pgMatch) {
+                entity.maxHp = parseInt(pgMatch[0]);
+                entity.hp = entity.maxHp;
+            }
+        }
+        
+        if (stats.DES) {
+            const dexMatch = stats.DES.toString().match(/\(([+-]\d+)\)/);
+            if (dexMatch) {
+                const dexBonus = parseInt(dexMatch[1]);
+                entity.initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
+            } else {
+                const dexBaseMatch = stats.DES.toString().match(/\d+/);
+                if (dexBaseMatch) {
+                    const dexBase = parseInt(dexBaseMatch[0]);
+                    const dexBonus = Math.floor((dexBase - 10) / 2);
+                    entity.initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
+                }
+            }
+        }
+        
+        this.updateEnemiesList();
+        this.updateInitiativeOrder();
+        
+        this.showNotification(`Datos de ${bestiaryEntry.nombre} aplicados a ${entity.name}`, 'success');
+    }
+    
+    async showBestiaryInfo(entity) {
+        if (!entity.race && !entity.name) {
+            this.showNotification('No hay información de raza disponible', 'warning');
+            return;
+        }
+        
+        const searchTerm = (entity.race || entity.name).toUpperCase().trim();
+        
+        // Buscar en la fuente actual del bestiario
+        let bestiaryEntry = this.bestiarioActual.find(entry => 
+            entry.nombre === searchTerm
+        );
+        
+        if (!bestiaryEntry) {
+            bestiaryEntry = this.bestiarioActual.find(entry => 
+                entry.nombre.startsWith(searchTerm)
+            );
+        }
+        
+        if (!bestiaryEntry) {
+            const searchWords = searchTerm.split(/\s+/);
+            bestiaryEntry = this.bestiarioActual.find(entry => {
+                const entryWords = entry.nombre.split(/\s+/);
+                return searchWords.some(searchWord => 
+                    entryWords.some(entryWord => entryWord === searchWord)
+                );
+            });
+        }
+        
+        if (!bestiaryEntry) {
+            this.showNotification(`No se encontró información para: ${entity.race || entity.name}`, 'error');
+            return;
+        }
+        
+        this.currentBestiaryEntry = bestiaryEntry;
+        this.renderBestiaryModal(bestiaryEntry, entity);
+    }
+    
+    rollAllEnemiesInitiative() {
+        let updated = false;
+        this.enemies.forEach(enemy => {
+            if (enemy.type === 'enemy') {
+                let dexBonus = 0;
+                if (enemy.race) {
+                    const searchTerm = enemy.race.toUpperCase().trim();
+                    
+                    // Buscar en la fuente actual del bestiario
+                    let bestiaryEntry = this.bestiarioActual.find(entry => 
+                        entry.nombre === searchTerm
+                    );
+                    
+                    if (!bestiaryEntry) {
+                        bestiaryEntry = this.bestiarioActual.find(entry => 
+                            entry.nombre.startsWith(searchTerm)
+                        );
+                    }
+                    
+                    if (!bestiaryEntry) {
+                        const searchWords = searchTerm.split(/\s+/);
+                        bestiaryEntry = this.bestiarioActual.find(entry => {
+                            const entryWords = entry.nombre.split(/\s+/);
+                            return searchWords.some(searchWord => 
+                                entryWords.some(entryWord => entryWord === searchWord)
+                            );
+                        });
+                    }
+                    
+                    if (bestiaryEntry && bestiaryEntry.estadisticas && bestiaryEntry.estadisticas.DES) {
+                        const stats = bestiaryEntry.estadisticas;
+                        const dexMatch = stats.DES.toString().match(/\(([+-]\d+)\)/);
+                        if (dexMatch) {
+                            dexBonus = parseInt(dexMatch[1]);
+                        } else {
+                            const dexBaseMatch = stats.DES.toString().match(/\d+/);
+                            if (dexBaseMatch) {
+                                const dexBase = parseInt(dexBaseMatch[0]);
+                                dexBonus = Math.floor((dexBase - 10) / 2);
+                            }
+                        }
+                    }
+                }
+                
+                enemy.initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
+                updated = true;
+            }
+        });
+        
+        if (updated) {
+            this.updateEnemiesList();
+            this.updateInitiativeOrder();
+            const fuenteLabel = this.fuenteBestiarioActual === 'original' ? 'original' : 'personalizado';
+            this.showNotification(`Iniciativa tirada para todos los enemigos (usando bestiario ${fuenteLabel})`, 'success');
+        } else {
+            this.showNotification('No hay enemigos para tirar iniciativa', 'warning');
+        }
+    }
+    
+    // ========== FIN MÉTODOS MODIFICADOS DEL BESTIARIO ==========
     
     setupEventListeners() {
         document.querySelectorAll('.static-menu-btn').forEach(btn => {
@@ -2239,19 +2600,20 @@ if (personaje.spellStats) {
             if (race && i === 0) {
                 const searchTerm = race.toUpperCase().trim();
                 
-                let bestiaryEntry = this.bestiarioData.find(entry => 
+                // Buscar en la fuente actual del bestiario
+                let bestiaryEntry = this.bestiarioActual.find(entry => 
                     entry.nombre === searchTerm
                 );
                 
                 if (!bestiaryEntry) {
-                    bestiaryEntry = this.bestiarioData.find(entry => 
+                    bestiaryEntry = this.bestiarioActual.find(entry => 
                         entry.nombre.startsWith(searchTerm)
                     );
                 }
                 
                 if (!bestiaryEntry) {
                     const searchWords = searchTerm.split(/\s+/);
-                    bestiaryEntry = this.bestiarioData.find(entry => {
+                    bestiaryEntry = this.bestiarioActual.find(entry => {
                         const entryWords = entry.nombre.split(/\s+/);
                         return searchWords.some(searchWord => 
                             entryWords.some(entryWord => entryWord === searchWord)
@@ -2260,7 +2622,7 @@ if (personaje.spellStats) {
                 }
                 
                 if (!bestiaryEntry && searchTerm.length >= 4) {
-                    bestiaryEntry = this.bestiarioData.find(entry => 
+                    bestiaryEntry = this.bestiarioActual.find(entry => 
                         entry.nombre.includes(searchTerm)
                     );
                 }
@@ -2469,297 +2831,6 @@ if (personaje.spellStats) {
         }
     }
     
-    async showBestiaryInfo(entity) {
-        if (!entity.race && !entity.name) {
-            this.showNotification('No hay información de raza disponible', 'warning');
-            return;
-        }
-        
-        const searchTerm = (entity.race || entity.name).toUpperCase().trim();
-        
-        let bestiaryEntry = this.bestiarioData.find(entry => 
-            entry.nombre === searchTerm
-        );
-        
-        if (!bestiaryEntry) {
-            bestiaryEntry = this.bestiarioData.find(entry => 
-                entry.nombre.startsWith(searchTerm)
-            );
-        }
-        
-        if (!bestiaryEntry) {
-            const searchWords = searchTerm.split(/\s+/);
-            bestiaryEntry = this.bestiarioData.find(entry => {
-                const entryWords = entry.nombre.split(/\s+/);
-                return searchWords.some(searchWord => 
-                    entryWords.some(entryWord => entryWord === searchWord)
-                );
-            });
-        }
-        
-        if (!bestiaryEntry) {
-            this.showNotification(`No se encontró información para: ${entity.race || entity.name}`, 'error');
-            return;
-        }
-        
-        this.currentBestiaryEntry = bestiaryEntry;
-        this.renderBestiaryModal(bestiaryEntry, entity);
-    }
-    
-    getBestiaryImage(creatureName) {
-        const searchTerm = creatureName.toUpperCase().trim();
-        
-        let bestiaryEntry = this.bestiarioData.find(entry => 
-            entry.nombre === searchTerm
-        );
-        
-        if (!bestiaryEntry) {
-            bestiaryEntry = this.bestiarioData.find(entry => 
-                entry.nombre.startsWith(searchTerm)
-            );
-        }
-        
-        if (!bestiaryEntry) {
-            const searchWords = searchTerm.split(/\s+/);
-            bestiaryEntry = this.bestiarioData.find(entry => {
-                const entryWords = entry.nombre.split(/\s+/);
-                return searchWords.some(searchWord => 
-                    entryWords.some(entryWord => entryWord === searchWord)
-                );
-            });
-        }
-        
-        if (bestiaryEntry && bestiaryEntry.img_url) {
-            return bestiaryEntry.img_url;
-        }
-        
-        return null;
-    }
-    
-    async renderBestiaryModal(entry, entity = null) {
-        let modal = document.getElementById('bestiaryModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'bestiaryModal';
-            modal.className = 'bestiary-modal';
-            modal.innerHTML = `
-                <div class="bestiary-modal-content">
-                    <span class="close-modal">&times;</span>
-                    <div id="bestiaryModalBody"></div>
-                    <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                        <div class="image-credit" style="font-size: 0.8rem; color: var(--ink-light); opacity: 0.7;">
-                            <span id="imageSource"></span>
-                        </div>
-                        <div>
-                            <button class="control-btn" id="applyBestiaryDataBtn" style="display: none;">
-                                <i class="fas fa-check"></i> Aplicar a este enemigo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.querySelector('.close-modal').addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-            
-            window.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
-        }
-        
-        const modalBody = document.getElementById('bestiaryModalBody');
-        const applyBtn = document.getElementById('applyBestiaryDataBtn');
-        const imageSource = document.getElementById('imageSource');
-        
-        if (!modalBody) return;
-        
-        modalBody.innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: var(--accent-gold);"></i>
-                <p>Cargando información...</p>
-            </div>
-        `;
-        
-        let imageUrl = this.getBestiaryImage(entry.nombre);
-        
-        let html = '';
-        
-        html += `<div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">`;
-        if (imageUrl) {
-            html += `
-                <div style="width: 100%; max-height: 300px; overflow: hidden; border-radius: 8px; border: 2px solid var(--accent-gold); margin-bottom: 10px;">
-                    <img src="${imageUrl}" alt="${entry.nombre}" style="width: 100%; height: auto; object-fit: contain; max-height: 300px;">
-                </div>
-            `;
-            if (imageSource) imageSource.textContent = 'Imagen desde el archivo JSON';
-        } else {
-            html += `
-                <div style="width: 100%; height: 200px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; margin-bottom: 10px; border: 2px solid var(--accent-gold);">
-                    <i class="fas fa-dragon" style="font-size: 4rem; margin-bottom: 10px; opacity: 0.8;"></i>
-                    <p style="font-family: 'MedievalSharp', cursive;">${entry.nombre}</p>
-                    <p style="font-size: 0.9rem; opacity: 0.7;">Imagen no disponible en el JSON</p>
-                </div>
-            `;
-            if (imageSource) imageSource.textContent = 'No se encontró imagen en el JSON';
-        }
-        html += `</div>`;
-        
-        html += `<h2>${entry.nombre}</h2>`;
-        
-        if (entry.descripcion) {
-            html += `<p><em>${entry.descripcion}</em></p>`;
-        }
-        
-        if (entry.estadisticas && Object.keys(entry.estadisticas).length > 0) {
-            const stats = entry.estadisticas;
-            
-            html += `<div class="stat-block">`;
-            html += `<h3>Estadísticas</h3>`;
-            
-            if (stats.tipo) html += `<p><strong>Tipo:</strong> ${stats.tipo}</p>`;
-            if (stats.ca) html += `<p><strong>CA:</strong> ${stats.ca}</p>`;
-            if (stats.pg) html += `<p><strong>PG:</strong> ${stats.pg}</p>`;
-            if (stats.velocidad) html += `<p><strong>Velocidad:</strong> ${stats.velocidad}</p>`;
-            
-            html += `<div class="stat-grid">`;
-            if (stats.FUE) html += `<div class="stat-item"><strong>FUE:</strong> ${stats.FUE}</div>`;
-            if (stats.DES) html += `<div class="stat-item"><strong>DES:</strong> ${stats.DES}</div>`;
-            if (stats.CON) html += `<div class="stat-item"><strong>CON:</strong> ${stats.CON}</div>`;
-            if (stats.INT) html += `<div class="stat-item"><strong>INT:</strong> ${stats.INT}</div>`;
-            if (stats.SAB) html += `<div class="stat-item"><strong>SAB:</strong> ${stats.SAB}</div>`;
-            if (stats.CAR) html += `<div class="stat-item"><strong>CAR:</strong> ${stats.CAR}</div>`;
-            html += `</div>`;
-            
-            if (stats.habilidades) html += `<p><strong>Habilidades:</strong> ${stats.habilidades}</p>`;
-            if (stats.resistencias) html += `<p><strong>Resistencias:</strong> ${stats.resistencias}</p>`;
-            if (stats.inmunidades_daño) html += `<p><strong>Inmunidades al daño:</strong> ${stats.inmunidades_daño}</p>`;
-            if (stats.inmunidades_estados) html += `<p><strong>Inmunidades a estados:</strong> ${stats.inmunidades_estados}</p>`;
-            if (stats.sentidos) html += `<p><strong>Sentidos:</strong> ${stats.sentidos}</p>`;
-            if (stats.idiomas) html += `<p><strong>Idiomas:</strong> ${stats.idiomas}</p>`;
-            if (stats.desafio) html += `<p><strong>Desafío:</strong> ${stats.desafio}</p>`;
-            
-            if (stats.atributos_especiales && stats.atributos_especiales.length > 0) {
-                html += `<h4>Atributos Especiales</h4>`;
-                stats.atributos_especiales.forEach(attr => {
-                    html += `<p><strong>${attr.nombre}:</strong> ${attr.descripcion}</p>`;
-                });
-            }
-            
-            if (stats.acciones && stats.acciones.length > 0) {
-                html += `<h4>Acciones</h4>`;
-                stats.acciones.forEach(action => {
-                    html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
-                });
-            }
-            
-            if (stats.acciones_legendarias && stats.acciones_legendarias.length > 0) {
-                html += `<h4>Acciones Legendarias</h4>`;
-                stats.acciones_legendarias.forEach(action => {
-                    html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
-                });
-            }
-            
-            if (stats.variantes && stats.variantes.length > 0) {
-                html += `<div class="variants-section">`;
-                html += `<h3 style="color: var(--accent-black); margin-top: 20px; border-top: 2px solid var(--accent-gold); padding-top: 15px;">Variantes</h3>`;
-                
-                stats.variantes.forEach((variante, index) => {
-                    html += `<div class="variant-block" style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid var(--accent-gold);">`;
-                    html += `<h4 style="color: var(--accent-black); margin-top: 0;">${variante.nombre}</h4>`;
-                    if (variante.descripcion) {
-                        html += `<p><em>${variante.descripcion}</em></p>`;
-                    }
-                    
-                    if (variante.atributos_especiales && variante.atributos_especiales.length > 0) {
-                        variante.atributos_especiales.forEach(attr => {
-                            html += `<p><strong>${attr.nombre}:</strong> ${attr.descripcion}</p>`;
-                        });
-                    }
-                    
-                    if (variante.acciones && variante.acciones.length > 0) {
-                        html += `<h5 style="margin-top: 10px;">Acciones</h5>`;
-                        variante.acciones.forEach(action => {
-                            html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
-                        });
-                    }
-                    
-                    html += `</div>`;
-                });
-                
-                html += `</div>`;
-            }
-            
-            html += `</div>`;
-        } else {
-            html += `<p class="not-found"><i class="fas fa-dragon"></i><br>No hay estadísticas detalladas para esta criatura</p>`;
-        }
-        
-        modalBody.innerHTML = html;
-        
-        if (entity && entity.type === 'enemy' && applyBtn) {
-            applyBtn.style.display = 'inline-flex';
-            
-            const newApplyBtn = applyBtn.cloneNode(true);
-            applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
-            
-            newApplyBtn.addEventListener('click', () => {
-                this.applyBestiaryDataToEntity(entry, entity);
-                modal.style.display = 'none';
-            });
-        } else if (applyBtn) {
-            applyBtn.style.display = 'none';
-        }
-        
-        modal.style.display = 'block';
-    }
-    
-    applyBestiaryDataToEntity(bestiaryEntry, entity) {
-        const stats = bestiaryEntry.estadisticas;
-        if (!stats) {
-            this.showNotification('El bestiario no tiene estadísticas para esta criatura', 'warning');
-            return;
-        }
-        
-        if (stats.ca) {
-            const caMatch = stats.ca.toString().match(/\d+/);
-            if (caMatch) {
-                entity.ca = parseInt(caMatch[0]);
-            }
-        }
-        
-        if (stats.pg) {
-            const pgMatch = stats.pg.toString().match(/\d+/);
-            if (pgMatch) {
-                entity.maxHp = parseInt(pgMatch[0]);
-                entity.hp = entity.maxHp;
-            }
-        }
-        
-        if (stats.DES) {
-            const dexMatch = stats.DES.toString().match(/\(([+-]\d+)\)/);
-            if (dexMatch) {
-                const dexBonus = parseInt(dexMatch[1]);
-                entity.initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
-            } else {
-                const dexBaseMatch = stats.DES.toString().match(/\d+/);
-                if (dexBaseMatch) {
-                    const dexBase = parseInt(dexBaseMatch[0]);
-                    const dexBonus = Math.floor((dexBase - 10) / 2);
-                    entity.initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
-                }
-            }
-        }
-        
-        this.updateEnemiesList();
-        this.updateInitiativeOrder();
-        
-        this.showNotification(`Datos de ${bestiaryEntry.nombre} aplicados a ${entity.name}`, 'success');
-    }
-    
     rollInitiativeForEntity(entity) {
         if (entity.type === 'player') {
             const newInitiative = prompt(`Introduce nueva iniciativa para ${entity.name}:`, entity.initiative);
@@ -2777,19 +2848,20 @@ if (personaje.spellStats) {
             if (entity.race) {
                 const searchTerm = entity.race.toUpperCase().trim();
                 
-                let bestiaryEntry = this.bestiarioData.find(entry => 
+                // Buscar en la fuente actual del bestiario
+                let bestiaryEntry = this.bestiarioActual.find(entry => 
                     entry.nombre === searchTerm
                 );
                 
                 if (!bestiaryEntry) {
-                    bestiaryEntry = this.bestiarioData.find(entry => 
+                    bestiaryEntry = this.bestiarioActual.find(entry => 
                         entry.nombre.startsWith(searchTerm)
                     );
                 }
                 
                 if (!bestiaryEntry) {
                     const searchWords = searchTerm.split(/\s+/);
-                    bestiaryEntry = this.bestiarioData.find(entry => {
+                    bestiaryEntry = this.bestiarioActual.find(entry => {
                         const entryWords = entry.nombre.split(/\s+/);
                         return searchWords.some(searchWord => 
                             entryWords.some(entryWord => entryWord === searchWord)
@@ -2834,64 +2906,6 @@ if (personaje.spellStats) {
                 
                 this.showNotification(`${entity.name}: Vida cambiada a ${hpValue}/${entity.maxHp}`, 'info');
             }
-        }
-    }
-    
-    rollAllEnemiesInitiative() {
-        let updated = false;
-        this.enemies.forEach(enemy => {
-            if (enemy.type === 'enemy') {
-                let dexBonus = 0;
-                if (enemy.race) {
-                    const searchTerm = enemy.race.toUpperCase().trim();
-                    
-                    let bestiaryEntry = this.bestiarioData.find(entry => 
-                        entry.nombre === searchTerm
-                    );
-                    
-                    if (!bestiaryEntry) {
-                        bestiaryEntry = this.bestiarioData.find(entry => 
-                            entry.nombre.startsWith(searchTerm)
-                        );
-                    }
-                    
-                    if (!bestiaryEntry) {
-                        const searchWords = searchTerm.split(/\s+/);
-                        bestiaryEntry = this.bestiarioData.find(entry => {
-                            const entryWords = entry.nombre.split(/\s+/);
-                            return searchWords.some(searchWord => 
-                                entryWords.some(entryWord => entryWord === searchWord)
-                            );
-                        });
-                    }
-                    
-                    if (bestiaryEntry && bestiaryEntry.estadisticas && bestiaryEntry.estadisticas.DES) {
-                        const stats = bestiaryEntry.estadisticas;
-                        const dexMatch = stats.DES.toString().match(/\(([+-]\d+)\)/);
-                        if (dexMatch) {
-                            dexBonus = parseInt(dexMatch[1]);
-                        } else {
-                            const dexBaseMatch = stats.DES.toString().match(/\d+/);
-                            if (dexBaseMatch) {
-                                const dexBase = parseInt(dexBaseMatch[0]);
-                                dexBonus = Math.floor((dexBase - 10) / 2);
-                            }
-                        }
-                    }
-                }
-                
-                enemy.initiative = Math.floor(Math.random() * 20) + 1 + dexBonus;
-                updated = true;
-            }
-        });
-        
-        if (updated) {
-            this.updateEnemiesList();
-            this.updateInitiativeOrder();
-            const bestiaryType = this.bestiaryCustomLoaded ? 'personalizado' : 'original';
-            this.showNotification(`Iniciativa tirada para todos los enemigos (usando bestiario ${bestiaryType})`, 'success');
-        } else {
-            this.showNotification('No hay enemigos para tirar iniciativa', 'warning');
         }
     }
     
@@ -3573,9 +3587,11 @@ if (personaje.spellStats) {
             campaign: 100
         };
         
+        // Restaurar bestiario original si existe
         if (this.bestiarioOriginal) {
-            this.bestiarioData = [...this.bestiarioOriginal];
-            this.bestiaryCustomLoaded = false;
+            this.bestiarioActual = JSON.parse(JSON.stringify(this.bestiarioOriginal));
+            this.bestiarioPersonalizado = null;
+            this.fuenteBestiarioActual = 'original';
             this.generateBestiaryDenominaciones();
             this.setupBestiaryAutocomplete();
             this.updateBestiaryStatus('original');
@@ -3602,7 +3618,7 @@ if (personaje.spellStats) {
             currentRound: this.currentRound,
             combatMode: this.combatMode,
             notes: this.notes,
-            bestiaryCustomLoaded: this.bestiaryCustomLoaded,
+            bestiaryCustomLoaded: !!this.bestiarioPersonalizado,
             timestamp: new Date().toISOString(),
             version: '2.1'
         };
@@ -3787,4 +3803,10 @@ window.toggleSeccion = function(seccionId) {
 
 document.addEventListener('DOMContentLoaded', () => {
     window.dmScreen = new DMScreen();
+});
+import('./ai/DMChat.js').then(module => {
+    // El chat se inicializa solo con DOMContentLoaded
+    console.log('Módulo de chat IA cargado');
+}).catch(err => {
+    console.error('Error cargando chat IA:', err);
 });

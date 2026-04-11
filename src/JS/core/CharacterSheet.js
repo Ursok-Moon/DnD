@@ -49,6 +49,10 @@ export class CharacterSheet {
         
         // Setup UI bindings
         this.initUI();
+
+        setTimeout(() => {
+    this.createAIImportButton();
+    }, 500);
         
         // Setup global events
         this.setupGlobalEvents();
@@ -94,6 +98,432 @@ export class CharacterSheet {
         
         setTimeout(() => clearInterval(checkInterval), 5000);
     }
+
+
+async analyzePDFWithAI(pdfFile) {
+    if (!pdfFile || pdfFile.type !== 'application/pdf') {
+        Helpers.showMessage('Por favor, selecciona un archivo PDF válido', 'error');
+        return null;
+    }
+
+    console.log('📄 Iniciando análisis de PDF:', pdfFile.name);
+
+    // Verificar conexión con Groq
+    try {
+        const statusResponse = await fetch('/api/ai/status');
+        if (!statusResponse.ok) {
+            throw new Error(`HTTP ${statusResponse.status}`);
+        }
+        const status = await statusResponse.json();
+        
+        if (!status.available) {
+            Helpers.showMessage('IA no disponible. Verifica tu conexión con Groq.', 'error');
+            return null;
+        }
+        console.log('✅ IA disponible, modelo:', status.model);
+    } catch (error) {
+        console.error('Error verificando IA:', error);
+        Helpers.showMessage('Error de conexión con el servidor de IA. ¿Está el servidor corriendo?', 'error');
+        return null;
+    }
+
+    // Mostrar indicador de carga
+    const loadingDiv = this.showLoadingIndicator('Analizando PDF...');
+    console.log('Mostrando indicador de carga');
+
+    try {
+        // Crear FormData para enviar el PDF
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+        
+        console.log('Enviando PDF al servidor...');
+        
+        // Llamar al endpoint de análisis de PDF
+        const response = await fetch('/api/ai/analyze-pdf', {
+            method: 'POST',
+            body: formData
+        });
+
+        console.log('📥 Respuesta recibida, status:', response.status);
+        
+        const result = await response.json();
+        console.log('📦 Datos recibidos:', result);
+
+        if (!response.ok) {
+            throw new Error(result.error || `Error HTTP ${response.status}`);
+        }
+
+        if (result.success && result.analysis) {
+            console.log('✅ Análisis recibido, procesando JSON...');
+            
+            // Extraer JSON de la respuesta
+            let jsonString = result.analysis;
+            
+            // Limpiar markdown si está presente
+            jsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            
+            // Buscar el objeto JSON
+            const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('No se encontró JSON válido en la respuesta');
+            }
+            
+            console.log('🔍 JSON encontrado, parseando...');
+            const characterData = JSON.parse(jsonMatch[0]);
+            
+            // Validar y completar datos faltantes
+            const validatedData = this.validateCharacterData(characterData);
+            
+            console.log('📋 Datos validados:', validatedData.basicInfo);
+            
+            // Cargar el personaje en la hoja
+            this.loadCharacterFromData(validatedData);
+            
+            // Mostrar mensaje de éxito
+            Helpers.showMessage('✅ Personaje generado desde PDF correctamente', 'success');
+            
+            // Guardar automáticamente
+            setTimeout(() => {
+                this.saveCharacter();
+                console.log('💾 Personaje guardado automáticamente');
+            }, 500);
+            
+            return validatedData;
+        } else {
+            throw new Error(result.error || 'Error al analizar el PDF');
+        }
+
+    } catch (error) {
+        console.error('❌ Error analizando PDF:', error);
+        Helpers.showMessage(`Error al analizar PDF: ${error.message}`, 'error');
+        return null;
+    } finally {
+        this.hideLoadingIndicator(loadingDiv);
+        console.log('🏁 Proceso finalizado');
+    }
+}
+
+validateCharacterData(data) {
+    // Mapeo de habilidades estándar con sus atributos en D&D 5e
+    const SKILL_ATTRIBUTE_MAP = {
+        'acrobacias': 'DESTREZA',
+        'arcano': 'INTELIGENCIA',
+        'atletismo': 'FUERZA',
+        'engaño': 'CARISMA',
+        'historia': 'INTELIGENCIA',
+        'interpretación': 'CARISMA',
+        'intimidación': 'CARISMA',
+        'investigación': 'INTELIGENCIA',
+        'juego de manos': 'DESTREZA',
+        'medicina': 'SABIDURÍA',
+        'naturaleza': 'INTELIGENCIA',
+        'percepción': 'SABIDURÍA',
+        'perspicacia': 'SABIDURÍA',
+        'persuasión': 'CARISMA',
+        'religión': 'INTELIGENCIA',
+        'sigilo': 'DESTREZA',
+        'supervivencia': 'SABIDURÍA',
+        'trato con animales': 'SABIDURÍA'
+    };
+
+    // Estructura base
+    const defaultData = {
+        basicInfo: { name: '', class: '', race: '', background: '', alignment: '' },
+        attributes: [],
+        hp: { current: 10, max: 10, temp: 0 },
+        attacks: [],
+        exp: { current: 0, max: 300, level: 1 },
+        skills: [],
+        proficiencies: [],
+        savingThrows: [],
+        notas: { personalidad: '', ideales: '', vinculos: '', defectos: '', rasgos: '' },
+        equipment: [],
+        treasures: [],
+        potions: []
+    };
+    
+    const result = { ...defaultData, ...data };
+    
+    // Asegurar que haya 6 atributos
+    const defaultAttributes = [
+        { nombre: 'Fuerza', valor: 10, modificador: 0 },
+        { nombre: 'DESTREZA', valor: 10, modificador: 0 },
+        { nombre: 'CONSTITUCIÓN', valor: 10, modificador: 0 },
+        { nombre: 'INTELIGENCIA', valor: 10, modificador: 0 },
+        { nombre: 'SABIDURÍA', valor: 10, modificador: 0 },
+        { nombre: 'CARISMA', valor: 10, modificador: 0 }
+    ];
+    
+    if (!result.attributes || result.attributes.length === 0) {
+        result.attributes = defaultAttributes;
+    } else {
+        for (let i = 0; i < defaultAttributes.length; i++) {
+            if (!result.attributes[i]) {
+                result.attributes.push(defaultAttributes[i]);
+            }
+        }
+    }
+    
+    // Calcular modificadores si faltan
+    result.attributes.forEach(attr => {
+        if (attr.valor && (attr.modificador === undefined || attr.modificador === null)) {
+            attr.modificador = Math.floor((attr.valor - 10) / 2);
+        }
+    });
+    
+    // Crear mapa de atributos
+    const attributeMap = {};
+    result.attributes.forEach(attr => {
+        const nombreKey = attr.nombre.toUpperCase();
+        attributeMap[nombreKey] = attr;
+        attributeMap[attr.nombre] = attr;
+    });
+    
+    // Lista completa de habilidades estándar
+    const defaultSkills = [
+        'Acrobacias', 'Arcano', 'Atletismo', 'Engaño', 'Historia',
+        'Interpretación', 'Intimidación', 'Investigación', 'Juego de Manos',
+        'Medicina', 'Naturaleza', 'Percepción', 'Perspicacia', 'Persuasión',
+        'Religión', 'Sigilo', 'Supervivencia', 'Trato con Animales'
+    ];
+    
+    // Procesar habilidades
+    if (!result.skills || result.skills.length === 0) {
+        result.skills = defaultSkills.map(name => {
+            const skillNameLower = name.toLowerCase();
+            const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
+            return { 
+                name: name, 
+                bonus: 0,
+                attribute: assignedAttribute,
+                proficient: false,
+                expertise: false,
+                misc: 0
+            };
+        });
+    } else {
+        const processedSkills = [];
+        const existingSkillNames = new Set();
+        
+        result.skills.forEach(skill => {
+            const skillName = skill.name;
+            const skillNameLower = skillName.toLowerCase();
+            existingSkillNames.add(skillName);
+            
+            // Asignar atributo si falta
+            if (!skill.attribute || skill.attribute === '') {
+                const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower];
+                if (assignedAttribute) {
+                    skill.attribute = assignedAttribute;
+                    console.log(`✅ Asignado atributo ${assignedAttribute} a habilidad ${skillName}`);
+                }
+            }
+            
+            // Asegurar campos necesarios
+            skill.proficient = skill.proficient || false;
+            skill.expertise = skill.expertise || false;
+            skill.misc = skill.misc || 0;
+            
+            // Calcular bonus si falta
+            if (skill.bonus === undefined || skill.bonus === null) {
+                let bonus = 0;
+                if (skill.attribute && attributeMap[skill.attribute]) {
+                    bonus += attributeMap[skill.attribute].modificador || 0;
+                }
+                if (skill.proficient) {
+                    const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
+                    bonus += skill.expertise ? profBonus * 2 : profBonus;
+                }
+                bonus += skill.misc || 0;
+                skill.bonus = bonus;
+            }
+            
+            processedSkills.push(skill);
+        });
+        
+        // Agregar habilidades faltantes
+        defaultSkills.forEach(defaultSkill => {
+            if (!existingSkillNames.has(defaultSkill)) {
+                const skillNameLower = defaultSkill.toLowerCase();
+                const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
+                processedSkills.push({
+                    id: Date.now() + Math.random(),
+                    name: defaultSkill,
+                    bonus: 0,
+                    attribute: assignedAttribute,
+                    proficient: false,
+                    expertise: false,
+                    misc: 0
+                });
+                console.log(`➕ Agregada habilidad estándar faltante: ${defaultSkill} (${assignedAttribute})`);
+            }
+        });
+        
+        result.skills = processedSkills;
+    }
+    
+    // Procesar tiradas de salvación
+    const defaultSavingThrows = [
+        { name: 'Fuerza', basedOn: 'Fuerza', proficient: false, value: 0 },
+        { name: 'DESTREZA', basedOn: 'DESTREZA', proficient: false, value: 0 },
+        { name: 'CONSTITUCIÓN', basedOn: 'CONSTITUCIÓN', proficient: false, value: 0 },
+        { name: 'INTELIGENCIA', basedOn: 'INTELIGENCIA', proficient: false, value: 0 },
+        { name: 'SABIDURÍA', basedOn: 'SABIDURÍA', proficient: false, value: 0 },
+        { name: 'CARISMA', basedOn: 'CARISMA', proficient: false, value: 0 }
+    ];
+    
+    if (!result.savingThrows || result.savingThrows.length === 0) {
+        result.savingThrows = defaultSavingThrows;
+    } else {
+        const existingThrowNames = new Set(result.savingThrows.map(st => st.name));
+        defaultSavingThrows.forEach(defaultThrow => {
+            if (!existingThrowNames.has(defaultThrow.name)) {
+                result.savingThrows.push(defaultThrow);
+            }
+        });
+    }
+    
+    // Calcular valores de tiradas de salvación
+    result.savingThrows.forEach(st => {
+        const attributeKey = st.basedOn || st.name;
+        const attribute = attributeMap[attributeKey] || attributeMap[attributeKey.toUpperCase()];
+        let value = attribute?.modificador || 0;
+        if (st.proficient) {
+            const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
+            value += profBonus;
+        }
+        st.value = value;
+    });
+    
+    // Normalizar nombres de atributos
+    result.attributes = result.attributes.map(attr => {
+        const nameMap = {
+            'str': 'Fuerza', 'strength': 'Fuerza',
+            'dex': 'DESTREZA', 'dexterity': 'DESTREZA',
+            'con': 'CONSTITUCIÓN', 'constitution': 'CONSTITUCIÓN',
+            'int': 'INTELIGENCIA', 'intelligence': 'INTELIGENCIA',
+            'wis': 'SABIDURÍA', 'wisdom': 'SABIDURÍA',
+            'cha': 'CARISMA', 'charisma': 'CARISMA'
+        };
+        const lowerName = (attr.nombre || '').toLowerCase();
+        if (nameMap[lowerName]) {
+            attr.nombre = nameMap[lowerName];
+        }
+        return attr;
+    });
+    
+    // Calcular percepción pasiva
+    const sabiduriaAttr = result.attributes.find(attr => 
+        attr.nombre === 'SABIDURÍA' || attr.nombre === 'Sabiduría'
+    );
+    if (sabiduriaAttr) {
+        const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
+        const wisdomMod = sabiduriaAttr.modificador || 0;
+        const isPerceptionProficient = result.skills?.find(s => 
+            s.name === 'Percepción' && s.proficient
+        );
+        result.passivePerception = 10 + wisdomMod + (isPerceptionProficient ? profBonus : 0);
+    } else {
+        result.passivePerception = 10;
+    }
+    
+    // Procesar proficiencies - eliminar duplicados
+    if (result.proficiencies && result.proficiencies.length > 0) {
+        const uniqueProficiencies = [];
+        const seen = new Set();
+        for (const prof of result.proficiencies) {
+            const key = `${prof.name}-${prof.type}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueProficiencies.push(prof);
+            }
+        }
+        result.proficiencies = uniqueProficiencies;
+    }
+    
+    return result;
+}
+
+/**
+ * Mostrar indicador de carga
+ */
+showLoadingIndicator(message) {
+    const overlay = document.createElement('div');
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = `
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>${message}</p>
+            <small>Esto puede tomar unos segundos...</small>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+/**
+ * Ocultar indicador de carga
+ */
+hideLoadingIndicator(element) {
+    if (element && element.parentNode) {
+        element.remove();
+    }
+}
+
+/**
+ * Crear botón de importación con IA
+ */
+createAIImportButton() {
+    // Buscar el contenedor correcto (footer-buttons en tu HTML)
+    const container = document.querySelector('.footer-buttons');
+    if (!container) {
+        console.warn('No se encontró el contenedor .footer-buttons');
+        return;
+    }
+    
+    const existingBtn = document.getElementById('aiImportPdfBtn');
+    if (existingBtn) return;
+    
+    const aiButton = document.createElement('button');
+    aiButton.id = 'aiImportPdfBtn';
+    aiButton.className = 'btn-import';
+    aiButton.innerHTML = 'IMPORTAR PDF (demo)';
+    aiButton.title = 'Analizar PDF y crear personaje automáticamente';
+    aiButton.style.background = 'linear-gradient(135deg, #6a0dad, #4a90e2)';
+    aiButton.style.margin = '0 5px';
+    aiButton.style.border = 'none';
+    aiButton.style.color = 'white';
+    aiButton.style.cursor = 'pointer';
+    aiButton.style.padding = '10px 15px';
+    aiButton.style.borderRadius = '6px';
+    aiButton.style.fontFamily = 'Cinzel, serif';
+    aiButton.style.fontWeight = 'bold';
+    aiButton.style.transition = 'all 0.3s ease';
+    
+    aiButton.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                console.log('📄 Archivo seleccionado:', file.name);
+                await this.analyzePDFWithAI(file);
+            }
+        };
+        input.click();
+    });
+    
+    // Insertar después del botón de importar existente o al inicio
+    const importBtn = document.getElementById('importBtn');
+    if (importBtn) {
+        importBtn.insertAdjacentElement('afterend', aiButton);
+    } else {
+        container.appendChild(aiButton);
+    }
+    
+    console.log('✅ Botón creado correctamente');
+}
 
     async ensureUserIsSet() {
         // Esperar a que el DOM esté listo
@@ -2960,22 +3390,57 @@ populateSpellcastingAbilitySelect() {
             this.deathSavesManager.notify();
         }
         
-        if (data.skills && data.skills.length > 0) {
-            this.skillsManager.skills = [];
-            data.skills.forEach(skill => {
-                this.skillsManager.add(skill.name, skill.attribute || '');
-                
-                const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
-                if (lastSkill) {
-                    lastSkill.bonus = skill.bonus || 0;
-                    lastSkill.proficient = skill.proficient || false;
-                    lastSkill.expertise = skill.expertise || false;
-                    lastSkill.misc = skill.misc || 0;
-                }
-            });
-            this.skillsManager.updateAllBonuses();
-            this.skillsManager.notify();
-        }
+         if (data.skills && data.skills.length > 0) {
+        // Obtener mapa de atributos actuales
+        const currentAttributes = this.attributeManager.getAll();
+        const attributeMap = {};
+        currentAttributes.forEach(attr => {
+            attributeMap[attr.name] = attr;
+            attributeMap[attr.name.toUpperCase()] = attr;
+        });
+        
+        this.skillsManager.skills = [];
+        data.skills.forEach(skill => {
+            // Asegurar que el atributo esté asignado para habilidades estándar
+            let attribute = skill.attribute || '';
+            if (!attribute) {
+                const skillNameLower = skill.name.toLowerCase();
+                const SKILL_ATTRIBUTE_MAP = {
+                    'acrobacias': 'DESTREZA',
+                    'arcano': 'INTELIGENCIA',
+                    'atletismo': 'FUERZA',
+                    'engaño': 'CARISMA',
+                    'historia': 'INTELIGENCIA',
+                    'interpretación': 'CARISMA',
+                    'intimidación': 'CARISMA',
+                    'investigación': 'INTELIGENCIA',
+                    'juego de manos': 'DESTREZA',
+                    'medicina': 'SABIDURÍA',
+                    'naturaleza': 'INTELIGENCIA',
+                    'percepción': 'SABIDURÍA',
+                    'perspicacia': 'SABIDURÍA',
+                    'persuasión': 'CARISMA',
+                    'religión': 'INTELIGENCIA',
+                    'sigilo': 'DESTREZA',
+                    'supervivencia': 'SABIDURÍA',
+                    'trato con animales': 'SABIDURÍA'
+                };
+                attribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
+            }
+            
+            this.skillsManager.add(skill.name, attribute);
+            
+            const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
+            if (lastSkill) {
+                lastSkill.bonus = skill.bonus || 0;
+                lastSkill.proficient = skill.proficient || false;
+                lastSkill.expertise = skill.expertise || false;
+                lastSkill.misc = skill.misc || 0;
+            }
+        });
+        this.skillsManager.updateAllBonuses();
+        this.skillsManager.notify();
+    }
         
         if (data.passivePerception !== undefined) {
             this.passivePerception = data.passivePerception;

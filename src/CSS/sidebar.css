@@ -314,15 +314,16 @@ body.with-sidebar .parchment {
 
 /* Responsive */
 @media (max-width: 768px) {
+    body.with-sidebar {
+        padding-left: 0;
+    }
+    
     .sidebar {
         width: 0;
+        transition: width 0.3s ease;
     }
     
     .sidebar:hover {
         width: 220px;
-    }
-    
-    body.with-sidebar {
-        padding-left: 0;
     }
 }

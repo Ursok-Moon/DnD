@@ -1,0 +1,242 @@
+.ai-chat-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 350px;
+    height: 500px;
+    background: #1e1e1e;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+}
+
+.ai-chat-container.active {
+    transform: translateX(0);
+}
+
+.ai-chat-header {
+    background: #2c2c2c;
+    padding: 15px;
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #444;
+}
+
+.ai-chat-header h3 {
+    margin: 0;
+    color: #ffd700;
+    font-size: 16px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.close-btn:hover {
+    color: #ff4444;
+}
+
+.ai-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.message {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    word-wrap: break-word;
+}
+
+.message.user {
+    background: #007bff;
+    color: white;
+    align-self: flex-end;
+}
+
+.message.assistant {
+    background: #2c2c2c;
+    color: #e0e0e0;
+    align-self: flex-start;
+    border-left: 3px solid #ffd700;
+}
+
+.message.error {
+    background: #ff4444;
+    color: white;
+    align-self: center;
+    text-align: center;
+}
+
+.message.typing {
+    background: #2c2c2c;
+    padding: 12px;
+    display: flex;
+    gap: 5px;
+}
+
+.message.typing span {
+    width: 8px;
+    height: 8px;
+    background: #ffd700;
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+}
+
+.message.typing span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.message.typing span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+.ai-chat-input-area {
+    padding: 15px;
+    border-top: 1px solid #444;
+    background: #2c2c2c;
+    border-radius: 0 0 10px 10px;
+}
+
+#ai-chat-input {
+    width: 100%;
+    background: #1e1e1e;
+    color: white;
+    border: 1px solid #444;
+    border-radius: 5px;
+    padding: 8px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.chat-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.chat-controls label {
+    color: #999;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.send-btn {
+    background: #ffd700;
+    color: #1e1e1e;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.send-btn:hover {
+    background: #ffed4a;
+}
+
+/* Scrollbar personalizada */
+.ai-chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Agregar al final del archivo */
+.ai-chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    background: rgba(0,0,0,0.3);
+    padding: 4px 8px;
+    border-radius: 12px;
+    flex: 1;
+    max-width: 120px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.connecting {
+    background: #ffa500;
+    animation: pulse 1s infinite;
+}
+
+.status-dot.connected {
+    background: #00ff00;
+}
+
+.status-dot.disconnected {
+    background: #ff4444;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.message.system {
+    background: #2c2c2c;
+    color: #ffd700;
+    align-self: center;
+    font-style: italic;
+    font-size: 12px;
+    text-align: center;
+    max-width: 90%;
+}

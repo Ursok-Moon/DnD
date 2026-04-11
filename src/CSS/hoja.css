@@ -3193,3 +3193,55 @@ img, svg, iframe, video, embed {
 .skill-prof:hover {
     opacity: 0.8;
 }
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.loading-spinner {
+    background: linear-gradient(135deg, var(--parchment-light), var(--parchment-dark));
+    padding: 30px 50px;
+    border-radius: 20px;
+    text-align: center;
+    border: 3px solid var(--accent-gold);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.3s ease;
+}
+
+.loading-spinner i {
+    font-size: 3rem;
+    color: var(--accent-gold);
+    margin-bottom: 15px;
+}
+
+.loading-spinner p {
+    font-family: 'Cinzel', serif;
+    color: var(--accent-blue);
+    font-size: 1.2rem;
+    margin: 10px 0;
+}
+
+.loading-spinner small {
+    color: var(--ink-light);
+    font-size: 0.8rem;
+}
+
+.ai-import-btn {
+    transition: all 0.3s ease;
+}
+
+.ai-import-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(106, 13, 173, 0.4);
+}

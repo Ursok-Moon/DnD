@@ -1,4 +1,3 @@
-// src/JS/auth.js
 class AuthSystem {
     constructor() {
         this.currentUser = null;

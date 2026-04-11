@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente IA - D&D Master Assistant</title>
+    <link rel="stylesheet" href="/src/CSS/ai-chat.css">
+    <link rel="stylesheet" href="/src/CSS/sidebar.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .ai-chat-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .chat-sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-right: 2px solid #ffd700;
+            overflow-y: auto;
+        }
+
+        .chat-sidebar h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .chat-sidebar label {
+            display: block;
+            margin: 10px 0 5px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .chat-sidebar input,
+        .chat-sidebar select {
+            width: 100%;
+            padding: 8px;
+            background: #2d2d44;
+            border: 1px solid #ffd700;
+            color: white;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .chat-sidebar button {
+            width: 100%;
+            margin-bottom: 10px;
+            background: #ffd700;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .chat-sidebar button:hover {
+            background: #ffed4a;
+            transform: translateY(-2px);
+        }
+
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background: #4a4e69;
+            margin-left: auto;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .ai-message {
+            background: #22223b;
+            border-left: 4px solid #ffd700;
+            color: #eee;
+            border-bottom-left-radius: 5px;
+        }
+
+        .system-message {
+            background: #2d2d44;
+            color: #aaa;
+            font-style: italic;
+            text-align: center;
+            max-width: 100%;
+            font-size: 0.9rem;
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #ffd700;
+        }
+
+        #userInput {
+            flex: 1;
+            background: #2d2d44;
+            border: 1px solid #ffd700;
+            color: white;
+            padding: 12px;
+            border-radius: 5px;
+            resize: none;
+            height: 70px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: #ffed4a;
+        }
+
+        #sendMessage {
+            background: #ffd700;
+            color: #1a1a2e;
+            border: none;
+            padding: 0 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        #sendMessage:hover:not(:disabled) {
+            background: #ffed4a;
+            transform: translateY(-2px);
+        }
+
+        #sendMessage:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-badge {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #ffd700;
+        }
+
+        @media (max-width: 768px) {
+            .chat-sidebar {
+                width: 250px;
+            }
+            .message {
+                max-width: 95%;
+            }
+        }
+
+        /* Asegurar que el chat sea visible */
+.ai-chat-container {
+    display: flex !important;
+}
+
+.ai-chat-container.active {
+    display: flex !important;
+}
+
+/* Botón flotante (si no está definido) */
+.open-ai-chat-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    cursor: pointer;
+    z-index: 999;
+    font-size: 28px;
+    transition: all 0.3s ease;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.open-ai-chat-btn:hover {
+    transform: scale(1.1);
+}
+    </style>
+</head>
+<body>
+
+       <button id="open-ai-chat" class="open-ai-chat-btn" title="Asistente IA">
+    💬
+</button>
+    <div class="ai-chat-container">
+        <div class="chat-sidebar">
+            <h3>🎲 Contexto de Sesión</h3>
+            
+            <label>📍 Ubicación:</label>
+            <input type="text" id="location" placeholder="Ej: Taberna del Dragón, Bosque Sombrío...">
+            
+            <label>🌍 Ambiente:</label>
+            <select id="environment">
+                <option value="urbano">Urbano / Ciudad</option>
+                <option value="bosque">Bosque / Selva</option>
+                <option value="montañas">Montañas / Colinas</option>
+                <option value="mazmorra">Mazmorra / Ruinas</option>
+                <option value="desierto">Desierto</option>
+                <option value="mar">Mar / Costa</option>
+                <option value="plano">Plano Exterior</option>
+            </select>
+            
+            <hr style="margin: 15px 0; border-color: #ffd70030;">
+            
+            <button id="generateEncounter">✨ Generar Encuentro</button>
+            <button id="analyzeBestiary">📖 Mejorar Bestiario</button>
+            
+            <hr style="margin: 15px 0; border-color: #ffd70030;">
+            
+            <div style="font-size: 0.8rem; color: #888; margin-top: 15px;">
+                <strong>Sugerencias:</strong><br>
+                • "¿Cómo funciona la iniciativa?"<br>
+                • "Genera un NPC mercader"<br>
+                • "Reglas para sigilo"<br>
+                • "Crea una trampa para nivel 3"
+            </div>
+        </div>
+        
+        <div class="chat-main">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message system-message">
+                    🎲 ¡Bienvenido al Asistente de Dungeon Master!<br>
+                    Pregúntame sobre reglas, generación de encuentros, lore, NPCs y más.
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <textarea id="userInput" placeholder="Ej: ¿Cómo funcionan los salvajes de muerte? o 'Genera un encuentro para nivel 3 en un bosque'..."></textarea>
+                <button id="sendMessage">Enviar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-badge" id="aiStatus">🤖 Conectando...</div>
+    
+    <script type="module" src="/src/JS/ai/AIChatUI.js"></script>
+</body>
+</html>

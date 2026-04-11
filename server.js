@@ -1,11 +1,22 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs').promises;
-const multer = require('multer');
-const http = require('http');
-const { Server } = require('socket.io');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { promises as fs } from 'fs';
+import http from 'http';
+import { Server } from 'socket.io';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
+import archiver from 'archiver';
+
+// Importar rutas de IA y WebSockets
+import aiRoutes from './server/routes/aiRoutes.js';
+import setupWebSocketHandlers from './server/middleware/websocketHandlers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
@@ -18,10 +29,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// ===== ALMACENAMIENTO DE CONEXIONES ACTIVAS =====
-const connectedUsers = new Map();
-const activeRooms = new Map();
-
+// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -45,13 +53,18 @@ app.use((req, res, next) => {
 const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
 const DATA_PATH = process.env.JSON_PATH || path.join(__dirname, 'data');
 
-console.log(` Servidor configurado en: ${SERVER_URL}`);
-console.log(` Ruta de datos: ${DATA_PATH}`);
+console.log(`📡 Servidor configurado en: ${SERVER_URL}`);
+console.log(`📁 Ruta de datos: ${DATA_PATH}`);
 
-// ===== CONFIGURACIÓN DE MULTER PARA SUBIR IMÁGENES =====
+// ===== CONFIGURACIÓN DE MULTER PARA SUBIR ARCHIVOS =====
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const uploadPath = path.join(__dirname, 'data', 'imagenes');
+        let uploadPath;
+        if (file.mimetype === 'application/pdf') {
+            uploadPath = path.join(__dirname, 'data', 'pdfs');
+        } else {
+            uploadPath = path.join(__dirname, 'data', 'imagenes');
+        }
         fs.mkdir(uploadPath, { recursive: true }).then(() => {
             cb(null, uploadPath);
         }).catch(err => {
@@ -61,23 +74,57 @@ const storage = multer.diskStorage({
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
-        cb(null, 'pj_' + uniqueSuffix + ext);
+        let prefix = file.mimetype === 'application/pdf' ? 'pdf_' : 'pj_';
+        cb(null, prefix + uniqueSuffix + ext);
     }
 });
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
             cb(null, true);
         } else {
-            cb(new Error('Solo se permiten imágenes'), false);
+            cb(new Error('Solo se permiten imágenes y PDFs'), false);
         }
     }
 });
 
-// ===== FUNCIÓN PARA INICIALIZAR ARCHIVO DE SESIÓN =====
+// ===== WEBSOCKETS =====
+setupWebSocketHandlers(io);
+
+// ===== RUTAS DE IA =====
+app.use('/api/ai', aiRoutes);
+
+console.log('🤖 Rutas de IA con Groq configuradas:');
+console.log('   - GET  /api/ai/status');
+console.log('   - POST /api/ai/chat');
+console.log('   - POST /api/ai/chat/stream');
+console.log('   - POST /api/ai/analyze-pdf');
+console.log('   - POST /api/ai/enhance-bestiary');
+console.log('   - POST /api/ai/generate-encounter');
+console.log('   - POST /api/ai/analyze-character');
+console.log('   - POST /api/ai/generate-dialogue');
+console.log('   - POST /api/ai/suggest-actions');
+console.log('   - POST /api/ai/generate-json');
+console.log('   - POST /api/ai/query-bestiary');
+
+// ===== SERVIDOR DE ARCHIVOS ESTÁTICOS =====
+app.use(express.static(path.join(__dirname)));
+app.use('/src', express.static(path.join(__dirname, 'src')));
+app.use('/src/FROND', express.static(path.join(__dirname, 'src/FROND')));
+app.use('/src/CSS', express.static(path.join(__dirname, 'src/CSS')));
+app.use('/src/JS', express.static(path.join(__dirname, 'src/JS')));
+app.use('/src/Cartas', express.static(path.join(__dirname, 'src/Cartas')));
+app.use('/src/demo', express.static(path.join(__dirname, 'src/demo')));
+
+app.use('/data/imagenes', express.static(path.join(__dirname, 'data', 'imagenes')));
+app.use('/data/pdfs', express.static(path.join(__dirname, 'data', 'pdfs')));
+app.use('/data', express.static(path.join(__dirname, 'data')));
+app.use('/data/personajes', express.static(path.join(__dirname, 'data', 'personajes')));
+
+// ===== FUNCIONES DE INICIALIZACIÓN =====
 async function inicializarArchivoSesion() {
     try {
         const hoy = new Date().toISOString().split('T')[0];
@@ -87,6 +134,9 @@ async function inicializarArchivoSesion() {
         
         const imagenesPath = path.join(DATA_PATH, 'imagenes');
         await fs.mkdir(imagenesPath, { recursive: true });
+        
+        const pdfsPath = path.join(DATA_PATH, 'pdfs');
+        await fs.mkdir(pdfsPath, { recursive: true });
         
         const archivoHoy = path.join(personajesPath, `${hoy}.json`);
         
@@ -116,7 +166,6 @@ async function inicializarArchivoSesion() {
     }
 }
 
-// ===== FUNCIÓN PARA LIMPIAR ARCHIVOS ANTIGUOS =====
 async function limpiarArchivosAntiguos(diasAMantener = 30) {
     try {
         const personajesPath = path.join(DATA_PATH, 'personajes');
@@ -141,146 +190,9 @@ async function limpiarArchivosAntiguos(diasAMantener = 30) {
     }
 }
 
-// ===== EJECUTAR INICIALIZACIÓN AL ARRANCAR EL SERVIDOR =====
-(async () => {
-    await inicializarArchivoSesion();
-    await limpiarArchivosAntiguos(30);
-})();
+// ===== ENDPOINTS ADICIONALES =====
 
-// ===== MANEJADORES DE WEBSOCKET =====
-io.on('connection', (socket) => {
-    const clientIP = socket.handshake.address;
-    console.log(`🔌 Nueva conexión WebSocket: ${socket.id} (${clientIP})`);
-
-    // Registrar usuario
-    socket.on('registrar-usuario', (data) => {
-        const { nombre, tipo, personaje } = data;
-        connectedUsers.set(socket.id, {
-            id: socket.id,
-            nombre: nombre,
-            tipo: tipo || 'jugador',
-            personaje: personaje || null,
-            ip: clientIP,
-            conectado: new Date()
-        });
-        
-        console.log(`👤 Usuario registrado: ${nombre} (${tipo})`);
-        io.emit('usuarios-actualizados', Array.from(connectedUsers.values()));
-    });
-
-    // Unirse a sala
-    socket.on('unirse-sala', (codigoSala) => {
-        socket.join(codigoSala);
-        console.log(`📌 Usuario ${socket.id} se unió a sala: ${codigoSala}`);
-        
-        if (!activeRooms.has(codigoSala)) {
-            activeRooms.set(codigoSala, {
-                codigo: codigoSala,
-                usuarios: [],
-                creada: new Date()
-            });
-        }
-        
-        const sala = activeRooms.get(codigoSala);
-        const usuario = connectedUsers.get(socket.id);
-        if (usuario && !sala.usuarios.find(u => u.id === socket.id)) {
-            sala.usuarios.push(usuario);
-        }
-        
-        io.to(codigoSala).emit('usuario-unido', usuario);
-    });
-
-    // Enviar mensaje
-    socket.on('mensaje-sala', (data) => {
-        const { sala, mensaje, tipo } = data;
-        const usuario = connectedUsers.get(socket.id);
-        
-        const mensajeCompleto = {
-            id: Date.now(),
-            usuario: usuario?.nombre || 'Anónimo',
-            personaje: usuario?.personaje,
-            mensaje: mensaje,
-            tipo: tipo || 'texto',
-            timestamp: new Date().toISOString()
-        };
-        
-        io.to(sala).emit('nuevo-mensaje', mensajeCompleto);
-    });
-
-    // Actualizar personaje
-    socket.on('actualizar-personaje', (data) => {
-        const { sala, personaje } = data;
-        const usuario = connectedUsers.get(socket.id);
-        
-        if (usuario) {
-            usuario.personaje = personaje;
-            
-            if (sala && activeRooms.has(sala)) {
-                const salaData = activeRooms.get(sala);
-                const userIndex = salaData.usuarios.findIndex(u => u.id === socket.id);
-                if (userIndex !== -1) {
-                    salaData.usuarios[userIndex].personaje = personaje;
-                }
-            }
-            
-            io.emit('personaje-actualizado', {
-                usuarioId: socket.id,
-                personaje: personaje
-            });
-        }
-    });
-
-    // Iniciativa en tiempo real
-    socket.on('actualizar-iniciativa', (data) => {
-        const { sala, orden } = data;
-        io.to(sala).emit('iniciativa-actualizada', orden);
-    });
-
-    // Dibujo en tiempo real
-    socket.on('dibujo', (data) => {
-        const { sala, puntos } = data;
-        socket.to(sala).emit('nuevo-dibujo', puntos);
-    });
-
-    // Limpiar pizarra
-    socket.on('limpiar-pizarra', (sala) => {
-        io.to(sala).emit('pizarra-limpia');
-    });
-
-    // Desconexión
-    socket.on('disconnect', () => {
-        const usuario = connectedUsers.get(socket.id);
-        if (usuario) {
-            console.log(`🔌 Usuario desconectado: ${usuario.nombre} (${socket.id})`);
-            connectedUsers.delete(socket.id);
-            
-            activeRooms.forEach((sala, codigo) => {
-                const index = sala.usuarios.findIndex(u => u.id === socket.id);
-                if (index !== -1) {
-                    sala.usuarios.splice(index, 1);
-                    io.to(codigo).emit('usuario-desconectado', socket.id);
-                }
-            });
-            
-            io.emit('usuarios-actualizados', Array.from(connectedUsers.values()));
-        }
-    });
-});
-
-// ===== SERVIDOR DE ARCHIVOS ESTÁTICOS =====
-app.use(express.static(path.join(__dirname)));
-app.use('/src', express.static(path.join(__dirname, 'src')));
-app.use('/src/FROND', express.static(path.join(__dirname, 'src/FROND')));
-app.use('/src/CSS', express.static(path.join(__dirname, 'src/CSS')));
-app.use('/src/JS', express.static(path.join(__dirname, 'src/JS')));
-app.use('/src/Cartas', express.static(path.join(__dirname, 'src/Cartas')));
-app.use('/src/demo', express.static(path.join(__dirname, 'src/demo')));
-
-app.use('/data/imagenes', express.static(path.join(__dirname, 'data', 'imagenes')));
-app.use('/data', express.static(path.join(__dirname, 'data')));
-app.use('/data/personajes', express.static(path.join(__dirname, 'data', 'personajes')));
-
-// ===== ENDPOINTS PARA REGISTRO DE USUARIOS =====
+// Usuarios
 app.post('/api/usuario/registrar', async (req, res) => {
     try {
         const { nombre, socketId, ip } = req.body;
@@ -295,11 +207,8 @@ app.post('/api/usuario/registrar', async (req, res) => {
         try {
             const data = await fs.readFile(usuariosPath, 'utf8');
             usuarios = JSON.parse(data);
-        } catch (e) {
-            // Archivo no existe, se creará
-        }
+        } catch (e) {}
         
-        // Verificar si el usuario ya existe
         const index = usuarios.usuarios.findIndex(u => u.nombre === nombre);
         
         const usuarioData = {
@@ -348,7 +257,7 @@ app.get('/api/usuarios', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS DE IMÁGENES =====
+// Imágenes
 app.post('/api/imagenes/subir', upload.single('imagen'), (req, res) => {
     try {
         if (!req.file) {
@@ -431,7 +340,7 @@ app.post('/api/imagenes/limpiar-todas', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS ESPECÍFICOS PARA ADMIN =====
+// JSON management
 app.get('/api/json/list', async (req, res) => {
     try {
         const archivosOcultos = [
@@ -493,7 +402,7 @@ app.post('/api/json/delete', async (req, res) => {
             return res.status(400).json({ error: 'Nombre inválido' });
         }
         
-        const filePath = path.join(DATA_PATH,'personajes', filename);
+        const filePath = path.join(DATA_PATH, 'personajes', filename);
         
         try {
             await fs.access(filePath);
@@ -511,15 +420,14 @@ app.post('/api/json/delete', async (req, res) => {
 });
 
 app.get('/api/json/export-all', (req, res) => {
-    const archiver = require('archiver');
     const dataDir = path.join(__dirname, 'data');
     const outputPath = path.join(__dirname, 'temp', 'backup.zip');
     
-    if (!fs.existsSync(path.join(__dirname, 'temp'))) {
-        fs.mkdirSync(path.join(__dirname, 'temp'));
+    if (!require('fs').existsSync(path.join(__dirname, 'temp'))) {
+        require('fs').mkdirSync(path.join(__dirname, 'temp'));
     }
     
-    const output = fs.createWriteStream(outputPath);
+    const output = require('fs').createWriteStream(outputPath);
     const archive = archiver('zip');
     
     archive.pipe(output);
@@ -529,7 +437,7 @@ app.get('/api/json/export-all', (req, res) => {
     output.on('close', () => {
         res.download(outputPath, 'backup.zip', (err) => {
             if (err) console.error(err);
-            fs.unlinkSync(outputPath);
+            require('fs').unlinkSync(outputPath);
         });
     });
 });
@@ -596,7 +504,6 @@ app.get('/api/json/stats', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS GENÉRICOS PARA JSON =====
 app.get('/api/json/:tipo', async (req, res) => {
     try {
         const { tipo } = req.params;
@@ -620,7 +527,7 @@ app.post('/api/json/:tipo', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS DE BÚSQUEDA =====
+// Bestiario
 app.get('/api/bestiario/buscar/:termino', async (req, res) => {
     try {
         const { termino } = req.params;
@@ -637,7 +544,7 @@ app.get('/api/bestiario/buscar/:termino', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS DE AUTENTICACIÓN =====
+// Utilidades
 app.get('/api/check-localhost', (req, res) => {
     res.json({ 
         isLocalhost: req.userInfo.isLocalhost,
@@ -656,7 +563,6 @@ app.post('/api/dm-login', (req, res) => {
     }
 });
 
-// ===== ENDPOINTS PARA JUGADORES =====
 app.get('/api/jugadores', async (req, res) => {
     try {
         const rutaJugadores = path.join(DATA_PATH, 'jugadores.json');
@@ -697,7 +603,7 @@ app.post('/api/jugadores/registrar', async (req, res) => {
     }
 });
 
-// ===== ENDPOINTS PARA PERSONAJES =====
+// Personajes
 app.post('/api/personajes/guardar', async (req, res) => {
     try {
         const personajeData = req.body;
@@ -747,7 +653,6 @@ app.post('/api/personajes/guardar', async (req, res) => {
         
         console.log(`✅ Personaje guardado con ${Object.keys(personajeData.colores_personalizados || {}).length} colores personalizados`);
         
-        // Emitir evento de personaje guardado
         io.emit('personaje-guardado', {
             personaje: {
                 nombre: personajeData.nombre,
@@ -853,7 +758,6 @@ app.get('/api/personajes/buscar/:termino', async (req, res) => {
     }
 });
 
-// ===== ENDPOINT DE SESIÓN ACTUAL =====
 app.get('/api/sesion/actual', async (req, res) => {
     try {
         const hoy = new Date().toISOString().split('T')[0];
@@ -888,22 +792,15 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ===== INICIAR SERVIDOR =====
-server.listen(PORT, () => {
-    console.log(`🚀 Servidor HTTP corriendo en ${SERVER_URL}`);
-    console.log(`🔌 WebSocket server activo en ws://localhost:${PORT}`);
-    console.log(`📊 Endpoints API:`);
-    console.log(`   - GET ${SERVER_URL}/api/json/list`);
-    console.log(`   - GET ${SERVER_URL}/api/json/stats`);
-    console.log(`   - POST ${SERVER_URL}/api/json/upload`);
-    console.log(`   - POST ${SERVER_URL}/api/json/delete`);
-    console.log(`   - GET ${SERVER_URL}/api/json/export-all`);
-    console.log(`   - GET ${SERVER_URL}/api/json/bestiario`);
-    console.log(`   - POST ${SERVER_URL}/api/json/bestiario`);
-    console.log(`   - GET ${SERVER_URL}/api/bestiario/buscar/:termino`);
-    console.log(`   - GET ${SERVER_URL}/api/personajes/hoy`);
-    console.log(`   - POST ${SERVER_URL}/api/personajes/guardar`);
-    console.log(`   - GET ${SERVER_URL}/api/imagenes/listar`);
-    console.log(`   - POST ${SERVER_URL}/api/imagenes/subir`);
-    console.log(`   - POST ${SERVER_URL}/api/imagenes/eliminar`);
-});
+// ===== INICIALIZACIÓN Y ARRANQUE =====
+(async () => {
+    await inicializarArchivoSesion();
+    await limpiarArchivosAntiguos(30);
+    
+    server.listen(PORT, () => {
+        console.log(`\n🚀 Servidor HTTP corriendo en ${SERVER_URL}`);
+        console.log(`🔌 WebSocket server activo en ws://localhost:${PORT}`);
+        console.log(`\n🤖 IA con Groq activa y lista para usar!`);
+        console.log(`📄 Análisis de PDF disponible con extracción de texto mejorada`);
+    });
+})();

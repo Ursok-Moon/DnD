@@ -18,7 +18,9 @@ import { ColorManager } from '../modules/ui/ColorManager.js';
 import { DragDropManager } from '../modules/ui/DragDropManager.js';
 import { ResizeManager } from '../modules/ui/ResizeManager.js';
 import { ImageManager } from '../modules/ui/ImageManager.js';
+import { RichTextEditor } from '../modules/ui/RichTextEditor.js';
 import { UserManager } from './UserManager.js';
+import { SpeciesService } from '../services/SpeciesService.js';
 
 // Inventory Managers
 import { CurrencyManager } from '../modules/inventory/CurrencyManager.js';
@@ -39,6 +41,12 @@ export class CharacterSheet {
         this.storage = new StorageService('dnd_');
         this.api = new ApiService();
         this.userManager = new UserManager(this.storage); 
+
+        this.speciesService = new SpeciesService();
+        this.atributosBaseGuardados = null; 
+        this.razaActual = null;
+        this.atributosPersonalizablesPendientes = [];
+        this.richTextEditor = null;
         
         // Usar WebSocket global
         this.ws = null;
@@ -835,6 +843,13 @@ createAIImportButton() {
     initUI() {
         this.attributeUI = new AttributeUI(this.attributeManager, this.colorManager, this.eventBus);
         this.spellUI = new SpellUI(this.spellManager, this.spellSlotsManager, this.eventBus);
+
+        if (this.spellManager) {
+    // Pequeño delay para asegurar DOM
+    setTimeout(() => {
+        this.spellManager.setupAutocomplete();
+    }, 500);
+}
         
         this.setupSubscriptions();
         
@@ -849,7 +864,659 @@ createAIImportButton() {
         this.setupDeathSavesEvents();
         this.setupSpellStatsEvents();
         this.loadTraitsFromStorage();
+        this.setupRaceAutocomplete();
+        this.setupRaceClearHandler();
+        this.initRichTextEditor();
     }
+
+    initRichTextEditor() {
+    this.richTextEditor = new RichTextEditor();
+    this.richTextEditor.initRichTextAreas();
+    
+    // Escuchar cambios para guardar automáticamente
+    const textareaIds = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
+    textareaIds.forEach(id => {
+        const textarea = document.getElementById(id);
+        if (textarea) {
+            textarea.addEventListener('change', () => {
+                if (this.hasValidCharacterName()) {
+                    this.saveCharacter();
+                }
+            });
+        }
+    });
+}
+
+    async setupRaceAutocomplete() {
+    const raceInput = document.getElementById('char-race');
+    if (!raceInput) return;
+    
+    // Cargar especies
+    await this.speciesService.loadSpecies();
+    const speciesList = this.speciesService.getSpeciesDenominaciones();
+    
+    // Crear contenedor de resultados
+    let resultsList = document.getElementById('raceSearchResults');
+    if (!resultsList) {
+        resultsList = document.createElement('ul');
+        resultsList.id = 'raceSearchResults';
+        resultsList.className = 'search-results';
+        
+        resultsList.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid var(--accent-gold);
+            border-radius: 4px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            z-index: 10000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        
+        if (raceInput.parentNode) {
+            raceInput.parentNode.style.position = 'relative';
+            raceInput.parentNode.appendChild(resultsList);
+        }
+    }
+    
+    // Manejador de entrada
+    const inputHandler = (e) => {
+        const searchTerm = raceInput.value.toLowerCase().trim();
+        resultsList.innerHTML = '';
+        
+        if (searchTerm.length === 0) {
+            resultsList.style.display = 'none';
+            return;
+        }
+        
+        const filtered = speciesList.filter(item => {
+            const itemText = item.text.toLowerCase();
+            if (itemText === searchTerm) return true;
+            if (itemText.startsWith(searchTerm)) return true;
+            const words = itemText.split(/\s+/);
+            if (words.some(word => word === searchTerm)) return true;
+            if (words.some(word => word.startsWith(searchTerm))) return true;
+            if (searchTerm.length >= 3 && itemText.includes(searchTerm)) return true;
+            return false;
+        }).slice(0, 15);
+        
+        if (filtered.length > 0) {
+            filtered.forEach(item => {
+                const li = document.createElement('li');
+                
+                let highlightedText = item.text;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                highlightedText = item.text.replace(regex, '<span class="highlight">$1</span>');
+                
+                li.innerHTML = `
+                    <div style="display: flex; flex-direction: column;">
+                        <span>${highlightedText}</span>
+                        <small style="color: var(--ink-light); font-size: 0.7rem;">
+                            ${item.book ? `📖 ${item.book}` : ''}
+                            ${item.publisher ? ` • ${item.publisher}` : ''}
+                        </small>
+                    </div>
+                `;
+                
+                li.style.cssText = `
+                    padding: 10px 15px;
+                    cursor: pointer;
+                    border-bottom: 1px solid var(--parchment-dark);
+                    font-family: 'Cinzel', serif;
+                    transition: background 0.2s ease;
+                `;
+                
+                li.addEventListener('mouseover', () => {
+                    li.style.background = 'var(--parchment-light)';
+                });
+                
+                li.addEventListener('mouseout', () => {
+                    li.style.background = 'white';
+                });
+                
+                li.addEventListener('click', () => {
+                    raceInput.value = item.text;
+                    // Obtener la especie completa y mostrar su descripción
+                    const especieCompleta = this.speciesService.getSpeciesByName(item.text);
+                    this.cargarDatosRaza(especieCompleta || item);
+                    resultsList.style.display = 'none';
+                });
+                
+                resultsList.appendChild(li);
+            });
+            resultsList.style.display = 'block';
+        } else {
+            resultsList.style.display = 'none';
+        }
+    };
+    
+    raceInput.removeEventListener('input', this._boundRaceInputHandler);
+    this._boundRaceInputHandler = inputHandler;
+    raceInput.addEventListener('input', this._boundRaceInputHandler);
+    
+    // También manejar selección manual (cuando el usuario escribe y presiona Enter o pierde foco)
+    raceInput.addEventListener('change', async () => {
+        const value = raceInput.value.trim();
+        if (value) {
+            const especieCompleta = this.speciesService.getSpeciesByName(value);
+            if (especieCompleta) {
+                this.cargarDatosRaza(especieCompleta);
+            }
+        }
+    });
+    
+    // Cerrar al hacer clic fuera
+    const documentClickHandler = (e) => {
+        if (e.target !== raceInput && !resultsList.contains(e.target)) {
+            resultsList.style.display = 'none';
+        }
+    };
+    
+    document.removeEventListener('click', this._boundRaceDocumentClickHandler);
+    this._boundRaceDocumentClickHandler = documentClickHandler;
+    document.addEventListener('click', this._boundRaceDocumentClickHandler);
+}
+
+cargarDatosRaza(speciesItem) {
+    const raceInput = document.getElementById('char-race');
+    if (raceInput) raceInput.value = speciesItem.text || speciesItem.name;
+    
+    let especieCompleta = speciesItem;
+    if (!speciesItem.description && speciesItem.text) {
+        especieCompleta = this.speciesService.getSpeciesByName(speciesItem.text);
+    }
+    
+    const nombreRaza = especieCompleta?.name || especieCompleta?.text;
+    if (this.razaActual === nombreRaza) {
+        console.log('Misma raza seleccionada, omitiendo cambios');
+        return;
+    }
+    
+    if (this.razaActual && this.atributosBaseGuardados) {
+        this.restaurarAtributosBase();
+    }
+    
+    this.razaActual = nombreRaza;
+    
+    if (especieCompleta && especieCompleta.description) {
+        // ... código existente de descripción ...
+        
+        // APLICAR atributos de la especie
+        if (especieCompleta.atributos) {
+            this.aplicarAtributosDeEspecie(especieCompleta.atributos);
+        }
+        
+        if (especieCompleta.properties && especieCompleta.properties['Ability Score Increase']) {
+            this.aplicarAtributosDeEspecie(especieCompleta.properties['Ability Score Increase']);
+        }
+        
+        // NUEVO: Verificar si la especie tiene atributos personalizables
+        this.verificarAtributosPersonalizables(especieCompleta);
+    }
+}
+
+/**
+ * Verifica si la especie tiene atributos que requieren elección del jugador
+ * y muestra un modal si es necesario
+ */
+verificarAtributosPersonalizables(especieCompleta) {
+    const atributos = especieCompleta.atributos || 
+                      especieCompleta.properties?.['Ability Score Increase'];
+    
+    if (!atributos) return;
+    
+    // Buscar atributos con valor que parecen ser incrementos personalizables
+    // (valores como 2 o 1 que podrían ser para elegir)
+    const atributosParaElegir = [];
+    let tieneIncrementoFijo = false;
+    
+    for (const [attr, valor] of Object.entries(atributos)) {
+        // Si el atributo es un número positivo pequeño (1 o 2)
+        if (typeof valor === 'number' && valor > 0 && valor <= 3) {
+            // Verificar si el nombre del atributo es genérico
+            const nombreNormalizado = attr.toLowerCase();
+            if (nombreNormalizado === 'cualquier' || 
+                nombreNormalizado === 'elige' || 
+                nombreNormalizado === 'personalizable') {
+                atributosParaElegir.push({ atributo: null, valor });
+            } else {
+                // Es un atributo específico, es un incremento fijo
+                tieneIncrementoFijo = true;
+            }
+        }
+    }
+    
+    // Si hay atributos personalizables, mostrar modal
+    if (atributosParaElegir.length > 0) {
+        this.mostrarModalSeleccionAtributos(atributosParaElegir);
+    } else if (tieneIncrementoFijo) {
+        // Mostrar mensaje simple de confirmación
+        const cambios = Object.entries(atributos)
+            .map(([attr, val]) => `${attr} +${val}`)
+            .join(', ');
+        Helpers.showMessage(`✨ Atributos aplicados: ${cambios}`, 'success');
+    }
+}
+
+/**
+ * Muestra modal para que el jugador elija qué atributos aumentar
+ */
+mostrarModalSeleccionAtributos(atributosParaElegir) {
+    // Verificar si ya hay un modal abierto
+    let modal = document.getElementById('atributosModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'atributosModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    
+    // Obtener lista de atributos disponibles
+    const atributosDisponibles = this.attributeManager.getAll().map(attr => ({
+        id: attr.id,
+        name: attr.name,
+        currentValue: attr.value
+    }));
+    
+    // Si no hay atributos, crear los predeterminados
+    if (atributosDisponibles.length === 0) {
+        const defaultAttrs = ['Fuerza', 'DESTREZA', 'CONSTITUCIÓN', 'INTELIGENCIA', 'SABIDURÍA', 'CARISMA'];
+        defaultAttrs.forEach(name => {
+            this.attributeManager.add(name, 10);
+        });
+        // Recargar lista
+        atributosDisponibles.length = 0;
+        this.attributeManager.getAll().forEach(attr => {
+            atributosDisponibles.push({ id: attr.id, name: attr.name, currentValue: attr.value });
+        });
+    }
+    
+    let html = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-dice-d20"></i> Aumentar Atributos</h3>
+                <button class="modal-close" id="closeAtributosModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Esta especie te permite aumentar tus atributos. Elige dónde aplicar los siguientes incrementos:</p>
+    `;
+    
+    for (const item of atributosParaElegir) {
+        html += `
+            <div class="atributo-choice-group" style="margin-bottom: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                <label style="font-weight: bold; color: var(--accent-gold);">
+                    <i class="fas fa-arrow-up"></i> +${item.valor} punto${item.valor !== 1 ? 's' : ''}
+                </label>
+                <select class="atributo-choice-select" data-valor="${item.valor}" style="width: 100%; margin-top: 8px; padding: 8px; border-radius: 6px; border: 1px solid var(--accent-gold); background: var(--parchment-light);">
+                    <option value="">Selecciona un atributo...</option>
+        `;
+        
+        atributosDisponibles.forEach(attr => {
+            html += `<option value="${attr.id}" data-name="${attr.name}" data-current="${attr.currentValue}">${attr.name} (actual: ${attr.currentValue})</option>`;
+        });
+        
+        html += `
+                </select>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+            <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px;">
+                <button type="button" class="btn-secondary btn-cancel" id="cancelAtributosBtn">Cancelar</button>
+                <button type="button" class="btn-secondary" id="confirmAtributosBtn" style="background: #4CAF50;">Aplicar</button>
+            </div>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+    
+    // Cerrar modal
+    const closeModal = () => modal.remove();
+    document.getElementById('closeAtributosModal')?.addEventListener('click', closeModal);
+    document.getElementById('cancelAtributosBtn')?.addEventListener('click', closeModal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    
+    // Confirmar selección
+    document.getElementById('confirmAtributosBtn')?.addEventListener('click', () => {
+        const selects = modal.querySelectorAll('.atributo-choice-select');
+        let seleccionesValidas = true;
+        const atributosAAplicar = [];
+        
+        selects.forEach(select => {
+            const valor = parseInt(select.dataset.valor);
+            const attrId = select.value;
+            const attrName = select.options[select.selectedIndex]?.dataset?.name;
+            
+            if (!attrId) {
+                seleccionesValidas = false;
+                select.style.borderColor = '#ff4444';
+                return;
+            }
+            select.style.borderColor = 'var(--accent-gold)';
+            atributosAAplicar.push({ id: parseInt(attrId), name: attrName, incremento: valor });
+        });
+        
+        if (!seleccionesValidas) {
+            Helpers.showMessage('Por favor, selecciona todos los atributos', 'warning');
+            return;
+        }
+        
+        // Aplicar los incrementos seleccionados
+        for (const item of atributosAAplicar) {
+            const attr = this.attributeManager.getById(item.id);
+            if (attr) {
+                const nuevoValor = (attr.value || 10) + item.incremento;
+                const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+                console.log(`📈 Aplicando +${item.incremento} a ${item.name}: ${attr.value} -> ${valorLimitado}`);
+                this.attributeManager.update(item.id, { value: valorLimitado });
+            }
+        }
+        
+        // Forzar actualización de UI
+        this.attributeUI?.render(this.attributeManager.getAll());
+        this.savingThrowsManager?.updateFromAttributes();
+        this.calcularPercepcionPasiva();
+        
+        closeModal();
+        Helpers.showMessage('✅ Atributos actualizados correctamente', 'success');
+        
+        if (this.hasValidCharacterName()) {
+            this.saveCharacter();
+        }
+    });
+}
+
+// MODIFICAR el método aplicarAtributosDeEspecie para manejar correctamente los valores
+aplicarAtributosDeEspecie(atributos) {
+    if (!atributos || typeof atributos !== 'object') return;
+    
+    // Si no hay atributos base guardados, guardar los actuales primero
+    if (!this.atributosBaseGuardados) {
+        this.guardarAtributosBase();
+    }
+    
+    console.log('📊 Aplicando atributos de especie (reemplazando):', atributos);
+    
+    // Mapeo de nombres de atributos a sus formas estándar
+    const nombreMap = {
+        'fuerza': 'Fuerza',
+        'str': 'Fuerza',
+        'strength': 'Fuerza',
+        'destreza': 'DESTREZA',
+        'dex': 'DESTREZA',
+        'dexterity': 'DESTREZA',
+        'constitución': 'CONSTITUCIÓN',
+        'con': 'CONSTITUCIÓN',
+        'constitution': 'CONSTITUCIÓN',
+        'inteligencia': 'INTELIGENCIA',
+        'int': 'INTELIGENCIA',
+        'intelligence': 'INTELIGENCIA',
+        'sabiduría': 'SABIDURÍA',
+        'wis': 'SABIDURÍA',
+        'wisdom': 'SABIDURÍA',
+        'carisma': 'CARISMA',
+        'cha': 'CARISMA',
+        'charisma': 'CARISMA'
+    };
+    
+    // Separar atributos fijos de los personalizables
+    const atributosFijos = {};
+    const atributosPersonalizables = [];
+    
+    for (const [nombreAttr, incremento] of Object.entries(atributos)) {
+        if (typeof incremento !== 'number') continue;
+        
+        const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
+        const nombreLower = nombreAttr.toLowerCase();
+        
+        // Detectar si es un atributo personalizable (no es un nombre de atributo estándar)
+        const esAtributoEstandar = Object.keys(nombreMap).some(key => 
+            key === nombreLower || nombreMap[key]?.toLowerCase() === nombreLower
+        );
+        
+        if (!esAtributoEstandar && (incremento === 1 || incremento === 2)) {
+            // Es un incremento personalizable
+            atributosPersonalizables.push({ originalName: nombreAttr, incremento });
+        } else {
+            // Es un atributo fijo
+            atributosFijos[nombreNormalizado] = incremento;
+        }
+    }
+    
+    // Primero, restaurar valores base
+    this.restaurarAtributosBase();
+    
+    // Luego aplicar los incrementos fijos
+    const atributosActuales = this.attributeManager.getAll();
+    
+    for (const [nombreAttr, incremento] of Object.entries(atributosFijos)) {
+        const attrExistente = atributosActuales.find(attr => 
+            attr.name === nombreAttr || 
+            attr.name.toUpperCase() === nombreAttr.toUpperCase()
+        );
+        
+        if (attrExistente) {
+            let valorBase = 10;
+            if (this.atributosBaseGuardados) {
+                const baseGuardado = this.atributosBaseGuardados.find(a => a.id === attrExistente.id);
+                if (baseGuardado) {
+                    valorBase = baseGuardado.value;
+                }
+            }
+            
+            const nuevoValor = valorBase + incremento;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            
+            console.log(`📈 Aplicando ${nombreAttr}: base ${valorBase} +${incremento} = ${valorLimitado}`);
+            this.attributeManager.update(attrExistente.id, { value: valorLimitado });
+        } else {
+            const nuevoValor = 10 + incremento;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            console.log(`➕ Creando nuevo atributo: ${nombreAttr} con valor ${valorLimitado}`);
+            this.attributeManager.add(nombreAttr, valorLimitado);
+        }
+    }
+    
+    // Si hay atributos personalizables, mostrar modal
+    if (atributosPersonalizables.length > 0) {
+        // Guardar temporalmente los atributos personalizables para el modal
+        this.atributosPersonalizablesPendientes = atributosPersonalizables;
+        this.mostrarModalSeleccionAtributos(atributosPersonalizables);
+    }
+    
+    // Forzar actualización de UI
+    this.attributeUI?.render(this.attributeManager.getAll());
+    this.savingThrowsManager?.updateFromAttributes();
+    this.calcularPercepcionPasiva();
+    
+    // Guardar automáticamente
+    if (this.hasValidCharacterName()) {
+        this.saveCharacter();
+    }
+}
+
+/**
+ * Guarda los valores actuales de los atributos como base
+ * para poder restaurarlos después
+ */
+guardarAtributosBase() {
+    const atributosActuales = this.attributeManager.getAll();
+    this.atributosBaseGuardados = atributosActuales.map(attr => ({
+        id: attr.id,
+        name: attr.name,
+        value: attr.value,
+        modifier: attr.modifier
+    }));
+    console.log('💾 Atributos base guardados:', this.atributosBaseGuardados);
+}
+
+/**
+ * Restaura los atributos a sus valores base originales
+ */
+restaurarAtributosBase() {
+    if (!this.atributosBaseGuardados) return;
+    
+    console.log('🔄 Restaurando atributos base...');
+    
+    // Primero, eliminar atributos que no están en la base
+    const idsBase = new Set(this.atributosBaseGuardados.map(a => a.id));
+    const atributosActuales = this.attributeManager.getAll();
+    
+    // Eliminar atributos extra que se hayan añadido
+    for (const attr of atributosActuales) {
+        if (!idsBase.has(attr.id)) {
+            console.log(`🗑️ Eliminando atributo extra: ${attr.name}`);
+            this.attributeManager.remove(attr.id);
+        }
+    }
+    
+    // Restaurar valores de atributos existentes
+    for (const attrBase of this.atributosBaseGuardados) {
+        const attrActual = this.attributeManager.getById(attrBase.id);
+        if (attrActual) {
+            if (attrActual.value !== attrBase.value) {
+                console.log(`📊 Restaurando ${attrBase.name}: ${attrActual.value} -> ${attrBase.value}`);
+                this.attributeManager.update(attrBase.id, { value: attrBase.value });
+            }
+        } else {
+            // Si el atributo base no existe, crearlo
+            console.log(`➕ Recreando atributo base: ${attrBase.name}`);
+            this.attributeManager.add(attrBase.name, attrBase.value);
+        }
+    }
+    
+    // Forzar actualización de UI
+    this.attributeUI?.render(this.attributeManager.getAll());
+}
+
+/**
+ * Aplica los aumentos de atributo de una especie (reemplazando valores base)
+ * @param {Object} atributos - Objeto con los atributos a modificar ej: { "Fuerza": 2, "Destreza": 1 }
+ */
+aplicarAtributosDeEspecie(atributos) {
+    if (!atributos || typeof atributos !== 'object') return;
+    
+    // Si no hay atributos base guardados, guardar los actuales primero
+    if (!this.atributosBaseGuardados) {
+        this.guardarAtributosBase();
+    }
+    
+    console.log('📊 Aplicando atributos de especie (reemplazando):', atributos);
+    
+    // Mapeo de nombres de atributos a sus formas estándar
+    const nombreMap = {
+        'fuerza': 'Fuerza',
+        'str': 'Fuerza',
+        'strength': 'Fuerza',
+        'destreza': 'DESTREZA',
+        'dex': 'DESTREZA',
+        'dexterity': 'DESTREZA',
+        'constitución': 'CONSTITUCIÓN',
+        'con': 'CONSTITUCIÓN',
+        'constitution': 'CONSTITUCIÓN',
+        'inteligencia': 'INTELIGENCIA',
+        'int': 'INTELIGENCIA',
+        'intelligence': 'INTELIGENCIA',
+        'sabiduría': 'SABIDURÍA',
+        'wis': 'SABIDURÍA',
+        'wisdom': 'SABIDURÍA',
+        'carisma': 'CARISMA',
+        'cha': 'CARISMA',
+        'charisma': 'CARISMA'
+    };
+    
+    // Primero, restaurar valores base
+    this.restaurarAtributosBase();
+    
+    // Luego aplicar los nuevos incrementos
+    const atributosActuales = this.attributeManager.getAll();
+    
+    for (const [nombreAttr, incremento] of Object.entries(atributos)) {
+        if (typeof incremento !== 'number') continue;
+        
+        // Normalizar el nombre del atributo
+        const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
+        
+        // Buscar el atributo en la lista actual
+        const attrExistente = atributosActuales.find(attr => 
+            attr.name === nombreNormalizado || 
+            attr.name.toUpperCase() === nombreNormalizado.toUpperCase()
+        );
+        
+        if (attrExistente) {
+            // Usar el valor base (10) como punto de partida
+            // El valor base puede ser el original del atributo
+            let valorBase = 10;
+            
+            // Si tenemos el valor base guardado, usarlo
+            if (this.atributosBaseGuardados) {
+                const baseGuardado = this.atributosBaseGuardados.find(a => a.id === attrExistente.id);
+                if (baseGuardado) {
+                    valorBase = baseGuardado.value;
+                }
+            }
+            
+            const nuevoValor = valorBase + incremento;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            
+            console.log(`📈 Aplicando ${nombreNormalizado}: base ${valorBase} +${incremento} = ${valorLimitado}`);
+            
+            // Actualizar el atributo
+            this.attributeManager.update(attrExistente.id, { value: valorLimitado });
+        } else {
+            // Atributo no existe, crearlo con valor base 10 + incremento
+            const nuevoValor = 10 + incremento;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            
+            console.log(`➕ Creando nuevo atributo: ${nombreNormalizado} con valor ${valorLimitado}`);
+            
+            this.attributeManager.add(nombreNormalizado, valorLimitado);
+        }
+    }
+    
+    // Forzar actualización de UI de atributos
+    this.attributeUI?.render(this.attributeManager.getAll());
+    
+    // Recalcular tiradas de salvación y percepción pasiva
+    this.savingThrowsManager?.updateFromAttributes();
+    this.calcularPercepcionPasiva();
+    
+    // Mostrar mensaje de confirmación
+    const cambios = Object.entries(atributos)
+        .map(([attr, val]) => `${attr} +${val}`)
+        .join(', ');
+    
+    // Guardar automáticamente
+    if (this.hasValidCharacterName()) {
+        this.saveCharacter();
+    }
+}
+
+    setupRaceClearHandler() {
+    const raceInput = document.getElementById('char-race');
+    if (!raceInput) return;
+    
+    raceInput.addEventListener('input', (e) => {
+        const value = e.target.value.trim();
+        if (value === '') {
+            // Si el usuario borra la raza, no hacemos nada con la descripción
+            // (dejamos que la mantenga o se pueda limpiar manualmente)
+        }
+    });
+}
 
     setupSpellStatsEvents() {
     const spellcastingAbilitySelect = document.getElementById('spellcastingAbility');

@@ -97,7 +97,7 @@ setupWebSocketHandlers(io);
 // ===== RUTAS DE IA =====
 app.use('/api/ai', aiRoutes);
 
-console.log('🤖 Rutas de IA con Groq configuradas:');
+console.log('   - Rutas de IA configuradas:');
 console.log('   - GET  /api/ai/status');
 console.log('   - POST /api/ai/chat');
 console.log('   - POST /api/ai/chat/stream');
@@ -254,6 +254,55 @@ app.get('/api/usuarios', async (req, res) => {
         res.json(usuarios);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/json/especies', async (req, res) => {
+    try {
+        const especiesPath = path.join(DATA_PATH, 'especies.jsonl');
+        
+        console.log(`📖 Leyendo especies desde: ${especiesPath}`);
+        
+        // Verificar si el archivo existe
+        try {
+            await fs.access(especiesPath);
+        } catch (e) {
+            console.error('❌ Archivo no encontrado:', especiesPath);
+            return res.status(404).json({ error: 'Archivo de especies no encontrado' });
+        }
+        
+        // Leer el archivo como texto
+        const content = await fs.readFile(especiesPath, 'utf8');
+        
+        // Detectar si es JSONL (comienza con { y NO con [)
+        const isJSONL = content.trim().startsWith('{') && !content.trim().startsWith('[');
+        
+        if (isJSONL) {
+            // Procesar JSONL: una línea por especie
+            const lines = content.trim().split('\n').filter(line => line.trim());
+            const species = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                try {
+                    const obj = JSON.parse(lines[i]);
+                    species.push(obj);
+                } catch (e) {
+                    console.warn(`⚠️ Error parseando línea ${i + 1}:`, e.message);
+                    // Continuar con la siguiente línea
+                }
+            }
+            
+            console.log(`✅ ${species.length} especies cargadas (formato JSONL)`);
+            res.json(species);
+        } else {
+            // Procesar JSON normal (array)
+            const species = JSON.parse(content);
+            console.log(`✅ ${species.length} especies cargadas (formato JSON array)`);
+            res.json(species);
+        }
+    } catch (error) {
+        console.error('❌ Error leyendo especies.json:', error);
+        res.status(500).json({ error: 'Error al cargar especies', details: error.message });
     }
 });
 
@@ -798,9 +847,6 @@ app.get('/', (req, res) => {
     await limpiarArchivosAntiguos(30);
     
     server.listen(PORT, () => {
-        console.log(`\n🚀 Servidor HTTP corriendo en ${SERVER_URL}`);
-        console.log(`🔌 WebSocket server activo en ws://localhost:${PORT}`);
-        console.log(`\n🤖 IA con Groq activa y lista para usar!`);
-        console.log(`📄 Análisis de PDF disponible con extracción de texto mejorada`);
-    });
+        console.log(`\n Servidor HTTP corriendo en ${SERVER_URL}`);
+        console.log(`WebSocket server activo en ws://localhost:${PORT}`);});
 })();

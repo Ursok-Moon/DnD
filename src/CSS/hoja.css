@@ -3245,3 +3245,111 @@ img, svg, iframe, video, embed {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(106, 13, 173, 0.4);
 }
+
+/* Estilos para resultados de búsqueda de razas */
+.search-results .highlight {
+    background-color: var(--accent-gold);
+    color: var(--ink-black);
+    font-weight: bold;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
+.search-results li:hover {
+    background: var(--parchment-light) !important;
+}
+
+.search-results li.selected {
+    background: var(--parchment-light);
+}
+
+/* Estilos para el editor enriquecido */
+.rich-editor-container {
+    position: relative;
+    width: 100%;
+}
+
+.rich-editor-content h1 {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--accent-purple);
+    margin: 15px 0 10px;
+    font-family: 'Cinzel', serif;
+    border-left: 4px solid var(--accent-gold);
+    padding-left: 12px;
+}
+
+.rich-editor-content h2 {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--accent-blue);
+    margin: 12px 0 8px;
+    font-family: 'Cinzel', serif;
+}
+
+.rich-editor-content h3 {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--accent-teal);
+    margin: 10px 0 6px;
+    font-style: italic;
+}
+
+.rich-editor-content strong {
+    font-weight: bold;
+    color: var(--accent-purple);
+}
+
+.rich-editor-content em {
+    font-style: italic;
+    color: var(--accent-gold);
+}
+
+.rich-editor-content ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.rich-editor-content li {
+    margin: 4px 0;
+}
+
+.rich-editor-content blockquote {
+    border-left: 3px solid var(--accent-gold);
+    margin: 10px 0;
+    padding-left: 15px;
+    color: var(--ink-light);
+    font-style: italic;
+}
+
+/* Estilos para resultados de búsqueda de conjuros */
+.spell-search-results .highlight {
+    background-color: #d4af37;
+    color: #1a0f0a;
+    font-weight: bold;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
+.spell-search-results li:hover {
+    background: #f5e6d3 !important;
+}
+
+.spell-search-results {
+    scrollbar-width: thin;
+    scrollbar-color: #d4af37 #e8d5b7;
+}
+
+.spell-search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+.spell-search-results::-webkit-scrollbar-track {
+    background: #e8d5b7;
+    border-radius: 3px;
+}
+
+.spell-search-results::-webkit-scrollbar-thumb {
+    background: #d4af37;
+    border-radius: 3px;
+}

@@ -42,7 +42,7 @@ export class SpellUI {
         });
         
         this.spellSlotsManager.subscribe((slots) => {
-            console.log('💎 Slots actualizados:', slots);
+            console.log('Slots actualizados:', slots);
             this.renderSpellSlots(slots);
         });
         
@@ -51,7 +51,7 @@ export class SpellUI {
         
         // Render inicial
         const initialSlots = this.spellSlotsManager.getData();
-        console.log('🎯 Render inicial con slots:', initialSlots);
+        console.log(' Render inicial con slots:', initialSlots);
         this.renderSpellSlots(initialSlots);
     }
 
@@ -162,32 +162,32 @@ export class SpellUI {
         });
     }
 
-    // NUEVO: Actualizar solo un campo específico sin reconstruir todo
     updateSpellField(spellId, updates) {
-        const spellItem = this.container?.querySelector(`[data-id="${spellId}"]`);
-        if (!spellItem) return;
-        
-        if (updates.name !== undefined) {
-            const nameInput = spellItem.querySelector('.spell-name');
-            if (nameInput && nameInput.value !== updates.name) {
-                nameInput.value = updates.name;
-            }
-        }
-        
-        if (updates.level !== undefined) {
-            const levelInput = spellItem.querySelector('.spell-level-input');
-            if (levelInput && levelInput.value !== updates.level) {
-                levelInput.value = updates.level;
-            }
-        }
-        
-        if (updates.description !== undefined) {
-            const descTextarea = spellItem.querySelector('.spell-desc');
-            if (descTextarea && descTextarea.value !== updates.description) {
-                descTextarea.value = updates.description;
-            }
+    const spellItem = this.container?.querySelector(`[data-id="${spellId}"]`);
+    if (!spellItem) return;
+    
+    if (updates.name !== undefined && updates.name !== '') {
+        const nameInput = spellItem.querySelector('.spell-name');
+        if (nameInput && nameInput.value !== updates.name) {
+            nameInput.value = updates.name;
         }
     }
+    
+    // IMPORTANTE: Validar que el nivel no sea undefined o null
+    if (updates.level !== undefined && updates.level !== '' && updates.level !== null) {
+        const levelInput = spellItem.querySelector('.spell-level-input');
+        if (levelInput && levelInput.value != updates.level) {  // Usar != para comparar número vs string
+            levelInput.value = updates.level;
+        }
+    }
+    
+    if (updates.description !== undefined) {
+        const descTextarea = spellItem.querySelector('.spell-desc');
+        if (descTextarea && descTextarea.value !== updates.description) {
+            descTextarea.value = updates.description;
+        }
+    }
+}
 
     // NUEVO: Actualizar solo el estado de preparado
     updateSpellPrepared(spellId, prepared) {
@@ -268,58 +268,55 @@ export class SpellUI {
             .replace(/'/g, '&#039;');
     }
 
-    // NUEVO: Adjuntar eventos con debounce para no saturar
     attachSpellEvents(item, spell) {
-        const preparedIcon = item.querySelector('.spell-prepared');
-        const nameInput = item.querySelector('.spell-name');
-        const levelInput = item.querySelector('.spell-level-input');
-        const descTextarea = item.querySelector('.spell-desc');
-        const removeBtn = item.querySelector('.btn-remove-spell');
-        
-        const spellId = spell.id;
-        const self = this;
-        
-        // Evento para preparado
-        preparedIcon.addEventListener('click', function(e) {
-            e.stopPropagation();
-            self.spellManager.togglePrepared(spellId);
-        });
-        
-        // Evento para nombre
-        let nameTimeout;
-        nameInput.addEventListener('input', function() {
-            clearTimeout(nameTimeout);
-            nameTimeout = setTimeout(() => {
-                self.spellManager.update(spellId, { name: this.value });
-            }, 3000);
-        });
-        
-        // Evento para nivel 
-        let levelTimeout;
-        levelInput.addEventListener('input', function() {
-            clearTimeout(levelTimeout);
-            levelTimeout = setTimeout(() => {
-                self.spellManager.update(spellId, { level: this.value });
-            }, 3000);
-        });
-        
-        // Evento para descripción 
-        let descTimeout;
-        descTextarea.addEventListener('input', function() {
-            clearTimeout(descTimeout);
-            descTimeout = setTimeout(() => {
-                self.spellManager.update(spellId, { description: this.value });
-            }, 3000);
-        });
-        
-        // Evento para eliminar
-        removeBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (confirm('¿Eliminar este conjuro?')) {
-                self.spellManager.remove(spellId);
-            }
-        });
-    }
+    const preparedIcon = item.querySelector('.spell-prepared');
+    const nameInput = item.querySelector('.spell-name');
+    const levelInput = item.querySelector('.spell-level-input');
+    const descTextarea = item.querySelector('.spell-desc');
+    const removeBtn = item.querySelector('.btn-remove-spell');
+    
+    const spellId = spell.id;
+    const self = this;
+    
+    preparedIcon.addEventListener('click', function(e) {
+        e.stopPropagation();
+        self.spellManager.togglePrepared(spellId);
+    });
+    
+    // Para nombre - guardado inmediato en lugar de timeout
+    nameInput.addEventListener('change', function() {
+        if (this.value !== spell.name) {
+            self.spellManager.update(spellId, { name: this.value });
+        }
+    });
+    
+    // Para nivel - guardado inmediato y validación
+    levelInput.addEventListener('change', function() {
+        let levelValue = this.value.trim();
+        // Si está vacío, mantener el valor anterior
+        if (levelValue === '') {
+            this.value = spell.level;
+            return;
+        }
+        if (this.value !== spell.level) {
+            self.spellManager.update(spellId, { level: this.value });
+        }
+    });
+    
+    // Para descripción - guardado inmediato
+    descTextarea.addEventListener('change', function() {
+        if (this.value !== spell.description) {
+            self.spellManager.update(spellId, { description: this.value });
+        }
+    });
+    
+    removeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (confirm('¿Eliminar este conjuro?')) {
+            self.spellManager.remove(spellId);
+        }
+    });
+}
 
     // MODIFICADO: Renderizar todos los conjuros (solo para carga inicial)
     renderSpells(spells) {

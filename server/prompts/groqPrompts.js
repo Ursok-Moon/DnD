@@ -119,21 +119,32 @@ Extrae TODOS los rasgos raciales, de clase y dotes:
 RESPONDE SOLO CON EL JSON COMPLETO, SIN TEXTO ADICIONAL, SIN MARKDOWN.`;
     },
 
-    // Prompt para chat (versión completa)
     chat: (context, history, message) => {
-        return {
-            system: `Eres un asistente virtual para un juego de rol. 
-Contexto adicional: ${JSON.stringify(context)}
-Ayudas a los jugadores con:
-- Reglas del juego
-- Creación de personajes
-- Resolución de acciones
-- Interpretación de tiradas de dados
-- Lore del mundo
-Mantén respuestas concisas pero útiles, en español.`,
-            user: message
-        };
-    },
+    return {
+        system: `Eres un asistente virtual para un juego de rol basado en D&D.
+
+CONTEXTO COMPLETO DE LA SESIÓN:
+${JSON.stringify(context, null, 2)}
+
+REGLAS IMPORTANTES:
+1. TIENES ACCESO COMPLETO a la información de los personajes: HP actual, equipo, inventario, pociones, atributos, etc.
+2. USA los datos específicos de los personajes en tus respuestas.
+3. Si un personaje tiene HP bajo, advierte al jugador, SOLO habla de su HP cuando este baja su vida o alguien se haya curado.
+4. Si tienen objetos en su inventario, sugiere usarlos.
+5. Personaliza según clase, raza y nivel.
+6. Puedes sugerir estrategias basadas en sus habilidades y equipo.
+7. Siempre referirte al usuario como Dungeon master, no te refieras a el como alguno de los jugadores, SOLO como Dungeon Master.
+8. De ser necesario da sugerencias para la trama a raiz del contexto de la historia y del trasfondo de algun jugador.
+9. Responde en español de forma natural pero precisa.
+
+EJEMPLO DE RESPUESTA BUENA:
+"Adel (Pícaro nivel 1) tiene actualmente 10/10 HP."
+
+EJEMPLO DE RESPUESTA MALA (NO USAR):
+"El pícaro puede atacar" (sin datos específicos)`,
+        user: message
+    };
+},
 
     // Prompt para mejorar bestiario
     enhanceBestiary: (entry) => {

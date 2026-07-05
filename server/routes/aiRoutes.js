@@ -18,7 +18,11 @@ import {
     generateRPGContent,
     getCharacterContext,
     refreshCharacterContext,
-    searchCharacter
+    searchCharacter,
+    updateCombatState,
+    updateCustomBestiary,
+    getDMContext,
+    resetCombat
 } from '../controllers/aiController.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -151,6 +155,14 @@ router.post('/characters/detect', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// Estado de combate del DM
+router.post('/dm/combat/update', updateCombatState);
+router.post('/dm/combat/reset', resetCombat);
+router.get('/dm/context', getDMContext);
+
+// Bestiario personalizado
+router.post('/dm/bestiary/update', updateCustomBestiary);
 
 // Exportar router
 export default router;

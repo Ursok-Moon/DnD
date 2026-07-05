@@ -44,6 +44,8 @@ class DMScreen {
         
         this.timerInterval = null;
         this.timerSeconds = 0;
+
+        this.enemyCustomSheets = {};
         
         // Propiedades para el bestiario - MODIFICADO
         this.bestiarioOriginal = null;      // Referencia original, nunca se modifica
@@ -68,6 +70,7 @@ class DMScreen {
         this.loadSession();
         this.loadBestiarioOriginal();
         this.cargarPersonajesHoy();
+        this.loadCustomSheetsFromStorage(); 
         this.setupEventListeners();
         this.setupPDFJS();
         this.setupRichTextEditor();
@@ -1847,10 +1850,8 @@ class DMScreen {
                 <div style="width: 100%; height: 200px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; margin-bottom: 10px; border: 2px solid var(--accent-gold);">
                     <i class="fas fa-dragon" style="font-size: 4rem; margin-bottom: 10px; opacity: 0.8;"></i>
                     <p style="font-family: 'MedievalSharp', cursive;">${entry.nombre}</p>
-                    <p style="font-size: 0.9rem; opacity: 0.7;">Imagen no disponible en el JSON</p>
                 </div>
             `;
-            if (imageSource) imageSource.textContent = 'No se encontró imagen en el JSON';
         }
         html += `</div>`;
         
@@ -1859,9 +1860,17 @@ class DMScreen {
         html += `<h2>${entry.nombre}</h2>`;
         
         if (entry.descripcion) {
-            html += `<p><em>${entry.descripcion}</em></p>`;
-        }
-        
+        // Dividir por saltos de línea dobles (\n\n) para crear párrafos
+        const parrafos = entry.descripcion.split(/\n\n/);
+        html += `<div class="descripcion-container">`;
+        parrafos.forEach(parrafo => {
+            // Reemplazar saltos de línea simples con <br>
+            const textoFormateado = parrafo.replace(/\n/g, '<br>');
+            html += `<p><em>${textoFormateado}</em></p>`;
+        });
+        html += `</div>`;
+    }
+
         if (entry.estadisticas && Object.keys(entry.estadisticas).length > 0) {
             const stats = entry.estadisticas;
             
@@ -2038,13 +2047,137 @@ class DMScreen {
         }
         
         if (!bestiaryEntry) {
-            this.showNotification(`No se encontró información para: ${entity.race || entity.name}`, 'error');
+            this.showCustomSheetModal(entity);
             return;
         }
         
         this.currentBestiaryEntry = bestiaryEntry;
         this.renderBestiaryModal(bestiaryEntry, entity);
     }
+
+    // ===== MÉTODO: Calcular HP desde bestiario =====
+calcularHpDesdeBestiario(enemy) {
+    if (!enemy.race) {
+        console.warn(`⚠️ ${enemy.name} no tiene raza especificada`);
+        return null;
+    }
+    
+    const searchTerm = enemy.race.toUpperCase().trim();
+    
+    // Buscar en la fuente actual del bestiario
+    let bestiaryEntry = this.bestiarioActual.find(entry => 
+        entry.nombre === searchTerm
+    );
+    
+    if (!bestiaryEntry) {
+        bestiaryEntry = this.bestiarioActual.find(entry => 
+            entry.nombre.startsWith(searchTerm)
+        );
+    }
+    
+    if (!bestiaryEntry) {
+        const searchWords = searchTerm.split(/\s+/);
+        bestiaryEntry = this.bestiarioActual.find(entry => {
+            const entryWords = entry.nombre.split(/\s+/);
+            return searchWords.some(searchWord => 
+                entryWords.some(entryWord => entryWord === searchWord)
+            );
+        });
+    }
+    
+    if (bestiaryEntry && bestiaryEntry.estadisticas && bestiaryEntry.estadisticas.pg) {
+        const pgString = bestiaryEntry.estadisticas.pg.toString();
+        console.log(`📖 Buscando HP para ${enemy.race}: "${pgString}"`);
+        
+        // Buscar patrón como "39 (6d10+6)" o "45 (4d8+2)" o "22 (5d8)"
+        const diceMatch = pgString.match(/(\d+)d(\d+)(?:\s*\+\s*(\d+))?/i);
+        
+        if (diceMatch) {
+            const numDice = parseInt(diceMatch[1]);
+            const diceSides = parseInt(diceMatch[2]);
+            const bonus = diceMatch[3] ? parseInt(diceMatch[3]) : 0;
+            
+            let total = 0;
+            const rolls = [];
+            for (let i = 0; i < numDice; i++) {
+                const roll = Math.floor(Math.random() * diceSides) + 1;
+                rolls.push(roll);
+                total += roll;
+            }
+            total += bonus;
+            
+            console.log(`🎲 ${enemy.name} (${enemy.race}): ${numDice}d${diceSides}+${bonus} = [${rolls.join(' + ')}] + ${bonus} = ${total} PG`);
+            return total;
+        } else {
+            // Si hay un número fijo (ej: "45" sin dados)
+            const fixedMatch = pgString.match(/(\d+)/);
+            if (fixedMatch) {
+                const fixedValue = parseInt(fixedMatch[1]);
+                console.log(`📊 ${enemy.name} (${enemy.race}): HP fijo = ${fixedValue} PG`);
+                return fixedValue;
+            }
+        }
+    } else {
+        console.warn(`⚠️ No se encontró entrada en bestiario para: ${enemy.race}`);
+    }
+    
+    return null;
+}
+
+// ===== MÉTODO: Tirar PG para todos los enemigos =====
+rollAllEnemiesHp() {
+    if (this.enemies.length === 0) {
+        this.showNotification('No hay enemigos para tirar PG', 'warning');
+        return;
+    }
+    
+    let updatedCount = 0;
+    const results = [];
+    
+    this.enemies.forEach(enemy => {
+        if (enemy.type === 'enemy') {
+            const newHp = this.calcularHpDesdeBestiario(enemy);
+            
+            if (newHp !== null && newHp > 0) {
+                const oldHp = enemy.hp;
+                const oldMaxHp = enemy.maxHp;
+                
+                enemy.maxHp = newHp;
+                enemy.hp = newHp; // El HP actual también se actualiza al nuevo máximo
+                
+                results.push({
+                    name: enemy.name,
+                    race: enemy.race,
+                    oldHp: oldMaxHp,
+                    newHp: newHp
+                });
+                
+                updatedCount++;
+                console.log(`💚 ${enemy.name}: ${oldMaxHp} → ${newHp} PG`);
+            } else {
+                console.warn(`⚠️ No se pudo calcular HP para ${enemy.name} (raza: ${enemy.race || 'no especificada'})`);
+            }
+        }
+    });
+    
+    if (updatedCount > 0) {
+        // Actualizar las listas visuales
+        this.updateEnemiesList();
+        this.updateInitiativeOrder(); // Por si algún enemigo tenía HP modificado manualmente
+        
+        // Mostrar resumen
+        let summary = `${updatedCount}/${this.enemies.length} enemigos actualizados:\n`;
+        results.forEach(r => {
+            summary += `• ${r.name}: ${r.oldHp} → ${r.newHp} PG\n`;
+        });
+        console.log(summary);
+        
+        const fuenteLabel = this.fuenteBestiarioActual === 'original' ? 'original' : 'personalizado';
+        this.showNotification(`✅ ${updatedCount} enemigos con PG recalculados (bestiario ${fuenteLabel})`, 'success');
+    } else {
+        this.showNotification('No se pudo calcular HP para ningún enemigo. Verifica que tengan raza especificada y exista en el bestiario.', 'error');
+    }
+}
     
     rollAllEnemiesInitiative() {
         let updated = false;
@@ -2146,6 +2279,10 @@ class DMScreen {
         
         const rollAllInitiative = document.getElementById('rollAllInitiative');
         if (rollAllInitiative) rollAllInitiative.addEventListener('click', () => this.rollAllEnemiesInitiative());
+
+        const rollAllHpBtn = document.getElementById('rollAllHpBtn');
+        if (rollAllHpBtn) rollAllHpBtn.addEventListener('click', () => this.rollAllEnemiesHp());
+
         
         const nextTurnBtn = document.getElementById('nextTurnBtn');
         if (nextTurnBtn) nextTurnBtn.addEventListener('click', () => this.nextTurn());
@@ -2345,11 +2482,45 @@ class DMScreen {
         
         const initiativeOrder = document.getElementById('initiativeOrder');
         if (initiativeOrder) initiativeOrder.addEventListener('click', (e) => this.handleInitiativeClick(e));
+
+        const addSummonBtn = document.getElementById('addSummonBtn');
+        if (addSummonBtn) {
+            addSummonBtn.addEventListener('click', () => this.addSummon());
+        }
+
+        // Actualizar la lista de invocadores cuando cambien los jugadores
+        this.updateSummonInvocadoresList();
         
         setTimeout(() => {
             this.setupJugadoresAutocomplete();
         }, 500);
     }
+
+    updateSummonInvocadoresList() {
+    const select = document.getElementById('summonInvocadorSelect');
+    if (!select) return;
+    
+    // Guardar valor seleccionado actual
+    const currentValue = select.value;
+    
+    // Limpiar opciones
+    select.innerHTML = '<option value="">Seleccionar invocador</option>';
+    
+    // Agregar jugadores (excluyendo invocaciones)
+    this.players
+        .filter(p => p.type === 'player')
+        .forEach(player => {
+            const option = document.createElement('option');
+            option.value = player.id;
+            option.textContent = `${player.name} (Iniciativa: ${player.initiative})`;
+            select.appendChild(option);
+        });
+    
+    // Restaurar selección si existe
+    if (currentValue && this.players.some(p => p.id === currentValue)) {
+        select.value = currentValue;
+    }
+}
     
     setupDrawingCanvas() {
         const canvas = document.getElementById('dmCanvas');
@@ -2680,6 +2851,7 @@ class DMScreen {
                 ca: finalCA,
                 hp: finalHP || 10,
                 maxHp: finalMaxHp || 10,
+                tempHp: 0,
                 type: 'enemy'
             };
             
@@ -2707,6 +2879,537 @@ class DMScreen {
             this.showNotification(`Enemigo "${baseName}" añadido (Iniciativa: ${this.enemies[this.enemies.length - 1].initiative})`, 'success');
         }
     }
+
+    showCustomSheetModal(entity) {
+    let modal = document.getElementById('customSheetModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'customSheetModal';
+        modal.className = 'custom-sheet-modal';
+        modal.innerHTML = `
+            <div class="custom-sheet-modal-content">
+                <span class="close-modal">&times;</span>
+                <div class="section-header" style="background: linear-gradient(90deg, var(--accent-gold), var(--accent-blue)); padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-gold); border-radius: 8px 8px 0 0;">
+                    <h2 id="customSheetTitle" style="font-family: 'MedievalSharp', cursive; color: white; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3); margin: 0;">
+                        <i class="fas fa-file-pdf"></i> Ficha Personalizada
+                    </h2>
+                    <div class="section-controls" style="display: flex; gap: 10px;">
+                        <input type="file" id="customSheetFileInput" accept=".pdf" style="display: none;">
+                        <button class="section-btn" id="customSheetUploadBtn" style="padding: 8px 16px; background: var(--accent-blue); color: white; border: none; border-radius: 4px; font-family: 'Cinzel', serif; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; transition: all 0.3s ease;">
+                            <i class="fas fa-file-upload"></i> Cargar PDF
+                        </button>
+                        <button class="section-btn" id="customSheetRemovePdf" style="padding: 8px 16px; background: var(--accent-red); color: white; border: none; border-radius: 4px; font-family: 'Cinzel', serif; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; transition: all 0.3s ease;">
+                            <i class="fas fa-trash"></i> Limpiar
+                        </button>
+                        <button class="section-btn" id="customSheetCloseBtn" style="padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; font-family: 'Cinzel', serif; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; transition: all 0.3s ease;">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="custom-sheet-info" style="text-align: center; padding: 15px; background: rgba(212, 175, 55, 0.1); border-bottom: 1px solid var(--accent-gold);">
+                    <p style="color: var(--ink-dark); margin: 8px 0;">
+                        <i class="fas fa-info-circle" style="color: var(--accent-gold); margin-right: 8px;"></i> 
+                        No se encontró información para: <strong id="customSheetEntityName" style="color: var(--accent-purple);"></strong>
+                    </p>
+                </div>
+                
+                <div class="pdf-container" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--parchment-light);">
+                    <!-- Barra de herramientas del PDF -->
+                    <div class="pdf-toolbar" style="background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-gold);">
+                        <div class="pdf-info" style="display: flex; align-items: center; gap: 30px; color: white;">
+                            <span id="customSheetPdfTitle" style="font-weight: bold; font-size: 1.1rem;">No hay PDF cargado</span>
+                            <div class="page-input-group" style="display: flex; align-items: center; gap: 5px;">
+                                <span class="page-info" style="background: rgba(255, 255, 255, 0.2); padding: 5px 15px; border-radius: 20px; font-size: 0.9rem;">Página: </span>
+                                <input type="number" id="customSheetPageInput" class="page-input" min="1" value="1" disabled style="width: 50px; padding: 3px 5px; border: 1px solid white; border-radius: 4px; background: rgba(255, 255, 255, 0.2); color: white; text-align: center; font-family: 'Cinzel', serif;">
+                                <span class="page-info" style="background: rgba(255, 255, 255, 0.2); padding: 5px 15px; border-radius: 20px; font-size: 0.9rem;">/ <span id="customSheetTotalPages">-</span></span>
+                            </div>
+                        </div>
+                        <div class="pdf-controls" style="display: flex; align-items: center; gap: 15px;">
+                            <button class="pdf-control-btn" id="customSheetPrevBtn" disabled style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); border: 1px solid white; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="pdf-control-btn" id="customSheetNextBtn" disabled style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); border: 1px solid white; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                            <div class="zoom-controls" style="display: flex; align-items: center; gap: 10px;">
+                                <button class="pdf-control-btn" id="customSheetZoomOutBtn" disabled style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); border: 1px solid white; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <span class="zoom-level" id="customSheetZoomLevel" style="color: white; font-weight: bold; min-width: 50px; text-align: center;">100%</span>
+                                <button class="pdf-control-btn" id="customSheetZoomInBtn" disabled style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); border: 1px solid white; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Visor PDF -->
+                    <div class="pdf-viewer" id="customSheetPdfViewer" style="flex: 1; background: var(--parchment-light); overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: center;">
+                        <div class="pdf-placeholder" id="customSheetPlaceholder" style="text-align: center; color: var(--ink-light); max-width: 400px;">
+                            <i class="fas fa-file-pdf" style="font-size: 4rem; color: var(--accent-gold); opacity: 0.7; margin-bottom: 20px;"></i>
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-family: 'MedievalSharp', cursive;">Ficha Personalizada</h3>
+                            <p style="margin-bottom: 20px; font-size: 1.1rem;">Carga un PDF con la ficha de esta criatura</p>
+                            <button class="upload-btn" id="customSheetPlaceholderUploadBtn" style="padding: 12px 30px; background: linear-gradient(145deg, var(--accent-blue), var(--accent-purple)); color: white; border: none; border-radius: 6px; font-family: 'Cinzel', serif; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                                <i class="fas fa-cloud-upload-alt"></i> Seleccionar PDF
+                            </button>
+                            <p class="placeholder-hint" style="font-size: 0.9rem; opacity: 0.7;">Formatos soportados: .pdf</p>
+                        </div>
+                        <canvas id="customSheetCanvas" style="display: none; max-width: 100%; border: 1px solid var(--accent-gold); border-radius: 8px; background: white; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);"></canvas>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Eventos de cierre
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Actualizar título y nombre
+    const title = document.getElementById('customSheetTitle');
+    const entityName = document.getElementById('customSheetEntityName');
+    const pdfTitle = document.getElementById('customSheetPdfTitle');
+    if (title) title.innerHTML = `<i class="fas fa-file-pdf"></i> Ficha Personalizada - ${entity.name}`;
+    if (entityName) entityName.textContent = entity.race || entity.name;
+    if (pdfTitle) pdfTitle.textContent = 'No hay PDF cargado';
+    
+    // Guardar referencia al enemigo
+    modal._entity = entity;
+    modal._entityId = entity.id;
+    modal._customSheetPdfData = null; // Para almacenar datos del PDF
+    
+    // Verificar si ya hay un PDF cargado para este enemigo
+    const entityKey = entity.id || entity.name;
+    if (this.enemyCustomSheets[entityKey]) {
+        this.loadCustomSheetPdf(entityKey);
+    } else {
+        // Mostrar placeholder
+        this.showCustomSheetPlaceholder();
+    }
+    
+    // Configurar eventos
+    this.setupCustomSheetEvents(entity);
+    
+    // Mostrar el modal
+    modal.style.display = 'block';
+}
+
+showCustomSheetPlaceholder() {
+    const placeholder = document.getElementById('customSheetPlaceholder');
+    const canvas = document.getElementById('customSheetCanvas');
+    const pdfTitle = document.getElementById('customSheetPdfTitle');
+    const pageInput = document.getElementById('customSheetPageInput');
+    const totalPages = document.getElementById('customSheetTotalPages');
+    const zoomLevel = document.getElementById('customSheetZoomLevel');
+    
+    if (placeholder) placeholder.style.display = 'block';
+    if (canvas) canvas.style.display = 'none';
+    if (pdfTitle) pdfTitle.textContent = 'No hay PDF cargado';
+    if (pageInput) {
+        pageInput.value = '1';
+        pageInput.disabled = true;
+    }
+    if (totalPages) totalPages.textContent = '-';
+    if (zoomLevel) zoomLevel.textContent = '100%';
+    
+    // Deshabilitar controles
+    this.toggleCustomSheetControls(false);
+}
+
+toggleCustomSheetControls(enabled) {
+    const controls = [
+        'customSheetPrevBtn',
+        'customSheetNextBtn',
+        'customSheetZoomInBtn',
+        'customSheetZoomOutBtn',
+        'customSheetPageInput'
+    ];
+    
+    controls.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.disabled = !enabled;
+            if (id === 'customSheetPageInput') {
+                el.readOnly = !enabled;
+            }
+        }
+    });
+}
+setupCustomSheetEvents(entity) {
+    const entityKey = entity.id || entity.name;
+    
+    // Botón de carga desde el placeholder
+    const placeholderUploadBtn = document.getElementById('customSheetPlaceholderUploadBtn');
+    if (placeholderUploadBtn) {
+        const newBtn = placeholderUploadBtn.cloneNode(true);
+        placeholderUploadBtn.parentNode.replaceChild(newBtn, placeholderUploadBtn);
+        newBtn.addEventListener('click', () => {
+            document.getElementById('customSheetFileInput').click();
+        });
+    }
+    
+    // Botón de carga desde la barra de herramientas
+    const uploadBtn = document.getElementById('customSheetUploadBtn');
+    if (uploadBtn) {
+        const newUploadBtn = uploadBtn.cloneNode(true);
+        uploadBtn.parentNode.replaceChild(newUploadBtn, uploadBtn);
+        newUploadBtn.addEventListener('click', () => {
+            document.getElementById('customSheetFileInput').click();
+        });
+    }
+    
+    // Input file
+    const fileInput = document.getElementById('customSheetFileInput');
+    if (fileInput) {
+        const newFileInput = fileInput.cloneNode(true);
+        fileInput.parentNode.replaceChild(newFileInput, fileInput);
+        newFileInput.addEventListener('change', (e) => {
+            this.loadCustomSheetPdfFromFile(e.target.files[0], entity);
+            e.target.value = '';
+        });
+    }
+    
+    // Botón eliminar
+    const removeBtn = document.getElementById('customSheetRemovePdf');
+    if (removeBtn) {
+        const newRemoveBtn = removeBtn.cloneNode(true);
+        removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+        newRemoveBtn.addEventListener('click', () => {
+            if (confirm('¿Eliminar esta ficha personalizada?')) {
+                delete this.enemyCustomSheets[entityKey];
+                this.saveCustomSheetsToStorage();
+                this.showCustomSheetPlaceholder();
+                this.showNotification('Ficha eliminada', 'warning');
+            }
+        });
+    }
+    
+    // Botón cerrar
+    const closeBtn = document.getElementById('customSheetCloseBtn');
+    if (closeBtn) {
+        const newCloseBtn = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+        newCloseBtn.addEventListener('click', () => {
+            document.getElementById('customSheetModal').style.display = 'none';
+        });
+    }
+    
+    // Controles de página
+    this.setupCustomSheetPdfControls(entity);
+    
+    // Controles de zoom
+    const zoomInBtn = document.getElementById('customSheetZoomInBtn');
+    if (zoomInBtn) {
+        const newZoomIn = zoomInBtn.cloneNode(true);
+        zoomInBtn.parentNode.replaceChild(newZoomIn, zoomInBtn);
+        newZoomIn.addEventListener('click', () => {
+            const sheetData = this.enemyCustomSheets[entityKey];
+            if (!sheetData) return;
+            sheetData.zoom = Math.min(300, (sheetData.zoom || 100) + 10);
+            this.renderCustomSheetPdf(entityKey);
+            this.saveCustomSheetsToStorage();
+            const zoomLevel = document.getElementById('customSheetZoomLevel');
+            if (zoomLevel) zoomLevel.textContent = `${sheetData.zoom}%`;
+        });
+    }
+    
+    const zoomOutBtn = document.getElementById('customSheetZoomOutBtn');
+    if (zoomOutBtn) {
+        const newZoomOut = zoomOutBtn.cloneNode(true);
+        zoomOutBtn.parentNode.replaceChild(newZoomOut, zoomOutBtn);
+        newZoomOut.addEventListener('click', () => {
+            const sheetData = this.enemyCustomSheets[entityKey];
+            if (!sheetData) return;
+            sheetData.zoom = Math.max(50, (sheetData.zoom || 100) - 10);
+            this.renderCustomSheetPdf(entityKey);
+            this.saveCustomSheetsToStorage();
+            const zoomLevel = document.getElementById('customSheetZoomLevel');
+            if (zoomLevel) zoomLevel.textContent = `${sheetData.zoom}%`;
+        });
+    }
+    
+    // Input de página
+    const pageInput = document.getElementById('customSheetPageInput');
+    if (pageInput) {
+        const newPageInput = pageInput.cloneNode(true);
+        pageInput.parentNode.replaceChild(newPageInput, pageInput);
+        newPageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const sheetData = this.enemyCustomSheets[entityKey];
+                if (!sheetData) return;
+                const pageNum = parseInt(newPageInput.value);
+                if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= sheetData.totalPages) {
+                    sheetData.currentPage = pageNum;
+                    this.renderCustomSheetPdf(entityKey);
+                    this.saveCustomSheetsToStorage();
+                } else {
+                    newPageInput.value = sheetData.currentPage;
+                    this.showNotification(`Página válida: 1-${sheetData.totalPages}`, 'warning');
+                }
+            }
+        });
+    }
+}
+
+async loadCustomSheetPdfFromFile(file, entity) {
+    if (!file || !file.type.includes('pdf')) {
+        this.showNotification('Por favor, selecciona un archivo PDF válido', 'error');
+        return;
+    }
+    
+    try {
+        this.showNotification(`Cargando ficha: ${file.name}...`, 'info');
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        // Guardar en el almacenamiento del enemigo
+        const entityKey = entity.id || entity.name;
+        this.enemyCustomSheets[entityKey] = {
+            data: arrayBuffer,
+            name: file.name,
+            totalPages: pdf.numPages,
+            currentPage: 1,
+            zoom: 100,
+            pdf: pdf
+        };
+        
+        // Actualizar UI
+        const pdfTitle = document.getElementById('customSheetPdfTitle');
+        if (pdfTitle) pdfTitle.textContent = file.name;
+        
+        const placeholder = document.getElementById('customSheetPlaceholder');
+        const canvas = document.getElementById('customSheetCanvas');
+        if (placeholder) placeholder.style.display = 'none';
+        if (canvas) canvas.style.display = 'block';
+        
+        const totalPages = document.getElementById('customSheetTotalPages');
+        if (totalPages) totalPages.textContent = pdf.numPages;
+        
+        const pageInput = document.getElementById('customSheetPageInput');
+        if (pageInput) {
+            pageInput.value = 1;
+            pageInput.disabled = false;
+            pageInput.max = pdf.numPages;
+        }
+        
+        const zoomLevel = document.getElementById('customSheetZoomLevel');
+        if (zoomLevel) zoomLevel.textContent = '100%';
+        
+        // Habilitar controles
+        this.toggleCustomSheetControls(true);
+        
+        // Renderizar primera página
+        await this.renderCustomSheetPdf(entityKey);
+        
+        this.showNotification(`Ficha cargada: ${file.name}`, 'success');
+        
+        // Guardar en localStorage para persistencia
+        this.saveCustomSheetsToStorage();
+        
+    } catch (error) {
+        console.error('Error al cargar ficha:', error);
+        this.showNotification('Error al cargar el PDF', 'error');
+    }
+}
+
+async loadCustomSheetPdf(entityKey) {
+    const sheetData = this.enemyCustomSheets[entityKey];
+    if (!sheetData) return;
+    
+    try {
+        // Si tenemos el arrayBuffer guardado
+        if (sheetData.data) {
+            // Actualizar UI
+            const pdfTitle = document.getElementById('customSheetPdfTitle');
+            if (pdfTitle) pdfTitle.textContent = sheetData.name || 'Ficha personalizada';
+            
+            const placeholder = document.getElementById('customSheetPlaceholder');
+            const canvas = document.getElementById('customSheetCanvas');
+            if (placeholder) placeholder.style.display = 'none';
+            if (canvas) canvas.style.display = 'block';
+            
+            const totalPages = document.getElementById('customSheetTotalPages');
+            if (totalPages) totalPages.textContent = sheetData.totalPages || 1;
+            
+            const pageInput = document.getElementById('customSheetPageInput');
+            if (pageInput) {
+                pageInput.value = sheetData.currentPage || 1;
+                pageInput.disabled = false;
+                pageInput.max = sheetData.totalPages || 1;
+            }
+            
+            const zoomLevel = document.getElementById('customSheetZoomLevel');
+            if (zoomLevel) zoomLevel.textContent = `${sheetData.zoom || 100}%`;
+            
+            // Habilitar controles
+            this.toggleCustomSheetControls(true);
+            
+            // Cargar el PDF
+            const pdf = await pdfjsLib.getDocument({ data: sheetData.data }).promise;
+            sheetData.pdf = pdf;
+            sheetData.totalPages = pdf.numPages;
+            this.enemyCustomSheets[entityKey] = sheetData;
+            
+            await this.renderCustomSheetPdf(entityKey);
+        }
+    } catch (error) {
+        console.error('Error al cargar PDF guardado:', error);
+    }
+}
+
+async renderCustomSheetPdf(entityKey) {
+    const sheetData = this.enemyCustomSheets[entityKey];
+    if (!sheetData || !sheetData.pdf) {
+        // Si no hay pdf, intentar cargar desde datos
+        if (sheetData && sheetData.data) {
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: sheetData.data }).promise;
+                sheetData.pdf = pdf;
+                sheetData.totalPages = pdf.numPages;
+                this.enemyCustomSheets[entityKey] = sheetData;
+            } catch (error) {
+                console.error('Error al cargar PDF desde datos:', error);
+                return;
+            }
+        } else {
+            return;
+        }
+    }
+    
+    try {
+        const page = await sheetData.pdf.getPage(sheetData.currentPage || 1);
+        const canvas = document.getElementById('customSheetCanvas');
+        
+        if (!canvas) return;
+        
+        const context = canvas.getContext('2d');
+        const scale = (sheetData.zoom || 100) / 100;
+        const viewport = page.getViewport({ scale: scale });
+        
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        await page.render({
+            canvasContext: context,
+            viewport: viewport
+        }).promise;
+        
+        // Actualizar info de página
+        const pageInfo = document.getElementById('customSheetPageInput');
+        if (pageInfo) {
+            pageInfo.value = sheetData.currentPage || 1;
+        }
+        
+        const totalPages = document.getElementById('customSheetTotalPages');
+        if (totalPages) {
+            totalPages.textContent = sheetData.totalPages || 1;
+        }
+        
+        const zoomLevel = document.getElementById('customSheetZoomLevel');
+        if (zoomLevel) {
+            zoomLevel.textContent = `${sheetData.zoom || 100}%`;
+        }
+        
+    } catch (error) {
+        console.error('Error al renderizar ficha:', error);
+    }
+}
+setupCustomSheetPdfControls(entity) {
+    const entityKey = entity.id || entity.name;
+    
+    // Botón anterior
+    const prevBtn = document.getElementById('customSheetPrevBtn');
+    if (prevBtn) {
+        const newPrevBtn = prevBtn.cloneNode(true);
+        prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+        newPrevBtn.addEventListener('click', () => {
+            const sheetData = this.enemyCustomSheets[entityKey];
+            if (!sheetData) return;
+            if (sheetData.currentPage > 1) {
+                sheetData.currentPage--;
+                this.renderCustomSheetPdf(entityKey);
+                this.saveCustomSheetsToStorage();
+            }
+        });
+    }
+    
+    // Botón siguiente
+    const nextBtn = document.getElementById('customSheetNextBtn');
+    if (nextBtn) {
+        const newNextBtn = nextBtn.cloneNode(true);
+        nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+        newNextBtn.addEventListener('click', () => {
+            const sheetData = this.enemyCustomSheets[entityKey];
+            if (!sheetData) return;
+            if (sheetData.currentPage < sheetData.totalPages) {
+                sheetData.currentPage++;
+                this.renderCustomSheetPdf(entityKey);
+                this.saveCustomSheetsToStorage();
+            }
+        });
+    }
+}
+saveCustomSheetsToStorage() {
+    try {
+        // Convertir ArrayBuffers a base64 para almacenar
+        const serializable = {};
+        for (const [key, value] of Object.entries(this.enemyCustomSheets)) {
+            if (value.data) {
+                const uint8Array = new Uint8Array(value.data);
+                const binary = String.fromCharCode.apply(null, uint8Array);
+                const base64 = btoa(binary);
+                serializable[key] = {
+                    data: base64,
+                    name: value.name,
+                    totalPages: value.totalPages,
+                    currentPage: value.currentPage || 1,
+                    zoom: value.zoom || 100
+                };
+            }
+        }
+        localStorage.setItem('enemyCustomSheets', JSON.stringify(serializable));
+    } catch (error) {
+        console.warn('Error guardando fichas personalizadas:', error);
+    }
+}
+
+loadCustomSheetsFromStorage() {
+    try {
+        const stored = localStorage.getItem('enemyCustomSheets');
+        if (!stored) return;
+        
+        const parsed = JSON.parse(stored);
+        for (const [key, value] of Object.entries(parsed)) {
+            if (value.data) {
+                const binary = atob(value.data);
+                const uint8Array = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    uint8Array[i] = binary.charCodeAt(i);
+                }
+                this.enemyCustomSheets[key] = {
+                    data: uint8Array.buffer,
+                    name: value.name,
+                    totalPages: value.totalPages,
+                    currentPage: value.currentPage || 1,
+                    zoom: value.zoom || 100
+                };
+            }
+        }
+        console.log(`✅ ${Object.keys(this.enemyCustomSheets).length} fichas personalizadas cargadas`);
+    } catch (error) {
+        console.warn('Error cargando fichas personalizadas:', error);
+    }
+}
     
     updatePlayersList() {
         const container = document.getElementById('playersList');
@@ -2721,6 +3424,12 @@ class DMScreen {
             const playerElement = this.createEntityCard(player, index + 1);
             container.appendChild(playerElement);
         });
+        const summonBadge = document.getElementById('summonBadge');
+        if (summonBadge) {
+            const totalSummons = this.players.filter(p => p.type === 'summon').length;
+            summonBadge.textContent = totalSummons;
+        }
+        this.updateSummonInvocadoresList();
     }
     
     updateEnemiesList() {
@@ -2737,99 +3446,1203 @@ class DMScreen {
             container.appendChild(enemyElement);
         });
     }
+        
+createEntityCard(entity, number) {
+    const div = document.createElement('div');
+    div.className = `entity-card ${entity.type}`;
+    div.dataset.id = entity.id;
     
-    createEntityCard(entity, number) {
-        const div = document.createElement('div');
-        div.className = `entity-card ${entity.type}`;
-        div.dataset.id = entity.id;
-        
-        const avatarText = entity.type === 'player' ? `P${number}` : `E${number}`;
-        const hpColor = entity.hp > entity.maxHp * 0.5 ? 'green' : entity.hp > entity.maxHp * 0.25 ? 'orange' : 'red';
-        
-        const raceDisplay = entity.type === 'enemy' && entity.race ? 
-            `<span><i class="fas fa-paw"></i> ${entity.race}</span>` : '';
-        
-        const personajeInfo = entity.type === 'player' ? 
-            this.personajesHoy.find(p => p.nombre === entity.name) : null;
-        
-        div.innerHTML = `
-            <div class="entity-avatar ${entity.type}">${avatarText}</div>
-            <div class="entity-info">
-                <div class="entity-name">${entity.name}</div>
-                <div class="entity-details">
-                    <span>CA: ${entity.ca}</span>
-                    <span style="color: ${hpColor};">❤ ${entity.hp}/${entity.maxHp}</span>
-                    <span class="initiative-score">${entity.initiative || '?'}</span>
-                    ${raceDisplay}
-                    ${personajeInfo ? `<span><i class="fas fa-user"></i> ${personajeInfo.jugador}</span>` : ''}
-                </div>
+    // Determinar si es invocación
+    const esInvocacion = this.esInvocacion(entity);
+    const invocador = esInvocacion ? this.getInvocadorForSummon(entity.id) : null;
+    
+    // Estilo especial para invocaciones
+    if (esInvocacion) {
+        div.style.borderColor = 'var(--accent-purple)';
+        div.style.borderWidth = '3px';
+        div.style.background = 'linear-gradient(135deg, rgba(106, 13, 173, 0.05), rgba(255, 255, 255, 0.9))';
+        `.entity-btn.summon-btn {
+            background: var(--accent-gold);
+            color: var(--ink-dark);
+        }
+        .entity-btn.summon-btn:hover {
+            background: #f4c542;
+            transform: scale(1.1);
+}`
+    }
+    
+    const avatarText = esInvocacion ? `I${number}` : 
+                       (entity.type === 'player' ? `P${number}` : `E${number}`);
+    const hpColor = entity.hp > entity.maxHp * 0.5 ? 'green' : 
+                    entity.hp > entity.maxHp * 0.25 ? 'orange' : 'red';
+    
+    const raceDisplay = (entity.type === 'enemy' || entity.type === 'summon') && entity.race ? 
+        `<span><i class="fas fa-paw"></i> ${entity.race}</span>` : '';
+    
+    const personajeInfo = entity.type === 'player' || entity.type === 'summon' ? 
+        this.personajesHoy.find(p => p.nombre === entity.name) : null;
+    
+    // Mostrar vida temporal si existe
+    const tempDisplay = entity.tempHp && entity.tempHp > 0 ? 
+        `<span style="color: var(--accent-teal); font-size: 0.8rem;">🛡️+${entity.tempHp}</span>` : '';
+    
+    // Indicador de invocación
+    let invocacionIndicator = '';
+    if (esInvocacion && invocador) {
+        invocacionIndicator = `
+            <div style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--accent-purple);">
+                <i class="fas fa-arrow-right"></i>
+                <span>Invocado por: ${invocador.name}</span>
             </div>
-            <div class="entity-controls">
-                ${entity.type === 'enemy' ? `
-                    <button class="entity-btn info-btn" title="Ver información de ${entity.race || entity.name}" data-action="info">
-                        <i class="fas fa-info-circle"></i>
-                    </button>
-                ` : personajeInfo ? `
-                    <button class="entity-btn info-btn" title="Ver información de ${entity.name}" data-action="playerInfo">
-                        <i class="fas fa-info-circle"></i>
-                    </button>
-                ` : ''}
-                <button class="entity-btn" title="${entity.type === 'player' ? 'Cambiar iniciativa' : 'Tirar iniciativa'}" data-action="roll">
-                    <i class="fas fa-${entity.type === 'player' ? 'edit' : 'dice'}"></i>
+        `;
+    }
+    
+    // Botón de información según el tipo
+    let infoButton = '';
+    if (entity.type === 'enemy') {
+        infoButton = `
+            <button class="entity-btn info-btn" title="Ver información de ${entity.race || entity.name}" data-action="info">
+                <i class="fas fa-info-circle"></i>
+            </button>
+        `;
+    } else if (personajeInfo && (entity.type === 'player' || entity.type === 'summon')) {
+        infoButton = `
+            <button class="entity-btn info-btn" title="Ver información de ${entity.name}" data-action="playerInfo">
+                <i class="fas fa-info-circle"></i>
+            </button>
+        `;
+    } else if (entity.type === 'summon' && !personajeInfo) {
+        // Si es invocación sin personaje registrado, mostrar bestiario si tiene raza
+        infoButton = entity.race ? `
+            <button class="entity-btn info-btn" title="Ver información de ${entity.race}" data-action="info">
+                <i class="fas fa-info-circle"></i>
+            </button>
+        ` : '';
+    }
+    
+    div.innerHTML = `
+        <div class="entity-avatar ${entity.type}">${avatarText}</div>
+        <div class="entity-info">
+            <div class="entity-name" style="${esInvocacion ? 'color: var(--accent-purple);' : ''}">
+                ${entity.name}
+                ${esInvocacion ? '<i class="fas fa-star" style="color: var(--accent-gold); font-size: 0.8rem; margin-left: 5px;"></i>' : ''}
+            </div>
+            <div class="entity-details">
+                <span>CA: ${entity.ca}</span>
+                <span style="color: ${hpColor};">❤ ${entity.hp}/${entity.maxHp} ${tempDisplay}</span>
+                <span class="initiative-score">${entity.initiative || '?'}</span>
+                ${raceDisplay}
+                ${personajeInfo ? `<span><i class="fas fa-user"></i> ${personajeInfo.jugador}</span>` : ''}
+                ${invocacionIndicator}
+            </div>
+        </div>
+        <div class="entity-controls">
+            ${entity.type === 'player' ? `
+            <button class="entity-btn summon-btn" title="Invocar aliado" data-action="summon">
+                <i class="fas fa-star"></i>
+            </button>
+        ` : ''}
+            ${infoButton}
+            <button class="entity-btn" title="${entity.type === 'player' || entity.type === 'summon' ? 'Cambiar iniciativa' : 'Tirar iniciativa'}" data-action="roll">
+                <i class="fas fa-${entity.type === 'player' || entity.type === 'summon' ? 'sort' : 'dice'}"></i>
+            </button>
+            <button class="entity-btn" title="Editar vida" data-action="editHP">
+                <i class="fas fa-heart"></i>
+            </button>
+            <button class="entity-btn" title="Editar" data-action="edit">
+                <i class="fas fa-pen-fancy"></i>
+            </button>
+            ${esInvocacion ? `
+                <button class="entity-btn" title="Eliminar invocación" data-action="remove" style="background: var(--accent-purple);">
+                    <i class="fas fa-times"></i>
                 </button>
-                <button class="entity-btn" title="Editar vida" data-action="editHP">
-                    <i class="fas fa-heart"></i>
-                </button>
-                <button class="entity-btn" title="Editar" data-action="edit">
-                    <i class="fas fa-edit"></i>
-                </button>
+            ` : `
                 <button class="entity-btn" title="Eliminar" data-action="remove">
                     <i class="fas fa-trash"></i>
                 </button>
-            </div>
-        `;
-        
-        return div;
+            `}
+        </div>
+    `;
+    
+    return div;
+}
+
+    /**
+ * Abre el modal para invocar un aliado desde un jugador
+ */
+openSummonModal(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) {
+        this.showNotification('Jugador no encontrado', 'error');
+        return;
     }
     
-    handleEntityClick(event, type) {
-        const button = event.target.closest('.entity-btn');
-        if (!button) return;
+    // Crear o obtener el modal
+    let modal = document.getElementById('summonModal');
+    if (!modal) {
+        modal = this.createSummonModal();
+    }
+    
+    // Guardar el invocador en el modal
+    modal.dataset.invocadorId = player.id;
+    modal.dataset.invocadorName = player.name;
+    
+    // Actualizar título del modal
+    const title = modal.querySelector('.summon-modal-title');
+    if (title) {
+        title.innerHTML = `<i class="fas fa-star" style="color: var(--accent-gold);"></i> Invocar Aliado - ${player.name}`;
+    }
+    
+    // Limpiar campos
+    const nameInput = document.getElementById('summonNameInput');
+    const raceInput = document.getElementById('summonRaceInput');
+    const caInput = document.getElementById('summonCAInput');
+    const hpInput = document.getElementById('summonHPInput');
+    const resultsList = document.getElementById('summonSearchResults');
+    
+    if (nameInput) nameInput.value = '';
+    if (raceInput) raceInput.value = '';
+    if (caInput) caInput.value = '';
+    if (hpInput) hpInput.value = '';
+    if (resultsList) resultsList.style.display = 'none';
+    
+    // Mostrar el modal
+    modal.style.display = 'block';
+    
+    // Enfocar el primer campo
+    if (nameInput) setTimeout(() => nameInput.focus(), 100);
+}
+
+/**
+ * Crea el modal de invocación
+ */
+createSummonModal() {
+    const modal = document.createElement('div');
+    modal.id = 'summonModal';
+    modal.className = 'summon-modal';
+    modal.innerHTML = `
+        <div class="summon-modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 class="summon-modal-title">
+                <i class="fas fa-star" style="color: var(--accent-gold);"></i> Invocar Aliado
+            </h2>
+            
+            <div class="summon-form">
+                <div class="summon-field">
+                    <label for="summonNameInput">
+                        <i class="fas fa-user"></i> Nombre del aliado
+                    </label>
+                    <input type="text" id="summonNameInput" autocomplete="off">
+                </div>
+                
+                <div class="summon-field">
+                    <label for="summonRaceInput">
+                        <i class="fas fa-paw"></i> Raza / Especie
+                    </label>
+                    <div class="summon-race-input-wrapper">
+                        <input type="text" id="summonRaceInput" autocomplete="off">
+                        <ul id="summonSearchResults" class="search-results" style="display: none;"></ul>
+                    </div>
+                </div>
+                
+                <div class="summon-stats-row">
+                    <div class="summon-field half">
+                        <label for="summonCAInput">
+                            <i class="fas fa-shield-alt"></i> CA
+                        </label>
+                        <input type="number" id="summonCAInput"  min="1" max="30">
+                    </div>
+                    <div class="summon-field half">
+                        <label for="summonHPInput">
+                            <i class="fas fa-heart"></i> Vida
+                        </label>
+                        <input type="number" id="summonHPInput" min="1" max="999">
+                    </div>
+                </div>
+                
+                <div class="summon-actions">
+                    <button class="summon-btn-primary" id="summonConfirmBtn">
+                        <i class="fas fa-star"></i> Invocar Aliado
+                    </button>
+                    <button class="summon-btn-secondary" id="summonCancelBtn">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Eventos del modal
+    modal.querySelector('.close-modal').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    
+    modal.querySelector('#summonCancelBtn').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+    
+    // Configurar autocompletado de razas
+    this.setupSummonNameAutocomplete();
+    this.setupSummonRaceAutocomplete();
+    
+    // Configurar el botón de confirmación
+    const confirmBtn = document.getElementById('summonConfirmBtn');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            this.confirmSummon();
+        });
+    }
+    
+    // Enter en campos
+    const nameInput = document.getElementById('summonNameInput');
+    if (nameInput) {
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('summonRaceInput')?.focus();
+            }
+        });
+    }
+    
+    const raceInput = document.getElementById('summonRaceInput');
+    if (raceInput) {
+        raceInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('summonCAInput')?.focus();
+            }
+        });
+    }
+    
+    const caInput = document.getElementById('summonCAInput');
+    if (caInput) {
+        caInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('summonHPInput')?.focus();
+            }
+        });
+    }
+    
+    const hpInput = document.getElementById('summonHPInput');
+    if (hpInput) {
+        hpInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmBtn?.click();
+            }
+        });
+    }
+    
+    return modal;
+}
+
+/**
+ * Configura el autocompletado para el nombre del aliado en el modal de invocación
+ */
+setupSummonNameAutocomplete() {
+    const nameInput = document.getElementById('summonNameInput');
+    if (!nameInput) return;
+    
+    let resultsList = document.getElementById('summonNameSearchResults');
+    if (!resultsList) {
+        resultsList = document.createElement('ul');
+        resultsList.id = 'summonNameSearchResults';
+        resultsList.className = 'search-results';
+        resultsList.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid var(--accent-gold);
+            border-radius: 4px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            z-index: 10001;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
         
-        const entityCard = event.target.closest('.entity-card');
-        if (!entityCard) return;
-        
-        const entityId = entityCard.dataset.id;
-        const action = button.dataset.action;
-        
-        const entity = type === 'player' 
-            ? this.players.find(p => p.id === entityId)
-            : this.enemies.find(e => e.id === entityId);
-        
-        if (!entity) return;
-        
-        switch (action) {
-            case 'roll':
-                this.rollInitiativeForEntity(entity);
-                break;
-            case 'editHP':
-                this.editHPForEntity(entity);
-                break;
-            case 'edit':
-                this.editEntity(entity, type);
-                break;
-            case 'remove':
-                this.removeEntity(entityId, type);
-                break;
-            case 'info':
-                this.showBestiaryInfo(entity);
-                break;
-            case 'playerInfo':
-                const personaje = this.personajesHoy.find(p => p.nombre === entity.name);
-                if (personaje) this.mostrarInfoJugador(personaje);
-                break;
+        const parent = nameInput.parentElement;
+        if (parent) {
+            parent.style.position = 'relative';
+            parent.appendChild(resultsList);
         }
     }
+    
+    // Eliminar event listeners anteriores
+    if (this._summonNameInputHandler) {
+        nameInput.removeEventListener('input', this._summonNameInputHandler);
+    }
+    if (this._summonNameKeydownHandler) {
+        nameInput.removeEventListener('keydown', this._summonNameKeydownHandler);
+    }
+    
+    this._summonNameInputHandler = (e) => {
+        const searchTerm = nameInput.value.toLowerCase().trim();
+        resultsList.innerHTML = '';
+        
+        if (searchTerm.length === 0) {
+            resultsList.style.display = 'none';
+            return;
+        }
+        
+        // ✅ SOLO buscar en jugadoresDenominaciones (personajes registrados)
+        const filtered = this.jugadoresDenominaciones.filter(item => {
+            const itemText = item.text.toLowerCase();
+            const jugadorText = item.jugador?.toLowerCase() || '';
+            
+            return itemText.includes(searchTerm) || 
+                   jugadorText.includes(searchTerm) ||
+                   item.clase?.toLowerCase().includes(searchTerm) ||
+                   item.raza?.toLowerCase().includes(searchTerm);
+        }).slice(0, 10);
+        
+        if (filtered.length > 0) {
+            filtered.forEach(item => {
+                const li = document.createElement('li');
+                
+                let highlightedText = item.text;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                highlightedText = item.text.replace(regex, '<span class="highlight">$1</span>');
+                
+                li.innerHTML = `
+                    <div style="display: flex; flex-direction: column;">
+                        <span>${highlightedText}</span>
+                        <small style="color: var(--ink-light);">
+                            ${item.clase || ''} (nivel ${item.nivel || '?'}) - ${item.jugador || ''}
+                        </small>
+                    </div>
+                `;
+                
+                li.style.cssText = `
+                    padding: 10px 15px;
+                    cursor: pointer;
+                    border-bottom: 1px solid var(--parchment-dark);
+                    font-family: 'Cinzel', serif;
+                    transition: background 0.2s ease;
+                `;
+                
+                li.addEventListener('mouseover', () => {
+                    li.style.background = 'var(--parchment-light)';
+                });
+                
+                li.addEventListener('mouseout', () => {
+                    li.style.background = 'white';
+                });
+                
+                li.addEventListener('click', () => {
+                    nameInput.value = item.text;
+                    resultsList.style.display = 'none';
+                    this.cargarDatosAliado(item);
+                    this.showNotification(`Personaje "${item.text}" encontrado en el registro`, 'success');
+                });
+                
+                resultsList.appendChild(li);
+            });
+            resultsList.style.display = 'block';
+        } else {
+            // ❌ ELIMINADO: Ya no busca en bestiario
+            resultsList.style.display = 'none';
+        }
+    };
+    
+    this._summonNameKeydownHandler = (e) => {
+        const items = resultsList.getElementsByTagName('li');
+        let selectedIndex = -1;
+        
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].classList.contains('selected')) {
+                selectedIndex = i;
+                items[i].classList.remove('selected');
+                items[i].style.background = 'white';
+                break;
+            }
+        }
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (items.length > 0) {
+                const nextIndex = selectedIndex < items.length - 1 ? selectedIndex + 1 : 0;
+                items[nextIndex].classList.add('selected');
+                items[nextIndex].style.background = 'var(--parchment-light)';
+                items[nextIndex].scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (items.length > 0) {
+                const prevIndex = selectedIndex > 0 ? selectedIndex - 1 : items.length - 1;
+                items[prevIndex].classList.add('selected');
+                items[prevIndex].style.background = 'var(--parchment-light)';
+                items[prevIndex].scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'Enter' && selectedIndex >= 0) {
+            e.preventDefault();
+            items[selectedIndex].click();
+        } else if (e.key === 'Escape') {
+            resultsList.style.display = 'none';
+        }
+    };
+    
+    nameInput.addEventListener('input', this._summonNameInputHandler);
+    nameInput.addEventListener('keydown', this._summonNameKeydownHandler);
+    
+    if (this._summonNameDocumentClickHandler) {
+        document.removeEventListener('click', this._summonNameDocumentClickHandler);
+    }
+    this._summonNameDocumentClickHandler = (e) => {
+        if (e.target !== nameInput && !resultsList.contains(e.target)) {
+            resultsList.style.display = 'none';
+        }
+    };
+    document.addEventListener('click', this._summonNameDocumentClickHandler);
+}
+
+/**
+ * Carga los datos de un personaje registrado en el modal de invocación
+ */
+cargarDatosAliado(personaje) {
+    if (!personaje) return;
+    
+    const caInput = document.getElementById('summonCAInput');
+    const hpInput = document.getElementById('summonHPInput');
+    const raceInput = document.getElementById('summonRaceInput');
+    const invocadorInitiative = document.getElementById('summonInvocadorInitiative');
+    
+    // Cargar CA
+    if (caInput && personaje.stats?.ca) {
+        caInput.value = personaje.stats.ca;
+    }
+    
+    // Cargar HP máximo
+    if (hpInput && personaje.stats?.hp?.max) {
+        hpInput.value = personaje.stats.hp.max;
+    }
+    
+    // Cargar raza
+    if (raceInput && personaje.raza) {
+        raceInput.value = personaje.raza;
+    }
+    
+    // Guardar referencia al personaje completo para usarlo en la invocación
+    const modal = document.getElementById('summonModal');
+    if (modal) {
+        modal.dataset.personajeRegistrado = JSON.stringify(personaje);
+    }
+    
+    this.showNotification(`Datos de ${personaje.text} precargados`, 'success');
+}
+
+confirmSummon() {
+    const modal = document.getElementById('summonModal');
+    if (!modal) return;
+    
+    const invocadorId = modal.dataset.invocadorId;
+    const invocadorName = modal.dataset.invocadorName;
+    
+    const nameInput = document.getElementById('summonNameInput');
+    const raceInput = document.getElementById('summonRaceInput');
+    const caInput = document.getElementById('summonCAInput');
+    const hpInput = document.getElementById('summonHPInput');
+    
+    const name = nameInput?.value.trim();
+    const race = raceInput?.value.trim() || '';
+    const ca = parseInt(caInput?.value) || 10;
+    const hp = parseInt(hpInput?.value) || 10;
+    
+    if (!invocadorId) {
+        this.showNotification('Error: No se encontró el invocador', 'error');
+        return;
+    }
+    
+    if (!name) {
+        this.showNotification('Introduce un nombre para la invocación', 'warning');
+        nameInput?.focus();
+        return;
+    }
+    
+    // Buscar el invocador
+    const invocador = this.players.find(p => p.id === invocadorId);
+    if (!invocador) {
+        this.showNotification('Jugador invocador no encontrado', 'error');
+        return;
+    }
+    
+    // Verificar si hay un personaje registrado guardado en el modal
+    let personajeRegistrado = null;
+    if (modal.dataset.personajeRegistrado) {
+        try {
+            personajeRegistrado = JSON.parse(modal.dataset.personajeRegistrado);
+        } catch (e) {
+            console.warn('Error al parsear personaje registrado:', e);
+        }
+    }
+    
+    // Si no hay personaje registrado, buscar por nombre
+    if (!personajeRegistrado) {
+        personajeRegistrado = this.personajesHoy.find(p => 
+            p.nombre.toLowerCase() === name.toLowerCase()
+        );
+    }
+    
+    // Calcular iniciativa (menor que la del invocador)
+    let iniciativa = invocador.initiative - 1;
+    if (iniciativa < 1) iniciativa = 1;
+    
+    // Si hay otros summons del mismo invocador, ajustar iniciativa
+    const summonsDelInvocador = this.players.filter(p => 
+        p.type === 'summon' && p.invocadorId === invocadorId
+    );
+    
+    let initiativeExists = true;
+    let intentos = 0;
+    while (initiativeExists && intentos < 20) {
+        initiativeExists = this.players.some(p => 
+            p.initiative === iniciativa && p.type === 'summon' && p.invocadorId === invocadorId
+        );
+        if (initiativeExists) {
+            iniciativa = Math.max(1, iniciativa - 1);
+            intentos++;
+        }
+    }
+    
+    // Crear la invocación
+    const summon = {
+        id: `summon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name,
+        race: race || (personajeRegistrado?.raza || ''),
+        initiative: iniciativa,
+        ca: ca || (personajeRegistrado?.stats?.ca || 10),
+        hp: hp || (personajeRegistrado?.stats?.hp?.max || 10),
+        maxHp: hp || (personajeRegistrado?.stats?.hp?.max || 10),
+        tempHp: 0,
+        type: 'summon',
+        invocadorId: invocador.id,
+        invocadorName: invocador.name,
+        esPersonajeRegistrado: !!personajeRegistrado,
+        personajeData: personajeRegistrado || null
+    };
+    
+    // Si el personaje está registrado, guardar todos sus datos completos
+    if (personajeRegistrado) {
+        summon.personajeData = { ...personajeRegistrado };
+        // Asegurar que tenga todos los campos necesarios
+        summon.personajeData.stats = summon.personajeData.stats || {};
+        summon.personajeData.stats.ca = summon.personajeData.stats.ca || summon.ca;
+        summon.personajeData.stats.hp = summon.personajeData.stats.hp || { max: summon.maxHp, current: summon.hp };
+    }
+    
+    // Agregar a la lista de jugadores (para mantener el orden visual)
+    const invocadorIndex = this.players.findIndex(p => p.id === invocador.id);
+    
+    if (invocadorIndex !== -1) {
+        this.players.splice(invocadorIndex + 1, 0, summon);
+    } else {
+        this.players.push(summon);
+    }
+    
+    // Limpiar datos del modal
+    modal.dataset.personajeRegistrado = '';
+    
+    // Cerrar modal
+    modal.style.display = 'none';
+    
+    // Actualizar UI
+    this.updatePlayersList();
+    this.updateFooter();
+    this.updateInitiativeOrder();
+    
+    const mensaje = personajeRegistrado 
+        ? `✨ ${invocador.name} invoca a ${name} (Personaje registrado - ${personajeRegistrado.clase || ''})`
+        : `✨ ${invocador.name} invoca a ${name} (Iniciativa: ${iniciativa})`;
+    
+    this.showNotification(mensaje, 'success');
+}
+
+/**
+ * Configura el autocompletado de razas para el modal de invocación
+ */
+setupSummonRaceAutocomplete() {
+    const raceInput = document.getElementById('summonRaceInput');
+    if (!raceInput) return;
+    
+    let resultsList = document.getElementById('summonSearchResults');
+    if (!resultsList) {
+        const wrapper = raceInput.closest('.summon-race-input-wrapper');
+        if (!wrapper) return;
+        
+        resultsList = document.createElement('ul');
+        resultsList.id = 'summonSearchResults';
+        resultsList.className = 'search-results';
+        resultsList.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid var(--accent-gold);
+            border-radius: 4px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            z-index: 10000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        wrapper.style.position = 'relative';
+        wrapper.appendChild(resultsList);
+    }
+    
+    // Eliminar event listeners anteriores
+    if (this._summonRaceInputHandler) {
+        raceInput.removeEventListener('input', this._summonRaceInputHandler);
+    }
+    if (this._summonRaceKeydownHandler) {
+        raceInput.removeEventListener('keydown', this._summonRaceKeydownHandler);
+    }
+    
+    // Input handler
+    this._summonRaceInputHandler = (e) => {
+        const searchTerm = raceInput.value.toLowerCase().trim();
+        resultsList.innerHTML = '';
+        
+        if (searchTerm.length === 0) {
+            resultsList.style.display = 'none';
+            return;
+        }
+        
+        // Buscar en el bestiario actual
+        const filtered = this.bestiaryDenominaciones.filter(item => {
+            const itemText = item.text.toLowerCase();
+            if (itemText === searchTerm) return true;
+            if (itemText.startsWith(searchTerm)) return true;
+            const words = itemText.split(/\s+/);
+            if (words.some(word => word === searchTerm)) return true;
+            if (words.some(word => word.startsWith(searchTerm))) return true;
+            if (searchTerm.length >= 4 && itemText.includes(searchTerm)) return true;
+            return false;
+        }).slice(0, 10);
+        
+        if (filtered.length > 0) {
+            filtered.forEach(item => {
+                const li = document.createElement('li');
+                let highlightedText = item.text;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                highlightedText = item.text.replace(regex, '<span class="highlight">$1</span>');
+                li.innerHTML = highlightedText;
+                li.style.cssText = `
+                    padding: 10px 15px;
+                    cursor: pointer;
+                    border-bottom: 1px solid var(--parchment-dark);
+                    font-family: 'Cinzel', serif;
+                    transition: background 0.2s ease;
+                `;
+                li.addEventListener('mouseover', () => {
+                    li.style.background = 'var(--parchment-light)';
+                });
+                li.addEventListener('mouseout', () => {
+                    li.style.background = 'white';
+                });
+                li.addEventListener('click', () => {
+                    raceInput.value = item.text;
+                    resultsList.style.display = 'none';
+                    // Cargar datos del bestiario si existen
+                    this.loadSummonBestiaryData(item.text);
+                });
+                resultsList.appendChild(li);
+            });
+            resultsList.style.display = 'block';
+        } else {
+            resultsList.style.display = 'none';
+        }
+    };
+    
+    // Keydown handler para navegación con teclado
+    this._summonRaceKeydownHandler = (e) => {
+        const items = resultsList.getElementsByTagName('li');
+        let selectedIndex = -1;
+        
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].classList.contains('selected')) {
+                selectedIndex = i;
+                items[i].classList.remove('selected');
+                items[i].style.background = 'white';
+                break;
+            }
+        }
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextIndex = selectedIndex < items.length - 1 ? selectedIndex + 1 : 0;
+            items[nextIndex].classList.add('selected');
+            items[nextIndex].style.background = 'var(--parchment-light)';
+            items[nextIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevIndex = selectedIndex > 0 ? selectedIndex - 1 : items.length - 1;
+            items[prevIndex].classList.add('selected');
+            items[prevIndex].style.background = 'var(--parchment-light)';
+            items[prevIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter' && selectedIndex >= 0) {
+            e.preventDefault();
+            items[selectedIndex].click();
+        }
+    };
+    
+    raceInput.addEventListener('input', this._summonRaceInputHandler);
+    raceInput.addEventListener('keydown', this._summonRaceKeydownHandler);
+    
+    // Cerrar resultados al hacer clic fuera
+    if (this._summonDocumentClickHandler) {
+        document.removeEventListener('click', this._summonDocumentClickHandler);
+    }
+    this._summonDocumentClickHandler = (e) => {
+        if (e.target !== raceInput && !resultsList.contains(e.target)) {
+            resultsList.style.display = 'none';
+        }
+    };
+    document.addEventListener('click', this._summonDocumentClickHandler);
+}
+
+/**
+ * Carga datos del bestiario para el campo de raza en el modal de invocación
+ */
+loadSummonBestiaryData(raceName) {
+    const searchTerm = raceName.toUpperCase().trim();
+    
+    let bestiaryEntry = this.bestiarioActual.find(entry => 
+        entry.nombre === searchTerm
+    );
+    
+    if (!bestiaryEntry) {
+        bestiaryEntry = this.bestiarioActual.find(entry => 
+            entry.nombre.startsWith(searchTerm)
+        );
+    }
+    
+    if (!bestiaryEntry) {
+        const searchWords = searchTerm.split(/\s+/);
+        bestiaryEntry = this.bestiarioActual.find(entry => {
+            const entryWords = entry.nombre.split(/\s+/);
+            return searchWords.some(searchWord => 
+                entryWords.some(entryWord => entryWord === searchWord)
+            );
+        });
+    }
+    
+    if (bestiaryEntry && bestiaryEntry.estadisticas) {
+        const stats = bestiaryEntry.estadisticas;
+        const caInput = document.getElementById('summonCAInput');
+        const hpInput = document.getElementById('summonHPInput');
+        
+        if (stats.ca && caInput && caInput.value === '') {
+            const caMatch = stats.ca.toString().match(/\d+/);
+            if (caMatch) {
+                caInput.value = caMatch[0];
+            }
+        }
+        
+        if (stats.pg && hpInput && hpInput.value === '') {
+            const pgMatch = stats.pg.toString().match(/\d+/);
+            if (pgMatch) {
+                hpInput.value = pgMatch[0];
+            }
+        }
+        
+        const fuenteLabel = this.fuenteBestiarioActual === 'original' ? 'original' : 'personalizado';
+        this.showNotification(`Datos de ${bestiaryEntry.nombre} precargados (bestiario ${fuenteLabel})`, 'success');
+    }
+}
+
+/**
+ * Confirma la invocación desde el modal
+ */
+confirmSummon() {
+    const modal = document.getElementById('summonModal');
+    if (!modal) return;
+    
+    const invocadorId = modal.dataset.invocadorId;
+    const invocadorName = modal.dataset.invocadorName;
+    
+    const nameInput = document.getElementById('summonNameInput');
+    const raceInput = document.getElementById('summonRaceInput');
+    const caInput = document.getElementById('summonCAInput');
+    const hpInput = document.getElementById('summonHPInput');
+    
+    const name = nameInput?.value.trim();
+    const race = raceInput?.value.trim() || '';
+    const ca = parseInt(caInput?.value) || 10;
+    const hp = parseInt(hpInput?.value) || 10;
+    
+    if (!invocadorId) {
+        this.showNotification('Error: No se encontró el invocador', 'error');
+        return;
+    }
+    
+    if (!name) {
+        this.showNotification('Introduce un nombre para la invocación', 'warning');
+        nameInput?.focus();
+        return;
+    }
+    
+    // Buscar el invocador
+    const invocador = this.players.find(p => p.id === invocadorId);
+    if (!invocador) {
+        this.showNotification('Jugador invocador no encontrado', 'error');
+        return;
+    }
+    
+    // Verificar si el nombre existe como jugador registrado
+    const personajeRegistrado = this.personajesHoy.find(p => 
+        p.nombre.toLowerCase() === name.toLowerCase()
+    );
+    
+    // Calcular iniciativa (menor que la del invocador)
+    let iniciativa = invocador.initiative - 1;
+    if (iniciativa < 1) iniciativa = 1;
+    
+    // Si hay otros summons del mismo invocador, ajustar iniciativa
+    const summonsDelInvocador = this.players.filter(p => 
+        p.type === 'summon' && p.invocadorId === invocadorId
+    );
+    
+    let initiativeExists = true;
+    let intentos = 0;
+    while (initiativeExists && intentos < 20) {
+        initiativeExists = this.players.some(p => 
+            p.initiative === iniciativa && p.type === 'summon' && p.invocadorId === invocadorId
+        );
+        if (initiativeExists) {
+            iniciativa = Math.max(1, iniciativa - 1);
+            intentos++;
+        }
+    }
+    
+    // Crear la invocación
+    const summon = {
+        id: `summon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name,
+        race: race,
+        initiative: iniciativa,
+        ca: ca,
+        hp: hp,
+        maxHp: hp,
+        tempHp: 0,
+        type: 'summon',
+        invocadorId: invocador.id,
+        invocadorName: invocador.name,
+        esPersonajeRegistrado: !!personajeRegistrado,
+        personajeData: personajeRegistrado || null
+    };
+    
+    // Agregar a la lista de jugadores (para mantener el orden visual)
+    const invocadorIndex = this.players.findIndex(p => p.id === invocador.id);
+    
+    if (invocadorIndex !== -1) {
+        this.players.splice(invocadorIndex + 1, 0, summon);
+    } else {
+        this.players.push(summon);
+    }
+    
+    // Cerrar modal
+    modal.style.display = 'none';
+    
+    // Actualizar UI
+    this.updatePlayersList();
+    this.updateFooter();
+    this.updateInitiativeOrder();
+    
+    this.showNotification(
+        `✨ ${invocador.name} invoca a ${name} (Iniciativa: ${iniciativa})`, 
+        'success'
+    );
+}
+
+    removeEntity(id, type) {
+    if (!confirm(`¿Eliminar este ${type === 'player' ? 'jugador' : 'enemigo'}?`)) return;
+    
+    const currentEntityId = this.initiativeOrder[this.currentTurn]?.id;
+    
+    if (type === 'player') {
+        // ✅ Eliminar el jugador y TODAS sus invocaciones
+        const playerToRemove = this.players.find(p => p.id === id);
+        if (playerToRemove) {
+            // Contar invocaciones para el mensaje
+            const summonCount = this.players.filter(p => 
+                p.type === 'summon' && p.invocadorId === id
+            ).length;
+            
+            // Eliminar jugador y sus invocaciones
+            this.players = this.players.filter(p => 
+                p.id !== id && !(p.type === 'summon' && p.invocadorId === id)
+            );
+            
+            if (summonCount > 0) {
+                this.showNotification(`Jugador "${playerToRemove.name}" y ${summonCount} invocaciones eliminadas`, 'warning');
+            } else {
+                this.showNotification(`Jugador "${playerToRemove.name}" eliminado`, 'warning');
+            }
+        }
+        this.updatePlayersList();
+    } else {
+        this.enemies = this.enemies.filter(e => e.id !== id);
+        this.updateEnemiesList();
+    }
+    
+    this.updateInitiativeOrderAfterRemoval(id, currentEntityId);
+}
+
+editarIniciativaInvocacion(entity) {
+    const nuevaIniciativa = prompt(
+        `Editar iniciativa de "${entity.name}" (Invocado por ${entity.invocadorName}):`, 
+        entity.initiative
+    );
+    
+    if (nuevaIniciativa !== null) {
+        const iniciativaValue = parseInt(nuevaIniciativa);
+        if (!isNaN(iniciativaValue) && iniciativaValue > 0) {
+            entity.initiative = iniciativaValue;
+            this.updatePlayersList();
+            this.updateInitiativeOrder();
+            this.showNotification(`Iniciativa de "${entity.name}" cambiada a ${iniciativaValue}`, 'info');
+        } else {
+            this.showNotification('Valor de iniciativa inválido', 'warning');
+        }
+    }
+}
+
+    handleEntityClick(event, type) {
+    const button = event.target.closest('.entity-btn');
+    if (!button) return;
+    
+    const entityCard = event.target.closest('.entity-card');
+    if (!entityCard) return;
+    
+    const entityId = entityCard.dataset.id;
+    const action = button.dataset.action;
+    
+    // Buscar en players y enemies (las invocaciones están en players)
+    let entity = this.players.find(p => p.id === entityId);
+    if (!entity) {
+        entity = this.enemies.find(e => e.id === entityId);
+    }
+    if (!entity) return;
+    
+    // Si es invocación y se quiere eliminar, usar acción especial
+    if (this.esInvocacion(entity) && action === 'remove') {
+        this.removeSummon(entity.id);
+        return;
+    }
+    
+    switch (action) {
+        case 'roll':
+        if (this.esInvocacion(entity)) {
+            this.editarIniciativaInvocacion(entity);
+        } else {
+            this.rollInitiativeForEntity(entity);
+        }
+        break;
+        case 'editHP':
+            this.editHPForEntity(entity);
+            break;
+        case 'edit':
+        // Para invocaciones, usamos el mismo método pero internamente maneja solo nombre
+        this.editEntity(entity, type);
+        break;
+        case 'remove':
+            this.removeEntity(entityId, type);
+            break;
+        case 'info':
+            // Para invocaciones sin personaje registrado, usar bestiario
+            if (this.esInvocacion(entity) && !entity.personajeData && entity.race) {
+                this.showBestiaryInfo({ id: entity.id, name: entity.name, race: entity.race });
+            } else {
+                this.showBestiaryInfo(entity);
+            }
+            break;
+        case 'playerInfo':
+        // Buscar primero en personajes registrados
+        let personaje = this.personajesHoy.find(p => p.nombre === entity.name);
+        if (personaje) {
+            this.mostrarInfoJugador(personaje);
+        } else if (entity.personajeData) {
+            // Si la invocación tiene datos de personaje guardados
+            this.mostrarInfoJugador(entity.personajeData);
+        } else {
+            this.showNotification(`No se encontró ficha para "${entity.name}"`, 'warning');
+        }
+        break;
+        case 'summon':
+        this.openSummonModal(entityId);
+        break;
+        }
+}
+
+/**
+ * Elimina una invocación específica
+ */
+removeSummon(summonId) {
+    const summon = this.players.find(p => p.id === summonId);
+    if (!summon) return;
+    
+    if (!confirm(`¿Eliminar la invocación "${summon.name}" de ${summon.invocadorName}?`)) return;
+    
+    this.players = this.players.filter(p => p.id !== summonId);
+    
+    this.updatePlayersList();
+    this.updateInitiativeOrder();
+    this.updateFooter();
+    
+    this.showNotification(`Invocación "${summon.name}" eliminada`, 'warning');
+    this.updateSummonInvocadoresList();
+}
+
+addSummon() {
+    // Obtener el jugador invocador seleccionado
+    const invocadorSelect = document.getElementById('summonInvocadorSelect');
+    const summonNameInput = document.getElementById('summonNameInput');
+    const summonRaceInput = document.getElementById('summonRaceInput');
+    const summonCAInput = document.getElementById('summonCAInput');
+    const summonHPInput = document.getElementById('summonHPInput');
+    
+    if (!invocadorSelect || !summonNameInput) {
+        this.showNotification('Error: Faltan campos para la invocación', 'error');
+        return;
+    }
+    
+    const invocadorId = invocadorSelect.value;
+    const name = summonNameInput.value.trim();
+    const race = summonRaceInput ? summonRaceInput.value.trim() : '';
+    const ca = parseInt(summonCAInput?.value) || 10;
+    const hp = parseInt(summonHPInput?.value) || 10;
+    
+    if (!invocadorId) {
+        this.showNotification('Selecciona un jugador invocador', 'warning');
+        return;
+    }
+    
+    if (!name) {
+        this.showNotification('Introduce un nombre para la invocación', 'warning');
+        return;
+    }
+    
+    // Buscar el invocador
+    const invocador = this.players.find(p => p.id === invocadorId);
+    if (!invocador) {
+        this.showNotification('Jugador invocador no encontrado', 'error');
+        return;
+    }
+    
+    // Verificar si el nombre existe como jugador registrado
+    const personajeRegistrado = this.personajesHoy.find(p => 
+        p.nombre.toLowerCase() === name.toLowerCase()
+    );
+    
+    // Calcular iniciativa (menor que la del invocador)
+    let iniciativa = invocador.initiative - 1;
+    if (iniciativa < 1) iniciativa = 1;
+    
+    // Si hay otros summons del mismo invocador, ajustar iniciativa
+    const summonsDelInvocador = this.players.filter(p => 
+        p.type === 'summon' && p.invocadorId === invocadorId
+    );
+    
+    // Asegurar que la iniciativa sea única entre summons del mismo invocador
+    let initiativeExists = true;
+    let intentos = 0;
+    while (initiativeExists && intentos < 20) {
+        initiativeExists = this.players.some(p => 
+            p.initiative === iniciativa && p.type === 'summon' && p.invocadorId === invocadorId
+        );
+        if (initiativeExists) {
+            iniciativa = Math.max(1, iniciativa - 1);
+            intentos++;
+        }
+    }
+    
+    // Crear la invocación
+    const summon = {
+        id: `summon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name,
+        race: race,
+        initiative: iniciativa,
+        ca: ca,
+        hp: hp,
+        maxHp: hp,
+        tempHp: 0,
+        type: 'summon',
+        invocadorId: invocador.id,
+        invocadorName: invocador.name,
+        esPersonajeRegistrado: !!personajeRegistrado,
+        personajeData: personajeRegistrado || null
+    };
+    
+    // Agregar a la lista de jugadores (para mantener el orden visual)
+    // Buscar la posición del invocador
+    const invocadorIndex = this.players.findIndex(p => p.id === invocador.id);
+    
+    if (invocadorIndex !== -1) {
+        // Insertar después del invocador
+        this.players.splice(invocadorIndex + 1, 0, summon);
+    } else {
+        this.players.push(summon);
+    }
+    
+    // Limpiar campos
+    if (summonNameInput) summonNameInput.value = '';
+    if (summonRaceInput) summonRaceInput.value = '';
+    if (summonCAInput) summonCAInput.value = '';
+    if (summonHPInput) summonHPInput.value = '';
+    if (invocadorSelect) invocadorSelect.value = '';
+    
+    // Actualizar UI
+    this.updatePlayersList();
+    this.updateFooter();
+    this.updateInitiativeOrder();
+    
+    this.showNotification(
+        `✨ ${invocador.name} invoca a ${name} (Iniciativa: ${iniciativa})`, 
+        'success'
+    );
+}
+
+getSummonsForPlayer(playerId) {
+    return this.players.filter(p => 
+        p.type === 'summon' && p.invocadorId === playerId
+    );
+}
+
+/**
+ * Verifica si un nombre es una invocación
+ */
+esInvocacion(entity) {
+    return entity && entity.type === 'summon';
+}
+
+/**
+ * Obtiene el invocador de una invocación
+ */
+getInvocadorForSummon(summonId) {
+    const summon = this.players.find(p => p.id === summonId);
+    if (!summon || summon.type !== 'summon') return null;
+    return this.players.find(p => p.id === summon.invocadorId);
+}
+
+
     
     rollInitiativeForEntity(entity) {
         if (entity.type === 'player') {
@@ -2892,81 +4705,309 @@ class DMScreen {
     }
     
     editHPForEntity(entity) {
-        const currentHP = prompt(`Introduce la vida actual para ${entity.name} (Vida máxima: ${entity.maxHp}):`, entity.hp);
-        if (currentHP !== null) {
-            const hpValue = parseInt(currentHP);
-            if (!isNaN(hpValue)) {
-                entity.hp = hpValue;
+    let modal = document.getElementById('hpEditModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'hpEditModal';
+        modal.className = 'hp-modal';
+        modal.innerHTML = `
+            <div class="hp-modal-content">
+                <span class="close-modal">&times;</span>
+                <h2 id="hpModalTitle">Editar Estadísticas</h2>
                 
-                if (entity.type === 'player') {
-                    this.updatePlayersList();
-                } else {
-                    this.updateEnemiesList();
-                }
+                <div class="hp-display">
+                    <div class="hp-current" id="hpCurrentDisplay">0</div>
+                    <div class="hp-max">/ <span id="hpMaxDisplay">0</span> PG</div>
+                    <div class="hp-temp" id="hpTempDisplay">🛡️ Temporal: 0</div>
+                    <div class="hp-ca-display" style="margin-top: 8px; font-size: 1.1rem;">
+                        <i class="fas fa-shield-alt"></i> CA: <span id="hpCADisplay">0</span>
+                    </div>
+                </div>
                 
-                this.showNotification(`${entity.name}: Vida cambiada a ${hpValue}/${entity.maxHp}`, 'info');
+                <div class="hp-input-row">
+                    <div class="hp-input-group damage-group">
+                        <label for="hpDamageInput">
+                            <i class="fas fa-skull" style="color: #f44336;"></i> Daño
+                        </label>
+                        <input type="number" id="hpDamageInput" min="0" step="1" value="">
+                    </div>
+                    
+                    <div class="hp-input-group heal-group">
+                        <label for="hpHealInput">
+                            <i class="fas fa-heart" style="color: #4CAF50;"></i> Curación
+                        </label>
+                        <input type="number" id="hpHealInput" min="0" step="1" value="">
+                    </div>
+                </div>
+                
+                <div class="hp-input-group">
+                    <label for="hpMaxInput">Vida Máxima:</label>
+                    <input type="number" id="hpMaxInput" placeholder="Nueva vida máxima" step="1">
+                </div>
+                
+                <div class="hp-input-group" style="margin-top: 10px;">
+                    <label for="hpCAInput">
+                        <i class="fas fa-shield-alt"></i> Clase de Armadura (CA):
+                    </label>
+                    <input type="number" id="hpCAInput" placeholder="Nueva CA" min="1" max="30" step="1">
+                </div>
+                
+                <div class="hp-quick-buttons">
+                    <button class="hp-quick-btn temp" data-value="temp">🛡️ Temp</button>
+                </div>
+                
+                <div class="hp-error" id="hpError">Error</div>
+                
+                <div class="hp-actions">
+                    <button class="hp-apply-btn" id="hpApplyBtn">Aplicar</button>
+                    <button class="hp-close-btn" id="hpCloseBtn">Cerrar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        
+        modal.querySelector('#hpCloseBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
             }
-        }
+        });
     }
     
-    editEntity(entity, type) {
-        const newName = prompt(`Editar nombre de ${type === 'player' ? 'jugador' : 'enemigo'}:`, entity.name);
-        if (newName && newName.trim()) {
-            entity.name = newName.trim();
-            
-            if (type === 'enemy') {
-                const newRace = prompt(`Editar raza/especie de ${entity.name}:`, entity.race || '');
-                if (newRace !== null) {
-                    entity.race = newRace.trim() || '';
-                }
-            }
-            
-            const newCA = prompt(`Editar CA de ${entity.name}:`, entity.ca);
-            if (newCA !== null) {
-                const caValue = parseInt(newCA);
-                if (!isNaN(caValue)) {
-                    entity.ca = caValue;
-                }
-            }
-            
-            const newMaxHP = prompt(`Editar vida máxima de ${entity.name}:`, entity.maxHp);
-            if (newMaxHP !== null) {
-                const maxHPValue = parseInt(newMaxHP);
-                if (!isNaN(maxHPValue)) {
-                    entity.maxHp = maxHPValue;
-                    if (entity.hp > maxHPValue) {
-                        entity.hp = maxHPValue;
+    modal._entity = entity;
+    modal._entityType = entity.type;
+    
+    // Actualizar display
+    const currentDisplay = document.getElementById('hpCurrentDisplay');
+    const maxDisplay = document.getElementById('hpMaxDisplay');
+    const tempDisplay = document.getElementById('hpTempDisplay');
+    const caDisplay = document.getElementById('hpCADisplay');
+    const title = document.getElementById('hpModalTitle');
+    const damageInput = document.getElementById('hpDamageInput');
+    const healInput = document.getElementById('hpHealInput');
+    const hpMaxInput = document.getElementById('hpMaxInput');
+    const hpCAInput = document.getElementById('hpCAInput');
+    const errorDiv = document.getElementById('hpError');
+    
+    if (currentDisplay) currentDisplay.textContent = entity.hp;
+    if (maxDisplay) maxDisplay.textContent = entity.maxHp;
+    if (caDisplay) caDisplay.textContent = entity.ca || 0;
+    if (tempDisplay) {
+        const tempHp = entity.tempHp || 0;
+        tempDisplay.textContent = `🛡️ Temporal: ${tempHp}`;
+    }
+    if (title) {
+        const tipo = this.esInvocacion(entity) ? 'Invocación' : 
+                     entity.type === 'player' ? 'Jugador' : 'Enemigo';
+        title.textContent = `Editar Estadísticas - ${entity.name} (${tipo})`;
+    }
+    if (damageInput) damageInput.value = '';
+    if (healInput) healInput.value = '';
+    if (hpMaxInput) hpMaxInput.value = '';
+    if (hpCAInput) hpCAInput.value = '';
+    if (errorDiv) errorDiv.classList.remove('show');
+    
+    // Botón de aplicar
+    const applyBtn = document.getElementById('hpApplyBtn');
+    const newApplyBtn = applyBtn.cloneNode(true);
+    applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
+    
+    // Botones rápidos
+    document.querySelectorAll('.hp-quick-btn').forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', () => {
+            const value = newBtn.dataset.value;
+            if (value === 'temp') {
+                const tempValue = prompt('Introduce la cantidad de vida temporal:');
+                if (tempValue !== null) {
+                    const tempNum = parseInt(tempValue);
+                    if (!isNaN(tempNum) && tempNum > 0) {
+                        entity.tempHp = (entity.tempHp || 0) + tempNum;
+                        if (entity.tempHp < 0) entity.tempHp = 0;
+                        if (currentDisplay) currentDisplay.textContent = entity.hp;
+                        if (tempDisplay) tempDisplay.textContent = `🛡️ Temporal: ${entity.tempHp}`;
+                        if (errorDiv) errorDiv.classList.remove('show');
                     }
                 }
             }
+        });
+    });
+    
+    // Evento aplicar
+    newApplyBtn.addEventListener('click', () => {
+        const damageValue = parseInt(damageInput.value);
+        const healValue = parseInt(healInput.value);
+        const newMaxHp = parseInt(hpMaxInput.value);
+        const newCA = parseInt(hpCAInput.value);
+        
+        if (isNaN(damageValue) && isNaN(healValue) && isNaN(newMaxHp) && isNaN(newCA)) {
+            if (errorDiv) {
+                errorDiv.textContent = '⚠️ Introduce un valor en al menos un campo';
+                errorDiv.classList.add('show');
+            }
+            return;
+        }
+        
+        let changes = [];
+        
+        // Aplicar nueva CA
+        if (!isNaN(newCA) && newCA > 0) {
+            entity.ca = newCA;
+            if (caDisplay) caDisplay.textContent = newCA;
+            changes.push(`CA: ${newCA}`);
+        }
+        
+        // Aplicar nuevo máximo de vida
+        if (!isNaN(newMaxHp) && newMaxHp > 0) {
+            entity.maxHp = newMaxHp;
+            if (entity.hp > entity.maxHp) {
+                entity.hp = entity.maxHp;
+            }
+            changes.push(`Máximo: ${newMaxHp}`);
+        }
+        
+        // Aplicar daño
+        if (!isNaN(damageValue) && damageValue > 0) {
+            let remainingDamage = damageValue;
+            let tempUsed = 0;
+            let normalDamage = 0;
             
-            if (type === 'player') {
-                this.updatePlayersList();
-            } else {
-                this.updateEnemiesList();
+            if (entity.tempHp && entity.tempHp > 0) {
+                tempUsed = Math.min(entity.tempHp, remainingDamage);
+                entity.tempHp -= tempUsed;
+                remainingDamage -= tempUsed;
+                if (entity.tempHp < 0) entity.tempHp = 0;
             }
             
-            this.updateInitiativeOrder();
+            if (remainingDamage > 0) {
+                normalDamage = remainingDamage;
+                entity.hp = Math.max(0, entity.hp - normalDamage);
+            }
+            
+            if (tempUsed > 0 && normalDamage > 0) {
+                changes.push(`Daño: ${damageValue} (${tempUsed} temp + ${normalDamage} vida)`);
+            } else if (tempUsed > 0) {
+                changes.push(`Daño a temp: ${tempUsed}`);
+            } else {
+                changes.push(`Daño: ${damageValue}`);
+            }
+            this.showNotification(`${entity.name} recibe ${damageValue} de daño`, 'error');
         }
-    }
-    
-    removeEntity(id, type) {
-        if (!confirm(`¿Eliminar este ${type === 'player' ? 'jugador' : 'enemigo'}?`)) return;
         
-        const currentEntityId = this.initiativeOrder[this.currentTurn]?.id;
+        // Aplicar curación
+        if (!isNaN(healValue) && healValue > 0) {
+            const oldHp = entity.hp;
+            entity.hp = Math.min(entity.maxHp, entity.hp + healValue);
+            const actualHeal = entity.hp - oldHp;
+            changes.push(`Curado: ${actualHeal}`);
+            this.showNotification(`${entity.name} se cura ${actualHeal} PG`, 'success');
+        }
         
-        if (type === 'player') {
-            this.players = this.players.filter(p => p.id !== id);
+        // Actualizar UI
+        if (currentDisplay) currentDisplay.textContent = entity.hp;
+        if (maxDisplay) maxDisplay.textContent = entity.maxHp;
+        if (caDisplay) caDisplay.textContent = entity.ca || 0;
+        if (tempDisplay) tempDisplay.textContent = `🛡️ Temporal: ${entity.tempHp || 0}`;
+        if (errorDiv) errorDiv.classList.remove('show');
+        
+        if (damageInput) damageInput.value = '';
+        if (healInput) healInput.value = '';
+        if (hpMaxInput) hpMaxInput.value = '';
+        if (hpCAInput) hpCAInput.value = '';
+        
+        // Actualizar listas
+        if (entity.type === 'player' || this.esInvocacion(entity)) {
             this.updatePlayersList();
         } else {
-            this.enemies = this.enemies.filter(e => e.id !== id);
             this.updateEnemiesList();
         }
         
-        this.updateInitiativeOrderAfterRemoval(id, currentEntityId);
-        
-        this.showNotification(`${type === 'player' ? 'Jugador' : 'Enemigo'} eliminado`, 'warning');
+        if (changes.length > 0) {
+            this.showNotification(`${entity.name}: ${changes.join(', ')}`, 'info');
+        }
+    });
+    
+    // Enter en inputs
+    damageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') newApplyBtn.click();
+    });
+    healInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') newApplyBtn.click();
+    });
+    hpMaxInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') newApplyBtn.click();
+    });
+    hpCAInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') newApplyBtn.click();
+    });
+    
+    modal.style.display = 'block';
+    damageInput.focus();
+}
+
+    editEntity(entity, type) {
+    // ✅ Para invocaciones: solo editar nombre
+    if (this.esInvocacion(entity)) {
+        const newName = prompt(`Editar nombre de la invocación "${entity.name}":`, entity.name);
+        if (newName && newName.trim()) {
+            entity.name = newName.trim();
+            this.updatePlayersList();
+            this.updateInitiativeOrder();
+            this.showNotification(`Invocación renombrada a "${entity.name}"`, 'success');
+        }
+        return;
     }
+    
+    // ✅ Para jugadores y enemigos: edición completa
+    const newName = prompt(`Editar nombre de ${type === 'player' ? 'jugador' : 'enemigo'}:`, entity.name);
+    if (newName && newName.trim()) {
+        entity.name = newName.trim();
+        
+        if (type === 'enemy') {
+            const newRace = prompt(`Editar raza/especie de ${entity.name}:`, entity.race || '');
+            if (newRace !== null) {
+                entity.race = newRace.trim() || '';
+            }
+        }
+        
+        const newCA = prompt(`Editar CA de ${entity.name}:`, entity.ca);
+        if (newCA !== null) {
+            const caValue = parseInt(newCA);
+            if (!isNaN(caValue)) {
+                entity.ca = caValue;
+            }
+        }
+        
+        const newMaxHP = prompt(`Editar vida máxima de ${entity.name}:`, entity.maxHp);
+        if (newMaxHP !== null) {
+            const maxHPValue = parseInt(newMaxHP);
+            if (!isNaN(maxHPValue)) {
+                entity.maxHp = maxHPValue;
+                if (entity.hp > maxHPValue) {
+                    entity.hp = maxHPValue;
+                }
+            }
+        }
+        
+        if (type === 'player') {
+            this.updatePlayersList();
+        } else {
+            this.updateEnemiesList();
+        }
+        
+        this.updateInitiativeOrder();
+        this.showNotification(`${type === 'player' ? 'Jugador' : 'Enemigo'} actualizado`, 'success');
+    }
+}
     
     updateInitiativeOrderAfterRemoval(removedId, previousCurrentId) {
         const allEntities = [...this.players, ...this.enemies];
@@ -3272,6 +5313,38 @@ class DMScreen {
         await this.renderPDFPage(type);
         this.showNotification(`Página cambiada a: ${pageNumber}`, 'info');
     }
+
+    sincronizarConIA() {
+    if (!window.dmScreen) return;
+    
+    const combatData = {
+        enemies: this.enemies,
+        players: this.players,
+        initiativeOrder: this.initiativeOrder,
+        currentRound: this.currentRound,
+        currentTurn: this.currentTurn,
+        combatActive: this.combatMode
+    };
+    
+    // Enviar al servidor
+    fetch('/api/ai/dm/combat/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(combatData)
+    }).catch(err => console.error('Error sincronizando combate:', err));
+    
+    // Si hay bestiario personalizado, sincronizarlo también
+    if (this.bestiarioActual && this.fuenteBestiarioActual !== 'original') {
+        fetch('/api/ai/dm/bestiary/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                bestiary: this.bestiarioActual,
+                source: this.fuenteBestiarioActual
+            })
+        }).catch(err => console.error('Error sincronizando bestiario:', err));
+    }
+}
     
     async zoomPDF(type, delta) {
         const zoomElement = document.getElementById(`${type}ZoomLevel`);

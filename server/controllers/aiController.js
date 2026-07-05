@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import PDFParser from 'pdf2json';
 import { prompts, systemPrompts } from '../prompts/groqPrompts.js';
 import characterContextService from '../services/characterContextService.js';
+import dmContextService from '../services/dmContextService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,7 +116,7 @@ export const getAIStatus = async (req, res) => {
  */
 export const chatWithGroq = async (req, res) => {
     try {
-        const { message, history = [], context = {}, dmContext = null } = req.body;
+        const { message, history = [], context = {}, combatData = null } = req.body;
         
         if (!message) {
             return res.status(400).json({ success: false, error: 'Mensaje no proporcionado' });
@@ -125,30 +126,39 @@ export const chatWithGroq = async (req, res) => {
             return res.status(503).json({ success: false, error: 'Groq no disponible' });
         }
 
-        // Construir contexto automático de personajes
-        const characterContext = await characterContextService.buildAIContext(message, dmContext);
+        // Construir contexto del DM (combate + bestiario)
+        const dmContext = await dmContextService.buildAIContext(message, combatData);
         
-        // Combinar contexto manual con contexto automático
+        // Construir contexto de personajes (jugadores)
+        const characterContext = await characterContextService.buildAIContext(message);
+        
+        // Combinar todos los contextos
+        let fullContextString = "";
+        
+        if (dmContext.hasContext) {
+            fullContextString += dmContext.contextString;
+            fullContextString += "\n";
+        }
+        
+        if (characterContext.hasCharacters) {
+            fullContextString += characterContext.contextString;
+            fullContextString += "\n";
+        }
+        
         const enhancedContext = {
             ...context,
-            characters: characterContext.hasCharacters ? characterContext.contextString : null,
-            mentionedCharacters: characterContext.mentionedCharacters.map(c => ({
-                name: c.nombre,
-                class: c.clase,
-                race: c.raza,
-                level: c.nivel,
-                player: c.jugador
-            })),
-            totalPartyMembers: characterContext.fullContext?.totalCharacters || 0,
-            sessionDate: characterContext.fullContext?.sessionDate || new Date().toISOString().split('T')[0]
+            dmContext: dmContext.hasContext ? dmContext.contextString : null,
+            characterContext: characterContext.hasCharacters ? characterContext.contextString : null,
+            combatActive: dmContext.combatActive,
+            enemiesInCombat: dmContext.activeEnemies,
+            playersInCombat: dmContext.activePlayers
         };
 
         const { system, user } = prompts.chat(enhancedContext, history, message);
 
-        // Añadir el contexto de personajes al mensaje del usuario
         let enhancedUserMessage = user;
-        if (characterContext.hasCharacters && !context.skipCharacterContext) {
-            enhancedUserMessage = `${user}\n\n[CONTEXTO AUTOMÁTICO DE LA SESIÓN]\n${characterContext.contextString}`;
+        if (fullContextString) {
+            enhancedUserMessage = `${user}\n\n[CONTEXTO DE LA SESIÓN]\n${fullContextString}`;
         }
 
         const messages = [
@@ -167,17 +177,15 @@ export const chatWithGroq = async (req, res) => {
 
         const response = completion.choices[0]?.message?.content || 'Lo siento, no pude procesar tu solicitud.';
 
-        // Incluir información de contexto en la respuesta
         res.json({
             success: true,
             response: response,
             model: groqModel,
             usage: completion.usage,
             context: {
-                charactersFound: characterContext.mentionedCharacters.length,
-                totalCharacters: characterContext.fullContext?.totalCharacters || 0,
-                sessionDate: characterContext.fullContext?.sessionDate,
-                mentionedCharacters: characterContext.mentionedCharacters.map(c => c.nombre)
+                combatActive: dmContext.combatActive,
+                enemiesInCombat: dmContext.activeEnemies,
+                charactersFound: characterContext.mentionedCharacters.length
             }
         });
 
@@ -254,6 +262,86 @@ export const chatWithGroqStream = async (req, res) => {
         } else {
             res.end();
         }
+    }
+};
+
+/**
+ * Actualizar estado de combate desde el DM
+ */
+export const updateCombatState = async (req, res) => {
+    try {
+        const combatData = req.body;
+        dmContextService.updateCombatState(combatData);
+        res.json({ 
+            success: true, 
+            message: 'Estado de combate actualizado',
+            combatActive: dmContextService.combatActive,
+            enemiesCount: dmContextService.activeEnemies.length,
+            playersCount: dmContextService.activePlayers.length
+        });
+    } catch (error) {
+        console.error('Error actualizando estado de combate:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Actualizar bestiario personalizado
+ */
+export const updateCustomBestiary = async (req, res) => {
+    try {
+        const { bestiary, source = 'personalizado' } = req.body;
+        
+        if (!bestiary || !Array.isArray(bestiary)) {
+            return res.status(400).json({ success: false, error: 'Bestiario inválido' });
+        }
+        
+        dmContextService.updateCustomBestiary(bestiary, source);
+        res.json({ 
+            success: true, 
+            message: 'Bestiario actualizado',
+            creaturesCount: bestiary.length,
+            source: source
+        });
+    } catch (error) {
+        console.error('Error actualizando bestiario:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Obtener contexto del DM (para debug)
+ */
+export const getDMContext = async (req, res) => {
+    try {
+        const combatContext = dmContextService.getCombatContext();
+        res.json({
+            success: true,
+            combatActive: dmContextService.combatActive,
+            enemies: dmContextService.activeEnemies,
+            players: dmContextService.activePlayers,
+            initiativeOrder: dmContextService.initiativeOrder,
+            currentRound: dmContextService.currentRound,
+            currentTurn: dmContextService.currentTurn,
+            combatContext: combatContext,
+            bestiaryLoaded: !!dmContextService.bestiarioActual,
+            bestiarySource: dmContextService.bestiarioFuente,
+            bestiaryCount: dmContextService.bestiarioActual?.length || 0
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Resetear estado de combate
+ */
+export const resetCombat = async (req, res) => {
+    try {
+        dmContextService.resetCombatState();
+        res.json({ success: true, message: 'Estado de combate reseteado' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 

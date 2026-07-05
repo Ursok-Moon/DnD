@@ -167,6 +167,128 @@
       ]
     }
   },
+
+  {
+  "nombre": "DEFENSOR DE ACERO",
+  "descripcion": "Al alcanzar el nivel 3, tu ingenio te ha brindado un fiel compañero, un defensor de acero. Es amigable contigo y tus compañeros, y obedece tus órdenes. Consulta sus estadísticas de juego en el bloque de estadísticas del Defensor de Acero, que utiliza tu bonificador de competencia (BC) en varios aspectos. Tú determinas la apariencia de la criatura y si tiene dos o cuatro patas; tu elección no afecta sus estadísticas de juego.\n\nEn combate, el defensor comparte tu iniciativa, pero su turno comienza inmediatamente después del tuyo. Puede moverse y usar su reacción por su cuenta, pero la única acción que realiza en su turno es Esquivar, a menos que uses una acción adicional en tu turno para ordenarle que realice otra acción. Esta acción puede ser una de sus estadísticas o cualquier otra. Si estás incapacitado, el defensor puede realizar cualquier acción que desee, no solo Esquivar.\n\nSi se le lanza el conjuro Reparación, recupera 2d6 puntos de golpe. Si ha muerto en la última hora, puedes usar tus herramientas de herrero como acción para revivirlo, siempre que estés a menos de 1,5 metros de él y gastes un espacio de conjuro de nivel 1 o superior. El defensor de acero vuelve a la vida después de 1 minuto con todos sus puntos de golpe restaurados.\n\nAl final de un descanso prolongado, puedes crear un nuevo defensor de acero si tienes herramientas de herrero contigo. Si ya tienes un defensor creado con esta habilidad, el primero muere inmediatamente. El defensor también muere si tú mueres.",
+  "img_url": "",
+  "estadisticas": {
+    "tipo": "Constructo Mediano, Neutral",
+    "ca": "15 (armadura natural)",
+    "pg": "iguales al modificador por Constitución del defensor + tu modificador por Inteligencia + 5 veces tu nivel en esta clase",
+    "velocidad": "40 pies",
+    "FUE": "14 (+2)",
+    "DES": "12 (+1)",
+    "CON": "14 (+2)",
+    "INT": "4 (-3)",
+    "SAB": "10 (+0)",
+    "CAR": "6 (-2)",
+    "tiradas_salvacion": "Des +3, Con +4",
+    "habilidades": "Atletismo +4, Percepción +4",
+    "inmunidades_daño": "veneno",
+    "inmunidades_estados": "hechizado, agotado, envenenado",
+    "sentidos": "visión en la oscuridad 60 pies, Percepción pasiva 14",
+    "idiomas": "entiende los idiomas de su creador, pero no puede hablar",
+    "desafio": "0 (10 PX)",
+    "atributos_especiales": [
+      {
+        "nombre": "Poder del Maestro",
+        "descripcion": "El poder del guardián aumenta junto al de su maestro y creador. Cada vez que el herrero obtiene +1 en el bonificador por competencia, se refleja dotando de mejoras al defensor sumando 1 punto por cada sumatorio extra en: Tiradas de salvación, Habilidades, Bonificación de ataque, Bonificación de daño y Reparar."
+      },
+      {
+        "nombre": "Vigilante",
+        "descripcion": "El defensor no puede ser sorprendido."
+      }
+    ],
+    "acciones": [
+      {
+        "nombre": "Descarga de fuerza",
+        "descripcion": "Ataque con arma cuerpo a cuerpo: +4 a impactar, alcance 5 pies, un objetivo que pueda ver. Impacto: 6 (1d8 + 2) de daño de fuerza."
+      },
+      {
+        "nombre": "Reparar (3/Día)",
+        "descripcion": "El mecanismo mágico integrado dentro del defensor recupera 2d8 + 2 puntos de golpe a sí mismo, a otro constructo o a un objeto a 5 pies de él."
+      }
+    ],
+    "reacciones": [
+      {
+        "nombre": "Reflejar ataque",
+        "descripcion": "El defensor puede usar su reacción para imponer desventaja en la tirada de ataque de una criatura que pueda ver y que esté a 5 pies de él. El defensor puede hacer esto siempre y cuando la tirada de ataque sea contra una criatura que no sea el propio defensor."
+      }
+    ]
+  }
+},
+{
+  "nombre": "DEMOGORGON",
+  "descripcion": "Demogorgon, el Príncipe de los Demonios, es una de las entidades más poderosas y temidas del Abismo. Con dos cabezas de mandril que nunca están de acuerdo, esta pesadilla de dos brazos tentaculares y cola prensil gobierna la capa de Gaping Maw. Su mera presencia es suficiente para desgarrar la cordura de los mortales, y su mirada puede seducir, confundir o hipnotizar a sus enemigos. Es un ser de caos y destrucción que siembra el terror allá donde aparece.",
+  "img_url": "https://alchetron.com/cdn/demogorgon-dungeons-and-dragons-ecb2eb65-4274-4aaf-a220-1f3230ab018-resize-750.jpeg",
+  "estadisticas": {
+    "tipo": "Infernal Enorme (demonio), Caótico Maligno",
+    "ca": "22 (armadura natural)",
+    "pg": "464 (32d12 + 256)",
+    "velocidad": "50 pies, nadar 50 pies",
+    "FUE": "29 (+9)",
+    "DES": "14 (+2)",
+    "CON": "26 (+8)",
+    "INT": "20 (+5)",
+    "SAB": "17 (+3)",
+    "CAR": "25 (+7)",
+    "tiradas_salvacion": "Des +10, Con +16, Sab +11, Car +15",
+    "habilidades": "Perspicacia +11, Percepción +19",
+    "resistencias": "frío, fuego, relámpago",
+    "inmunidades_daño": "veneno; contundente, perforante y cortante de ataques no mágicos",
+    "inmunidades_estados": "encantado, agotamiento, asustado, envenenado",
+    "sentidos": "visión verdadera 120 pies, Percepción pasiva 29",
+    "idiomas": "todos, telepatía 120 pies",
+    "desafio": "26 (90.000 PX)",
+    "atributos_especiales": [
+      {
+        "nombre": "Resistencia Legendaria (3/Día)",
+        "descripcion": "Si Demogorgon falla una tirada de salvación, puede elegir tener éxito en su lugar."
+      },
+      {
+        "nombre": "Resistencia Mágica",
+        "descripcion": "Demogorgon tiene ventaja en las tiradas de salvación contra hechizos y otros efectos mágicos."
+      },
+      {
+        "nombre": "Dos Cabezas",
+        "descripcion": "Demogorgon tiene ventaja en las tiradas de salvación contra ser cegado, ensordecido, aturdido o quedar inconsciente."
+      },
+      {
+        "nombre": "Lanzamiento de Conjuros Innato",
+        "descripcion": "La aptitud mágica innata de Demogorgon es Carisma (salvación de conjuros CD 23). Puede lanzar de forma innata los siguientes conjuros, sin necesidad de componentes materiales: A voluntad: detectar magia, imagen mayor. 3/día cada uno: disipar magia, miedo, telequinesis. 1/día cada uno: debilitamiento mental, proyección de imagen."
+      }
+    ],
+    "acciones": [
+      {
+        "nombre": "Ataque múltiple",
+        "descripcion": "Demogorgon realiza dos ataques con tentáculos. Puede reemplazar un ataque con el uso de Mirada."
+      },
+      {
+        "nombre": "Tentáculo",
+        "descripcion": "Ataque con arma cuerpo a cuerpo: +17 a impactar, alcance 10 pies, un objetivo. Impacto: 28 (3d12 + 9) de daño de fuerza. Si el objetivo es una criatura, debe superar una tirada de salvación de Constitución CD 23 o su máximo de puntos de golpe se reduce en una cantidad igual al daño recibido. Esta reducción dura hasta que el objetivo complete un descanso prolongado. El objetivo muere si su máximo de puntos de golpe se reduce a 0."
+      },
+      {
+        "nombre": "Mirada",
+        "descripcion": "Demogorgon dirige su mirada mágica hacia una criatura que pueda ver a menos de 120 pies de él. El objetivo debe superar una tirada de salvación de Sabiduría CD 23 o sufrir uno de los siguientes efectos (elige uno o tira un d6):\n\n1-2: Mirada seductora. El objetivo queda aturdido hasta el comienzo del siguiente turno de Demogorgon o hasta que Demogorgon ya no esté dentro de su línea de visión.\n\n3-4: Mirada confusa. El objetivo sufre el efecto del conjuro de confusión sin realizar una tirada de salvación. El efecto dura hasta el inicio del siguiente turno de Demogorgon. Demogorgon no necesita concentrarse en el conjuro.\n\n5-6: Mirada hipnótica. El objetivo queda encantado por Demogorgon hasta el comienzo del siguiente turno de Demogorgon. Demogorgon decide cómo el objetivo encantado usa su acción, reacción y movimiento."
+      }
+    ],
+    "acciones_legendarias": [
+      {
+        "nombre": "Mirada",
+        "descripcion": "Demogorgon usa Mirada y debe usar Mirada Seductora o Mirada Confusa."
+      },
+      {
+        "nombre": "Cola",
+        "descripcion": "Ataque con arma cuerpo a cuerpo: +17 a impactar, alcance 15 pies, un objetivo. Impacto: 20 (2d10 + 9) de daño contundente más 11 (2d10) de daño necrótico."
+      },
+      {
+        "nombre": "Lanzar conjuro (cuesta 2 acciones)",
+        "descripcion": "Demogorgon usa Lanzamiento de Conjuros Innato."
+      }
+    ]
+  }
+},
   {
     "nombre": "DEVA",
     "descripcion": "Los devas son ángeles que actúan como mensajeros o agentes divinos en el Plano Material, el Shadowfell o el Feywild, y pueden adoptar un aspecto adecuado al reino al que son enviados.",
@@ -1422,7 +1544,7 @@
         },
         {
           "nombre": "Rayos oculares",
-          "descripcion": "El contemplador dispara tres de los siguientes rayos oculares mágicos determinados aleatoriamente (vuelve a tirar los resultados duplicados) contra entre uno y tres objetivos que pueda ver y se encuentren a 120 pies o menos de distancia. 1. Rayo cautivador: La criatura objetivo deberá hacer una tirada de salvación de Sabiduría CD 16. Si falla, estará hechizada por el contemplador durante 1 hora o hasta que el contemplador la dañe. 2. Rayo paralizador: La criatura objetivo deberá superar una tirada de salvación de Constitución CD 16 o quedará paralizada durante 1 minuto. El objetivo puede repetir la tirada de salvación al final de cada uno de sus turnos, librándose del efecto si tiene éxito. 3. Rayo aterrador: La criatura objetivo deberá superar una tirada de salvación de Sabiduría CD 16 o estará asustada durante 1 minuto. El objetivo puede repetir la tirada de salvación al final de cada uno de sus turnos, librándose del efecto si tiene éxito. 4. Rayo ralentizador: La criatura objetivo deberá hacer una tirada de salvación de Destreza CD 16. Si falla, su velocidad se verá reducida a la mitad durante 1 minuto y, además, no podrá llevar a cabo reacciones y tendrá que elegir si quiere realizar una acción o una acción adicional en su turno, solo una de las dos. La criatura puede repetir la tirada de salvación al final de cada uno de sus turnos, librándose del efecto si tiene éxito. 5. Rayo debilitador: La criatura objetivo deberá hacer una tirada de salvación de Constitución CD 16, sufriendo 36 (8d8) de daño de necrótico si la falla, o la mitad de ese daño si la supera. 6. Rayo telequinético: Si el objetivo es una criatura, esta deberá superar una tirada de salvación de Fuerza CD 16 o el contemplador podrá moverla hasta 30 pies en cualquier dirección. Además, estará apresada por la fuerza telequinética del rayo hasta el principio del siguiente turno del contemplador o hasta que este sea incapacitado. Si el objetivo es un objeto de 300 libras o menos de peso que no esté llevando ni vistiendo nadie, el contemplador podrá moverlo hasta 30 pies en cualquier dirección. El contemplador es capaz de manipular con cuidado objetos usando este rayo, para así utilizar herramientas simples o abrir puertas y contenedores. 7. Rayo somnífero: La criatura objetivo deberá superar una tirada de salvación de Sabiduría CD 16 o se dormirá y estará inconsciente durante 1 minuto. Se despertará si recibe algún daño o si otra criatura utiliza su acción para despertarla. Este rayo no tiene efecto alguno sobre autómatas o muertos vivientes. 8. Rayo petrificador: La criatura objetivo deberá hacer una tirada de salvación de Destreza CD 16. Si falla, empezará a convertirse en piedra, estará apresada y deberá repetir la tirada de salvación al final de su próximo turno. Si tiene éxito en la tirada, el efecto termina inmediatamente. Si falla, la criatura estará petrificada hasta que sea liberada mediante un conjuro de restablecimiento mayor o algún efecto mágico similar. 9. Rayo desintegrador: Si el objetivo es una criatura, esta deberá tener éxito en una tirada de salvación de Destreza CD 16 o sufrirá 45 (10d8) de daño de fuerza. Si este daño reduce los puntos de golpe de la criatura a 0, su cuerpo se convertirá en una pila de fino polvo gris. Si el objetivo es un objeto no mágico o una creación de fuerza mágica y su tamaño es Grande o menor, será desintegrado sin necesidad de tirada de salvación alguna. Sin embargo, si es un objeto o una creación de fuerza mágica y su tamaño es Enorme o mayor, el rayo desintegrará un fragmento equivalente a un cubo de 10 pies de lado. 10. Rayo mortal: La criatura objetivo deberá superar una tirada de salvación de Destreza CD 16 o sufrirá 55 (10d10) de daño necrótico. Si el rayo reduce sus puntos de golpe a 0, morirá."
+          "descripcion": "El contemplador dispara tres de los siguientes rayos oculares mágicos determinados aleatoriamente (vuelve a tirar los resultados duplicados) contra entre uno y tres objetivos que pueda ver y se encuentren a 120 pies o menos de distancia.<br><b>1. Rayo cautivador:</b> La criatura objetivo deberá hacer una tirada de salvación de Sabiduría CD 16. Si falla, estará hechizada por el contemplador durante 1 hora o hasta que el contemplador la dañe.<br><b>2. Rayo paralizador:</b> La criatura objetivo deberá superar una tirada de salvación de Constitución CD 16 o quedará paralizada durante 1 minuto. El objetivo puede repetir la tirada de salvación al final de cada uno de sus turnos, librándose del efecto si tiene éxito.<br><b>3. Rayo aterrador:</b> La criatura objetivo deberá superar una tirada de salvación de Sabiduría CD 16 o estará asustada durante 1 minuto. El objetivo puede repetir la tirada de salvación al final de cada uno de sus turnos, librándose del efecto si tiene éxito.<br><b>4. Rayo ralentizador:</b> La criatura objetivo deberá hacer una tirada de salvación de Destreza CD 16. Si falla, su velocidad se verá reducida a la mitad durante 1 minuto y, además, no podrá llevar a cabo reacciones y tendrá que elegir si quiere realizar una acción o una acción adicional en su turno, solo una de las dos. La criatura puede repetir la tirada de salvación al final de cada uno de sus turnos, librándose del efecto si tiene éxito.<br><b>5. Rayo debilitador:</b> La criatura objetivo deberá hacer una tirada de salvación de Constitución CD 16, sufriendo 36 (8d8) de daño de necrótico si la falla, o la mitad de ese daño si la supera.<br><b>6. Rayo telequinético:</b> Si el objetivo es una criatura, esta deberá superar una tirada de salvación de Fuerza CD 16 o el contemplador podrá moverla hasta 30 pies en cualquier dirección. Además, estará apresada por la fuerza telequinética del rayo hasta el principio del siguiente turno del contemplador o hasta que este sea incapacitado. Si el objetivo es un objeto de 300 libras o menos de peso que no esté llevando ni vistiendo nadie, el contemplador podrá moverlo hasta 30 pies en cualquier dirección. El contemplador es capaz de manipular con cuidado objetos usando este rayo, para así utilizar herramientas simples o abrir puertas y contenedores.<br><b>7. Rayo somnífero:</b> La criatura objetivo deberá superar una tirada de salvación de Sabiduría CD 16 o se dormirá y estará inconsciente durante 1 minuto. Se despertará si recibe algún daño o si otra criatura utiliza su acción para despertarla. Este rayo no tiene efecto alguno sobre autómatas o muertos vivientes.<br><b>8. Rayo petrificador:</b> La criatura objetivo deberá hacer una tirada de salvación de Destreza CD 16. Si falla, empezará a convertirse en piedra, estará apresada y deberá repetir la tirada de salvación al final de su próximo turno. Si tiene éxito en la tirada, el efecto termina inmediatamente. Si falla, la criatura estará petrificada hasta que sea liberada mediante un conjuro de restablecimiento mayor o algún efecto mágico similar.<br><b>9. Rayo desintegrador:</b> Si el objetivo es una criatura, esta deberá tener éxito en una tirada de salvación de Destreza CD 16 o sufrirá 45 (10d8) de daño de fuerza. Si este daño reduce los puntos de golpe de la criatura a 0, su cuerpo se convertirá en una pila de fino polvo gris. Si el objetivo es un objeto no mágico o una creación de fuerza mágica y su tamaño es Grande o menor, será desintegrado sin necesidad de tirada de salvación alguna. Sin embargo, si es un objeto o una creación de fuerza mágica y su tamaño es Enorme o mayor, el rayo desintegrará un fragmento equivalente a un cubo de 10 pies de lado.<br><b>10. Rayo mortal</b>: La criatura objetivo deberá superar una tirada de salvación de Destreza CD 16 o sufrirá 55 (10d10) de daño necrótico. Si el rayo reduce sus puntos de golpe a 0, morirá."
         }
       ],
       "acciones_legendarias": [
@@ -9925,6 +10047,7 @@
   {
     "nombre": "MEPHIT DE BARRO",
     "descripcion": "Los mephits de barro son seres de tierra y agua lentos y grasientos. Se quejan constantemente a cualquiera que les escuche, suplicando constantemente atención y tesoros.",
+    "img_url":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSyK8dVg03os1pqDshSvyN-6WsPZL8UWylJ1BUWKrroKA&s=10",
     "estadisticas": {
       "tipo": "Elemental Pequeño, neutral malvado",
       "ca": "11",
@@ -9967,6 +10090,7 @@
   {
     "nombre": "MEPHIT DE HIELO",
     "descripcion": "Hechos de aire gélido y agua, los mephits de hielo son distantes y fríos, superando en crueldad a todos los demás mephits.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/47139/2/1000/1000/638741964309617781.jpeg",
     "estadisticas": {
       "tipo": "Elemental Pequeño, neutral malvado",
       "ca": "11",
@@ -10014,6 +10138,7 @@
   {
     "nombre": "MEPHIT DE HUMO",
     "descripcion": "Los mephits de humo son criaturas toscas y perezosas, hechas de aire y fuego. Desprenden humo continuamente. Rara vez dicen la verdad y les encanta engañar y reírse de otras criaturas.",
+    "img_url":"https://www.aidedd.org/monster/img/mephit-smoke.jpg",
     "estadisticas": {
       "tipo": "Elemental Pequeño, neutral malvado",
       "ca": "12",
@@ -10056,6 +10181,7 @@
   {
     "nombre": "MEPHIT DE MAGMA",
     "descripcion": "Estos mephits están compuestos de tierra y fuego. Brillan con un color rojizo y dejan escapar gotas de lava fundida. Tardan en entender el significado de las palabras y actos de otras criaturas.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/47139/49/1000/1000/638741964372215335.jpeg",
     "estadisticas": {
       "tipo": "Elemental Pequeño, neutral malvado",
       "ca": "11",
@@ -10103,6 +10229,7 @@
   {
     "nombre": "MEPHIT DE POLVO",
     "descripcion": "A estos mephits, compuestos de aire y tierra, les atraen las catacumbas y sienten una fascinación morbosa por la muerte.",
+    "img_url":"https://www.aidedd.org/monster/img/mephit-dust.jpg",
     "estadisticas": {
       "tipo": "Elemental Pequeño, neutral malvado",
       "ca": "12",
@@ -10146,6 +10273,7 @@
   {
     "nombre": "MEPHIT DE VAPOR",
     "descripcion": "Estos mephits están formados de fuego y agua y emiten hilillos de vapor al sisear. Dejan un rastro de agua caliente allí por donde pasan. Mandones y extremadamente susceptibles, se han autoproclamado los señores supremos de todos los mephits.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/47139/271/1000/1000/638741964680156603.jpeg",
     "estadisticas": {
       "tipo": "Elemental Pequeño, neutral malvado",
       "ca": "10",
@@ -10402,6 +10530,7 @@
   {
     "nombre": "MIMETO",
     "descripcion": "Los mimetos son depredadores capaces de asumir la forma de objetos inanimados para atraer a sus presas a su perdición. En las mazmorras, estas astutas criaturas suelen copiar la apariencia de puertas y cofres, pues han aprendido que estos aspectos son especialmente efectivos a la hora de captar la atención de potenciales víctimas.",
+    "img_url":"https://pausasaludstar.wordpress.com/wp-content/uploads/2017/11/unnamed-2_jm29nj.jpg?w=313&h=312",
     "estadisticas": {
       "tipo": "Monstruosidad Mediana (cambiaformas), neutral",
       "ca": "12 (armadura natural)",
@@ -10501,6 +10630,7 @@
   {
     "nombre": "MONODRON",
     "descripcion": "Los monodrons solo pueden realizar una tarea el mismo tiempo y son capaces de retransmitir un mensaje de hasta cuarenta y ocho palabras.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/5/5b/Monodrone-5e.jpg/revision/latest?cb=20171011150019",
     "estadisticas": {
       "tipo": "Autómata Mediano, legal neutral",
       "ca": "15 (armadura natural)",
@@ -10540,6 +10670,7 @@
   {
     "nombre": "DUODRON",
     "descripcion": "Los duodrons, que poseen forma de bloque, supervisan las unidades de monodrons y pueden llevar a cabo hasta dos tareas a la vez.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/e/e2/Duodrone-5e.jpeg/revision/latest?cb=20171002153952",
     "estadisticas": {
       "tipo": "Autómata Mediano, legal neutral",
       "ca": "15 (armadura natural)",
@@ -10583,6 +10714,7 @@
   {
     "nombre": "TRIDRON",
     "descripcion": "Los tridrons tienen la forma de pirámides invertidas y lideran a los modrons inferiores en combate.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/a/a9/Tridrone-5e.jpeg/revision/latest?cb=20171002155847",
     "estadisticas": {
       "tipo": "Autómata Mediano, legal neutral",
       "ca": "15 (armadura natural)",
@@ -10626,6 +10758,7 @@
   {
     "nombre": "CUADRON",
     "descripcion": "Los cuadrons son guerreros astutos, que sirven de artillería y oficiales de campo en los regimientos de los ejércitos modrons.",
+    "img_url":"https://files.d20.io/images/424032605/FDfGcdLiXyGvPWMIeGf12g/original.png",
     "estadisticas": {
       "tipo": "Autómata Mediano, legal neutral",
       "ca": "16 (armadura natural)",
@@ -10670,6 +10803,7 @@
   {
     "nombre": "PENTADRON",
     "descripcion": "Los pentadrones supervisan a la población trabajadora de Mechanus y son capaces de improvisar para adaptarse a situaciones nuevas.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/0/0a/Pentadrone.jpeg/revision/latest?cb=20171004214950",
     "estadisticas": {
       "tipo": "Autómata Grande, legal neutral",
       "ca": "16 (armadura natural)",
@@ -10714,6 +10848,7 @@
   {
     "nombre": "MOLE SOMBRÍA",
     "descripcion": "Las moles sombrías son horrores abominables que proceden de las profundidades de la tierra. Se abren paso excavando hasta el interior de complejos de cuevas, mazmorras o asentamientos del Underdark en busca de alimento.",
+    "img_url":"https://wa-cdn.nyc3.cdn.digitaloceanspaces.com/user-data/production/87bedd55-bd64-4dd7-a4c6-8a733740a5d7/uploads/images/df67caf2ab4e8b7c4a67e9d2cd5babfa.png",
     "estadisticas": {
       "tipo": "Monstruosidad Grande, caótica malvada",
       "ca": "18 (armadura natural)",
@@ -10757,6 +10892,7 @@
   {
     "nombre": "MOMIA",
     "descripcion": "Alzadas mediante oscuros rituales funerarios, las momias surgen de la amortajada quietud de una tumba o templo olvidados en el pasado. Cuando se las despierta de su letargo, castigan a los intrusos con el poder de su impía maldición.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/47139/102/1000/1000/638741964444245665.png",
     "estadisticas": {
       "tipo": "Muerto viviente Mediano, legal malvado",
       "ca": "11 (armadura natural)",
@@ -10795,6 +10931,7 @@
   {
     "nombre": "SEÑOR DE LAS MOMIAS",
     "descripcion": "En las tumbas de los antiguos, los monarcas tiranos y los sumos sacerdotes de los dioses oscuros yacen en un letargo sin sueños, esperando el momento en que puedan reclamar sus tronos y volver a forjar sus imperios ancestrales.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/47139/100/1000/1000/638741964441125626.png",
     "estadisticas": {
       "tipo": "Muerto viviente Mediano, legal malvado",
       "ca": "17 (armadura natural)",
@@ -10884,6 +11021,7 @@
   {
     "nombre": "MONSTRUO CORROSIVO",
     "descripcion": "La mayoría de enanos preferirían enfrentarse a un escuadrón de orcos antes que a un solo monstruo corrosivo. Estas extrañas criaturas, normalmente dóciles, corroen los metales ferrosos y engullen el óxido resultante.",
+    "img_url":"https://static.fandomspot.com/images/11/10321/07-rust-monster-5e-creature.jpg",
     "estadisticas": {
       "tipo": "Monstruosidad Mediana, sin alineamiento",
       "ca": "14 (armadura natural)",
@@ -10923,6 +11061,7 @@
   {
     "nombre": "NAGA ÓSEA",
     "descripcion": "Como respuesta a la larga historia de conflictos entre los yuan-tis y las nagas, aquellos crearon un ritual nigromántico capaz de interrumpir el proceso de resurrección de una naga, transformando su cuerpo aún vivo en un muerto viviente esquelético a su servicio.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/8/88/Bone_naga-5e.jpg/revision/latest?cb=20171010163229",
     "estadisticas": {
       "tipo": "Muerto viviente Grande, legal malvado",
       "ca": "15 (armadura natural)",
@@ -10956,6 +11095,7 @@
   {
     "nombre": "NAGA ESPIRITUAL",
     "descripcion": "Las nagas espirituales viven envueltas en la melancolía y el resentimiento, por lo que crean constantemente planes para vengarse de las criaturas que las han ofendido, o que ellas piensan que lo han hecho.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/30833/682/1000/1000/638063870353621782.png",
     "estadisticas": {
       "tipo": "Monstruosidad Grande, caótica malvada",
       "ca": "15 (armadura natural)",
@@ -11082,6 +11222,7 @@
   {
     "nombre": "ALFOMBRA ASFIXIANTE",
     "descripcion": "Una alfombra asfixiante puede tener diversas formas, desde una moqueta delicadamente tejida digna de una reina hasta una tosca estera en la choza de un campesino. Las criaturas capaces de detectar magia pueden sentir el aura mágica falsa de la alfombra.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/30761/845/1000/1000/638061095923531915.png",
     "estadisticas": {
       "tipo": "Autómata Grande, sin alineamiento",
       "ca": "12",
@@ -11123,6 +11264,7 @@
   {
     "nombre": "ARMADURA ANIMADA",
     "descripcion": "Esta cáscara hueca de acero se mueve con un ruido quejumbroso, mientras las pesadas placas que la componen se golpean y rozan entre ellas como el espíritu vengativo de un caballero deshonrado.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/31312/506/1000/1000/638084408333616236.png",
     "estadisticas": {
       "tipo": "Autómata Mediano, sin alineamiento",
       "ca": "18 (armadura natural)",
@@ -11164,6 +11306,7 @@
   {
     "nombre": "ESPADA VOLADORA",
     "descripcion": "Las espadas voladoras danzan en el aire, luchando con la confianza de un guerrero que no puede ser herido. Las armas más comunes animadas con este tipo de magia son las espadas.",
+    "img_url":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRViDtiQYq8EliFhAfxNLnmtn6_tqG5176aLWWibXoPINLyaHXc7NS5yHo&s=10",
     "estadisticas": {
       "tipo": "Autómata Pequeño, sin alineamiento",
       "ca": "17 (armadura natural)",
@@ -11232,6 +11375,7 @@
   {
     "nombre": "SEMIOGRO (OGRILLON)",
     "descripcion": "Cuando un ogro tiene descendencia con un humano, trasgo, osgo u orco, el resultado es siempre un semiogro. Los ogros no se aparean con enanos, medianos ni elfos. Se los comen.",
+    "img_url":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQj-3hqDDRFQMLKVyvQzt47oyaqnN4rE3Sw-sFydWA96l03ZHf5Sor2Ji0&s=10",
     "estadisticas": {
       "tipo": "Gigante Grande, cualquier alineamiento caótico",
       "ca": "12 (armadura de pieles)",
@@ -11728,6 +11872,7 @@
   {
     "nombre": "PERYTON",
     "descripcion": "Aunque este monstruoso carnívoro es capaz de alimentarse de cualquier criatura, su plato preferido son los humanoides, en especial elfos, semielfos y humanos. Cuando mata a un humanoide, el peryton le arranca el corazón y se lo lleva a su nido para devorarlo allí.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/8/8d/Peryton5e.png/revision/latest?cb=20171010174015",
     "estadisticas": {
       "tipo": "Monstruosidad Mediana, caótica malvada",
       "ca": "13 (armadura natural)",
@@ -11777,6 +11922,7 @@
   {
     "nombre": "PESADILLA",
     "descripcion": "Las pesadillas aparecen rodeadas de una nube de humo, con su crin, cola y pezuñas envueltas en llamas. La espeluznante y oscura forma de estos seres se mueve con una velocidad sobrenatural, desapareciendo en una nube de azufre tan rápidamente como apareció.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/4/4c/Nightmare-5e.jpg/revision/latest?cb=20171010171957",
     "estadisticas": {
       "tipo": "Infernal Mediano, neutral malvado",
       "ca": "13 (armadura natural)",
@@ -11817,6 +11963,7 @@
   {
     "nombre": "PIXIE",
     "descripcion": "Alzándose tan solo 1 pie (30 cm) de altura, los pixies parecen elfos diminutos, con alas delicadas como las de las libélulas o las mariposas, tan brillantes como un claro amanecer y tan luminosas como la luna llena.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/3/35/Pixie_Guide.jpg/revision/latest?cb=20211127120533",
     "estadisticas": {
       "tipo": "Feérico Diminuto, neutral bueno",
       "ca": "15",
@@ -11910,6 +12057,7 @@
   {
     "nombre": "QUAGGOTH",
     "descripcion": "Salvajes y territoriales, los quaggoths son criaturas que trepan por las simas del Underdark. Vapulean a sus enemigos cuando entran en frenesí, volviéndose aún más letales cuando están próximos a la muerte.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/1/18/Quaggoth-5e.png/revision/latest?cb=20171011012402",
     "estadisticas": {
       "tipo": "Humanoide Mediano (quaggoth), caótico neutral",
       "ca": "13 (armadura natural)",
@@ -11948,6 +12096,7 @@
   {
     "nombre": "THONOT QUAGGOTH",
     "descripcion": "Algunos quaggoths absorben la energía psiónica que cubre ciertos lugares del Underdark. Cuando una tribu descubre que alguno de ellos ha heredado tal poder, lo convierten a la fuerza en el chamán de la tribu, o thonot.",
+    "img_url":"https://files.d20.io/images/424067547/SlkzfJ0dx1aNPsSjCMT4Pw/original.png",
     "estadisticas": {
       "tipo": "Humanoide Mediano (quaggoth), caótico neutral",
       "ca": "13 (armadura natural)",
@@ -12076,6 +12225,7 @@
   {
     "nombre": "REDIVIVO",
     "descripcion": "Los redivivos surgen del alma de un mortal que ha sufrido un final cruel e injusto. Vuelven a la vida para saciar su sed de venganza contra aquellos que acabaron con su vida.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/16/558/1000/1000/636376343309269811.jpeg",
     "estadisticas": {
       "tipo": "Muerto viviente Mediano, neutral",
       "ca": "13 (armadura de cuero)",
@@ -12243,6 +12393,7 @@
   {
     "nombre": "SABUESO INFERNAL",
     "descripcion": "Los sabuesos infernales son entes monstruosos capaces de exhalar fuego y que asumen la forma de imponentes perros. Se les puede encontrar en los campos de batalla de Aqueronte y a lo largo y ancho de los Planos Inferiores.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/30788/714/1000/1000/638062180069124280.png",
     "estadisticas": {
       "tipo": "Infernal Mediano, legal malvado",
       "ca": "15 (armadura natural)",
@@ -12284,6 +12435,7 @@
   {
     "nombre": "SAGA CETRINA",
     "descripcion": "Las sagas cetrinas, retorcidas y llenas de odio, moran en las cuevas de bosques moribundos, pantanos solitarios y brezales cubiertos de niebla. Estas sagas adoran manipular a otros para que hagan su voluntad, de manera que ocultan sus verdaderas intenciones tras varias capas de mentiras.",
+    "img_url":"https://static.wikia.nocookie.net/reinosolvidados/images/2/2b/Aquelarre_de_brujas.webp/revision/latest?cb=20230324223143&path-prefix=es",
     "estadisticas": {
       "tipo": "Feérico Mediano, neutral malvado",
       "ca": "17 (armadura natural)",
@@ -12332,6 +12484,7 @@
   {
     "nombre": "SAGA DE LA NOCHE",
     "descripcion": "Taimadas y traicioneras, las sagas de la noche anhelan ver cómo las virtudes se tornan en defectos: el amor en obsesión, la amabilidad en odio, la devoción en desprecio y la generosidad en egoísmo.",
+    "img_url":"https://i.pinimg.com/736x/b3/40/e9/b340e9e61d5d0c67d437b66db2295397.jpg",
     "estadisticas": {
       "tipo": "Infernal Mediano, neutral malvado",
       "ca": "17 (armadura natural)",
@@ -12382,6 +12535,7 @@
   {
     "nombre": "SAGA DE LOS MARES",
     "descripcion": "Las sagas de los mares establecen sus guaridas bajo aguas contaminadas y fétidas, rodeadas de merrows y otros monstruos acuáticos. La belleza provoca fuertes ataques de ira en estos seres.",
+    "img_url":"https://www.aidedd.org/monster/img/sea-hag.jpg",
     "estadisticas": {
       "tipo": "Feérico Mediano, caótico malvado",
       "ca": "14 (armadura natural)",
@@ -12585,6 +12739,7 @@
   {
     "nombre": "SERPIENTE DE FUEGO",
     "descripcion": "Las salamandras reptan por el Mar de Cenizas del Plano Elemental del Fuego, con sus colas sinuosas y dorsos dentados al rojo vivo. Sus cuerpos emiten un calor intenso y sus ojos resplandecen como dos velas alojadas en las profundas cuencas de sus cabezas aguileñas.",
+    "img_url":"https://files.d20.io/images/423924668/7x1AXHjXWk-EVENUi1jkeA/original.png?1736439640",
     "estadisticas": {
       "tipo": "Elemental Mediano, neutral malvado",
       "ca": "14 (armadura natural)",
@@ -12852,6 +13007,7 @@
   {
     "nombre": "SIRÉNIDO",
     "descripcion": "Los sirénidos son humanoides con el torso de un humano y la parte inferior del cuerpo de un pez. Suelen adornar su piel y sus escamas con conchas.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/30833/374/1000/1000/638063862492555953.png",
     "estadisticas": {
       "tipo": "Humanoide Mediano (sirénido), neutral",
       "ca": "11",
@@ -12884,6 +13040,7 @@
   {
     "nombre": "RENACUAJO SLAAD",
     "descripcion": "En el Caos en Perpetua Mutación de Limbo, hay fragmentos de bosques y prados, castillos en ruinas e islas remotas que flotan a deriva sobre un tumulto de fuego, agua, tierra y aire. Los principales habitantes de este plano inhóspito son los batracios slaads.",
+    "img_url":"https://static1.cbrimages.com/wordpress/wp-content/uploads/2025/03/slaad-tadpole-from-the-d-d-5e-2025-mm.jpg",
     "estadisticas": {
       "tipo": "Aberración Diminuta, caótica neutral",
       "ca": "12",
@@ -12916,6 +13073,7 @@
   },
   {
     "nombre": "SLAAD ROJO",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/e/e1/Red_slaad-5e.jpg/revision/latest?cb=20170331180533",
     "descripcion": "",
     "estadisticas": {
       "tipo": "Aberración Grande, caótica neutral",
@@ -12961,6 +13119,7 @@
   },
   {
     "nombre": "SLAAD AZUL",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/d/dd/Blue_slaad-5e.jpg/revision/latest?cb=20170331161900",
     "descripcion": "",
     "estadisticas": {
       "tipo": "Aberración Grande, caótica neutral",
@@ -13007,6 +13166,7 @@
   {
     "nombre": "SLAAD VERDE",
     "descripcion": "Los slaads verdes son sorprendentemente inteligentes y poseen una aptitud mágica innata. Pueden cambiar su forma para hacerse pasar por humanoides.",
+    "img_url":"https://static.wikia.nocookie.net/los-archivos-de-queronea/images/6/60/D2528e774205d4db42c0aa92590a29a7.jpg/revision/latest/scale-to-width-down/1200?cb=20170206051559&path-prefix=es",
     "estadisticas": {
       "tipo": "Aberración Grande (cambiaformas), caótica neutral",
       "ca": "16 (armadura natural)",
@@ -13068,6 +13228,7 @@
   {
     "nombre": "SLAAD GRIS",
     "descripcion": "Cuando están fuera de Limbo, los slaads grises actúan como extensiones vivas de la voluntad de sus maestros, los slaads de la muerte. Viajan al Plano Material como heraldos de la fatalidad, a menudo asumiendo su forma humanoide.",
+    "img_url":"https://www.aidedd.org/dnd/images/gray-slaad.jpg",
     "estadisticas": {
       "tipo": "Aberración Grande (cambiaformas), caótica neutral",
       "ca": "18 (armadura natural)",
@@ -13129,6 +13290,7 @@
   {
     "nombre": "SLAAD DE LA MUERTE",
     "descripcion": "Los slaads de la muerte están imbuidos de energía procedente del Plano Negativo y ejemplifican la corrupción maligna del caos, de modo que obtienen un placer sádico causando daño a los demás.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/f/fe/Deathslaad3e.jpg/revision/latest?cb=20200610033910",
     "estadisticas": {
       "tipo": "Aberración Mediana (cambiaformas), caótica malvada",
       "ca": "18 (armadura natural)",
@@ -13190,6 +13352,7 @@
   {
     "nombre": "SOMBRA",
     "descripcion": "Las sombras son muertos vivientes que parecen oscuras y desproporcionadas sombras humanoides. Surgen de la oscuridad para alimentarse de la vitalidad de las criaturas vivas.",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/30835/825/1000/1000/638063922274815873.png",
     "estadisticas": {
       "tipo": "Muerto viviente Mediano, caótico malvado",
       "ca": "12",
@@ -13284,6 +13447,7 @@
   {
     "nombre": "TARASCA",
     "descripcion": "La legendaria tarasca es posiblemente el monstruo más temido del Plano Material. Se cree que solo existe una de estas criaturas, pero nadie puede predecir cuándo o dónde atacará.",
+    "img_url":"https://static.wikia.nocookie.net/monster/images/f/f5/Tarrasque.jpg/revision/latest?cb=20170524132940",
     "estadisticas": {
       "tipo": "Monstruosidad Gargantuesca (titán), sin alineamiento",
       "ca": "25 (armadura natural)",
@@ -13368,6 +13532,7 @@
   {
     "nombre": "THRI-KREEN",
     "descripcion": "Los thri-kreens vagan por desiertos y sabanas de todo el mundo, evitando al resto de razas. Se comunican mediante un lenguaje no verbal, entrechocando sus mandíbulas y ondulando sus antenas.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/3/3d/Thri-kreen_SJ_5e.png/revision/latest?cb=20220822092322",
     "estadisticas": {
       "tipo": "Humanoide Mediano (thri-kreen), caótico neutral",
       "ca": "15 (armadura natural)",
@@ -13438,6 +13603,7 @@
   {
     "nombre": "TROGLODITA",
     "descripcion": "Los salvajes y degenerados trogloditas habitan en las estrechas profundidades del Underdark, donde libran constantemente guerras entre ellos mismos y contra sus vecinos.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/0/0d/Troglodyte-5e.png/revision/latest?cb=20171011022105",
     "estadisticas": {
       "tipo": "Humanoide Mediano (troglodita), caótico malvado",
       "ca": "11 (armadura natural)",
@@ -13769,6 +13935,7 @@
   },
   {
     "nombre": "ENGENDRO VAMPÍRICO",
+    "img_url":"https://files.d20.io/images/424457786/iHZGAG6DKDMd41wgFh0FdQ/original.png?1736702514",
     "descripcion": "La mayoría de las víctimas de un vampiro se convierten en engendros vampíricos, criaturas voraces con su misma sed de sangre, pero bajo el control de sus creadores.",
     "estadisticas": {
       "tipo": "Muerto viviente Mediano, neutral malvado",
@@ -13974,6 +14141,7 @@
   {
     "nombre": "ABOMINACIÓN YUAN-TI",
     "descripcion": "Estas abominaciones son monstruosas serpientes con torso y brazos humanoides, pero forman la casta más alta en la sociedad yuan-ti, ya que son los que más se parecen a la raza que los dioses serpiente intentaron crear.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/7/74/Monster_Manual_5e_-_Yuan-ti_-_p307.jpg/revision/latest?cb=20141116095915",
     "estadisticas": {
       "tipo": "Monstruosidad Grande (cambiaformas, yuan-ti), neutral malvada",
       "ca": "15 (armadura natural)",
@@ -14032,6 +14200,7 @@
   {
     "nombre": "CORRUPTO YUAN-TI",
     "descripcion": "Los corruptos son una horrible mezcla de humano con rasgos viperinos. Se sabe que existen tres tipos de corruptos, aunque es posible que haya más. Estas criaturas son la casta media de la sociedad yuan-ti.",
+    "img_url":"https://files.d20.io/images/424940548/xWBo4IBkZgjX_Cb_txtRiQ/original.png",
     "estadisticas": {
       "tipo": "Monstruosidad Mediana (cambiaformas, yuan-ti), neutral malvada",
       "ca": "12",
@@ -14122,6 +14291,7 @@
   {
     "nombre": "YUAN-TI PURASANGRE",
     "descripcion": "Los purasangres son la casta más baja de la sociedad yuan-ti. Casi parecen humanos, pero cuando se les examina con detenimiento se aprecian algunos indicios de su verdadera naturaleza.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/5/59/Yuan-ti_Pureblood-5e.png/revision/latest?cb=20171011135901",
     "estadisticas": {
       "tipo": "Humanoide Mediano (yuan-ti), neutral malvado",
       "ca": "11",
@@ -14168,6 +14338,7 @@
   {
     "nombre": "ARCANALOTH",
     "descripcion": "Los arcanaloths son taimados entes con cabeza de chacal y cuerpo humanoide que utilizan su magia para tomar cualquier forma humanoide. Son lanzadores de conjuros inteligentes que ansían conocimientos y poder.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/9/90/Arcanaloth-5e.png/revision/latest?cb=20171010191559",
     "estadisticas": {
       "tipo": "Infernal Mediano (yugoloth), neutral malvado",
       "ca": "17 (armadura natural)",
@@ -14220,6 +14391,7 @@
   {
     "nombre": "MEZZOLOTH",
     "descripcion": "La gran mayoría de yugoloths son mezzoloths, insectos humanoides cubiertos de placas densas de quitina. Sirven como soldados en los ejércitos de yugoloths.",
+    "img_url":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcROFjTsNhilSWIF2D6Zdj_tmuj2sJ3PstLEA1eybux-Tg&s=10",
     "estadisticas": {
       "tipo": "Infernal Mediano (yugoloth), neutral malvado",
       "ca": "18 (armadura natural)",
@@ -14275,6 +14447,7 @@
   {
     "nombre": "NYCALOTH",
     "descripcion": "Los nycaloths, que parecen gárgolas musculosas, son las tropas de choque de élite aéreas del ejército yugoloth. Sus poderosas alas de murciélago les permiten volar sobre el campo de batalla.",
+    "img_url":"https://files.d20.io/images/424035689/t4JniwoeZRWB3jtq8nghwQ/original.png",
     "estadisticas": {
       "tipo": "Infernal Grande (yugoloth), neutral malvado",
       "ca": "18 (armadura natural)",
@@ -14330,6 +14503,7 @@
   {
     "nombre": "ULTROLOTH",
     "descripcion": "Los ultroloths comandan los ejércitos yugoloths de la Guerra de la Sangre. Parecen humanoides esbeltos de piel gris con la cabeza alargada. Su cara no tiene más rasgos que dos ojos ovoides.",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/3/34/Ultroloth-5e.png/revision/latest?cb=20171010182402",
     "estadisticas": {
       "tipo": "Infernal Mediano (yugoloth), neutral malvado",
       "ca": "19 (armadura natural)",
@@ -14454,7 +14628,8 @@
   },
   {
     "nombre": "CONTEMPLADOR ZOMBI",
-    "descripcion": "",
+    "img_url":"https://static.wikia.nocookie.net/forgottenrealms/images/c/c7/Beholder_zombie-5e.png/revision/latest?cb=20171011164729",
+    "descripcion": "Los zombis contempladores eran poderosos zombis creados a partir de los cadáveres reanimados de contempladores muertos mediante magia nigromántica . A diferencia de los tiranos despóticos de la muerte , eran sirvientes sin mente y no conservaban ningún recuerdo de su vida.",
     "estadisticas": {
       "tipo": "Muerto viviente Grande, neutral malvado",
       "ca": "15 (armadura natural)",
@@ -14851,6 +15026,7 @@
   {
     "nombre": "BABUINO",
     "descripcion": "",
+    "img_url":"https://www.dndbeyond.com/avatars/thumbnails/47144/597/1000/1000/638742154067495194.png",
     "estadisticas": {
       "tipo": "Bestia Pequeña, sin alineamiento",
       "ca": "12",
@@ -16104,6 +16280,7 @@
   {
     "nombre": "HUARGO",
     "descripcion": "Los huargos son depredadores malévolos, que se deleitan cazando y devorando a criaturas más débiles que ellos. Astutos y malintencionados, estos seres vagan en lugares apartados. Los goblins y hobgoblins los crían para usarlos como monturas.",
+    "img_url":"https://static.wikia.nocookie.net/la-marca-del-este-rpg/images/4/4a/Huargos_2.jpg/revision/latest/scale-to-width-down/250?cb=20131012012225",
     "estadisticas": {
       "tipo": "Monstruosidad Grande, neutral malvada",
       "ca": "13 (armadura natural)",
@@ -16883,6 +17060,7 @@
   {
     "nombre": "PERRO DEL INFRAMUNDO",
     "descripcion": "Los perros del inframundo son horribles sabuesos bicéfalos que moran en las llanuras, los desiertos y el Underdark. La saliva de los perros del inframundo transmite una enfermedad nauseabunda.",
+    "img_url":"https://i.pinimg.com/originals/6b/87/6e/6b876ef4012010b6980a247e067869a5.jpg",
     "estadisticas": {
       "tipo": "Monstruosidad Mediana, neutral malvada",
       "ca": "12",
@@ -16919,6 +17097,7 @@
   {
     "nombre": "PERRO INTERMITENTE",
     "descripcion": "Los perros intermitentes reciben este nombre debido a su capacidad para aparecer y desaparecer de forma intermitente. Suelen recurrir a este talento para aumentar la efectividad de sus ataques y evitar el peligro. Estos seres albergan un profundo odio hacia las bestias trémulas, a las que atacan en cuanto las ven.",
+    "img_url":"https://static.wikia.nocookie.net/criticalrole/images/a/ad/Blink_dog_running_2025.png/revision/latest/thumbnail/width/360/height/360?cb=20251110125354",
     "estadisticas": {
       "tipo": "Feérico Mediano, legal bueno",
       "ca": "13",
@@ -16955,6 +17134,7 @@
   {
     "nombre": "PICO DE HACHA",
     "descripcion": "Los picos de hacha son aves no voladoras de gran tamaño, que poseen unas patas fuertes y un pesado pico en forma de cuña. Tienen muy mal genio y suelen atacar a cualquier criatura con la que no estén familiarizados que se les acerque.",
+    "img_url":"https://www.aidedd.org/monster/img/axe-beak.jpg",
     "estadisticas": {
       "tipo": "Bestia Grande, sin alineamiento",
       "ca": "11",
@@ -18239,6 +18419,55 @@
       ]
     }
   },
+    {
+  "nombre": "ESPÍRITU ABERRANTE",
+  "descripcion": "Invocas un espíritu aberrante que se manifiesta en un espacio sin ocupar que puedas ver dentro del alcance. Esta forma corpórea usa el perfil del Espíritu aberrante (VD 0).\n\nCuando lances el conjuro, elige contemplador, slaad o semilla estelar. La criatura se parecerá a una aberración de ese tipo, lo que determinará ciertos atributos de su perfil. La criatura desaparecerá si sus puntos de golpe se reducen a 0 o si el conjuro termina.\n\nLa criatura se considera un aliado para ti y para tus compañeros. En combate, la criatura comparte tu orden de iniciativa, pero su turno va justo después del tuyo. Obedece tus órdenes verbales (no requiere acción) y, si no le das ninguna, hace la acción de Esquivar y usa su movimiento para evitar el peligro.\n\nA niveles superiores. Cuando lances este conjuro mediante un espacio de conjuro de nivel 5 o superior, usa el nivel más alto cuando se mencione el nivel del conjuro en el perfil.",
+  "img_url": "",
+  "estadisticas": {
+    "tipo": "Aberración Mediano, Sin alineamiento",
+    "ca": "11 + el nivel del conjuro (armadura natural)",
+    "pg": "40 + 10 por cada nivel de conjuro superior al 4",
+    "velocidad": "30 pies, volar 30 pies (levitar) (solo contempladores)",
+    "FUE": "16 (+3)",
+    "DES": "10 (+0)",
+    "CON": "15 (+2)",
+    "INT": "16 (+3)",
+    "SAB": "10 (+0)",
+    "CAR": "6 (-2)",
+    "inmunidades_daño": "psíquico",
+    "sentidos": "visión en la oscuridad 60 pies, Percepción pasiva 10",
+    "idiomas": "habla de las profundidades, entiende los idiomas que hables tú",
+    "desafio": "0 (10 PX)",
+    "atributos_especiales": [
+      {
+        "nombre": "Aura Susurrante (solo semilla estelar)",
+        "descripcion": "Al comienzo de todos los turnos de la aberración, cada criatura que esté a 5 pies o menos de ella deberá superar una tirada de salvación de Sabiduría contra tu CD de salvación de conjuros o recibirá 2d6 de daño psíquico, siempre que la aberración no esté incapacitada."
+      },
+      {
+        "nombre": "Regeneración (solo slaad)",
+        "descripcion": "La aberración recupera 5 puntos de golpe al principio de su turno si tiene al menos 1."
+      }
+    ],
+    "acciones": [
+      {
+        "nombre": "Ataque múltiple",
+        "descripcion": "La aberración realiza una cantidad de ataques igual a la mitad del nivel de este conjuro (redondeado hacia abajo)."
+      },
+      {
+        "nombre": "Garras (solo Slaad)",
+        "descripcion": "Ataque con arma cuerpo a cuerpo: tu modificador de ataque de conjuros a impactar, alcance 5 pies, un objetivo. Impacto: 1d10 + 3 + el nivel del conjuro de daño cortante. Si el objetivo es una criatura, no podrá recuperar puntos de golpe hasta el principio del siguiente turno de la aberración."
+      },
+      {
+        "nombre": "Rayo ocular (solo contempladores)",
+        "descripcion": "Ataque de conjuro a distancia: tu modificador de ataque de conjuros a impactar, alcance 150 pies, una criatura. Impacto: 1d8 + 3 + el nivel del conjuro de daño psíquico."
+      },
+      {
+        "nombre": "Golpe psíquico (solo semilla estelar)",
+        "descripcion": "Ataque de conjuro cuerpo a cuerpo: tu modificador de ataque de conjuros a impactar, alcance 5 pies, una criatura. Impacto: 1d8 + 3 + el nivel del conjuro de daño psíquico."
+      }
+    ]
+  }
+},
   {
     "nombre": "GLADIADOR",
     "descripcion": "Los gladiadores combaten para entretener a multitudes enfervorizadas. Algunos son brutales luchadores que ponen la vida en juego en cada pugna, mientras que otros son duelistas profesionales que perciben cuantiosos honorarios, pero rara vez combaten a muerte.",

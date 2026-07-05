@@ -1,0 +1,25 @@
+{
+  "usuarios": [
+    {
+      "nombre": "NPC",
+      "socketId": null,
+      "ip": "localhost",
+      "ultimaConexion": "2026-05-24T22:33:35.589Z",
+      "fechaRegistro": "2026-05-24T22:33:35.589Z"
+    },
+    {
+      "nombre": "Yoig",
+      "socketId": null,
+      "ip": "192.168.100.3",
+      "ultimaConexion": "2026-05-25T00:17:28.930Z",
+      "fechaRegistro": "2026-05-25T00:17:28.930Z"
+    },
+    {
+      "nombre": "Moon",
+      "socketId": null,
+      "ip": "192.168.100.3",
+      "ultimaConexion": "2026-07-04T15:41:15.936Z",
+      "fechaRegistro": "2026-07-04T15:41:15.936Z"
+    }
+  ]
+}

@@ -1,0 +1,434 @@
+{
+  "fecha": "2026-06-07",
+  "personajes": [
+    {
+      "id": "pj_1780876239861_5hko9mf2i",
+      "nombre": "albertico",
+      "clase": "CLERIGO",
+      "raza": "Kuo TOA",
+      "nivel": 1,
+      "jugador": "NPC",
+      "trasfondo": "Acolito",
+      "alineamiento": "neutral",
+      "imagen": "/data/imagenes/pj_1779663031868-234297327.jpeg",
+      "colores_personalizados": {
+        "background": null,
+        "parchment": null,
+        "accent": null,
+        "mana": null,
+        "hp": null,
+        "gems": null,
+        "textColors": {}
+      },
+      "stats": {
+        "hp": {
+          "current": 18,
+          "max": 18,
+          "temp": 0,
+          "percentage": 100
+        },
+        "mana": {
+          "current": 2,
+          "max": 15,
+          "percentage": 13.333333333333334
+        },
+        "ca": 12,
+        "velocidad": 30,
+        "iniciativa": 1,
+        "atributos": [
+          {
+            "nombre": "FUERZA",
+            "valor": 10,
+            "modificador": 0
+          },
+          {
+            "nombre": "DESTREZA",
+            "valor": 12,
+            "modificador": 1
+          },
+          {
+            "nombre": "CONSTITUCIÓN",
+            "valor": 10,
+            "modificador": 0
+          },
+          {
+            "nombre": "INTELIGENCIA",
+            "valor": 10,
+            "modificador": 0
+          },
+          {
+            "nombre": "SABIDURÍA",
+            "valor": 14,
+            "modificador": 2
+          },
+          {
+            "nombre": "CARISMA",
+            "valor": 9,
+            "modificador": -1
+          }
+        ]
+      },
+      "spellSlots": {
+        "level": 1,
+        "total": 4,
+        "used": 0
+      },
+      "spellStats": {
+        "spellcastingAbility": "SABIDURÍA",
+        "spellSaveDC": 12,
+        "spellAttackBonus": 4,
+        "preparedSpells": 0,
+        "cantripsKnown": 0,
+        "maxPreparedSpells": 3
+      },
+      "ataques": [
+        {
+          "name": "Mordisco",
+          "bonus": "+3",
+          "damage": "1D4 +1"
+        },
+        {
+          "name": "LANZA",
+          "bonus": "+3",
+          "damage": "1D6/1D8 +1"
+        },
+        {
+          "name": "RED",
+          "bonus": "+3",
+          "damage": ""
+        }
+      ],
+      "conjuros": [],
+      "inventario": {
+        "monedas": {
+          "gold": 0,
+          "silver": 0,
+          "copper": 0,
+          "name": "Monedas",
+          "goldName": "Oro",
+          "silverName": "Plata",
+          "copperName": "Cobre",
+          "total": 0
+        },
+        "tesoros": [],
+        "pociones": [],
+        "equipo": [],
+        "collapsed": false
+      },
+      "deathSaves": {
+        "successes": [
+          false,
+          false,
+          false
+        ],
+        "fails": [
+          false,
+          false,
+          false
+        ],
+        "successCount": 0,
+        "failCount": 0
+      },
+      "skills": [
+        {
+          "id": "1779662007817-6siyw1nge",
+          "name": "Acrobacias",
+          "bonus": 1,
+          "attribute": "DESTREZA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-wbpac6ksq",
+          "name": "Arcano",
+          "bonus": 0,
+          "attribute": "INTELIGENCIA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-yknw6y7fx",
+          "name": "Atletismo",
+          "bonus": 0,
+          "attribute": "FUERZA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-ukqhycvvs",
+          "name": "Engaño",
+          "bonus": -1,
+          "attribute": "CARISMA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-ojfszqe1h",
+          "name": "Historia",
+          "bonus": 0,
+          "attribute": "INTELIGENCIA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-u1zqrurlb",
+          "name": "Interpretación",
+          "bonus": -1,
+          "attribute": "CARISMA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-bp8nkf6vn",
+          "name": "Intimidación",
+          "bonus": -1,
+          "attribute": "CARISMA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-1d9va9cg2",
+          "name": "Investigación",
+          "bonus": 0,
+          "attribute": "INTELIGENCIA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-94i59df4q",
+          "name": "Juego de Manos",
+          "bonus": 1,
+          "attribute": "DESTREZA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-s7obj1idn",
+          "name": "Medicina",
+          "bonus": 4,
+          "attribute": "SABIDURÍA",
+          "proficient": true,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-oh0ysyp2z",
+          "name": "Naturaleza",
+          "bonus": 0,
+          "attribute": "INTELIGENCIA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-5lilbadf8",
+          "name": "Percepción",
+          "bonus": 4,
+          "attribute": "SABIDURÍA",
+          "proficient": true,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-i5y7oh8se",
+          "name": "Perspicacia",
+          "bonus": 2,
+          "attribute": "SABIDURÍA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-cz4t0vv0h",
+          "name": "Persuasión",
+          "bonus": -1,
+          "attribute": "CARISMA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-q48k8wygd",
+          "name": "Religión",
+          "bonus": 2,
+          "attribute": "INTELIGENCIA",
+          "proficient": true,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-o4crc155p",
+          "name": "Sigilo",
+          "bonus": 1,
+          "attribute": "DESTREZA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        },
+        {
+          "id": "1779662007818-sr6p51bog",
+          "name": "Supervivencia",
+          "bonus": 2,
+          "attribute": "SABIDURÍA",
+          "proficient": false,
+          "expertise": false,
+          "misc": 0
+        }
+      ],
+      "passivePerception": 14,
+      "proficiencies": [
+        {
+          "id": "1779662561118-6ymtrup3q",
+          "name": "Común",
+          "type": "language"
+        },
+        {
+          "id": "1779662682164-3lel7yv3z",
+          "name": "Infracomún",
+          "type": "language"
+        }
+      ],
+      "savingThrows": [
+        {
+          "name": "FUERZA",
+          "value": 0,
+          "proficient": false,
+          "basedOn": "FUERZA",
+          "modifier": 0
+        },
+        {
+          "name": "DESTREZA",
+          "value": 1,
+          "proficient": false,
+          "basedOn": "DESTREZA",
+          "modifier": 1
+        },
+        {
+          "name": "CONSTITUCIÓN",
+          "value": 0,
+          "proficient": false,
+          "basedOn": "CONSTITUCIÓN",
+          "modifier": 0
+        },
+        {
+          "name": "INTELIGENCIA",
+          "value": 0,
+          "proficient": false,
+          "basedOn": "INTELIGENCIA",
+          "modifier": 0
+        },
+        {
+          "name": "SABIDURÍA",
+          "value": 4,
+          "proficient": true,
+          "basedOn": "SABIDURÍA",
+          "modifier": 2
+        },
+        {
+          "name": "CARISMA",
+          "value": 1,
+          "proficient": true,
+          "basedOn": "CARISMA",
+          "modifier": -1
+        }
+      ],
+      "notas": {
+        "personalidad": "",
+        "ideales": "",
+        "vinculos": "",
+        "defectos": "",
+        "rasgos": "<h4 style=\"margin: 10px 0px 5px; color: rgb(0, 128, 128); font-size: 1.1rem;\"><strong style=\"font-size: medium;\">Anfibio:</strong><span style=\"font-size: medium; color: var(--ink-dark);\">&nbsp;</span><span style=\"font-size: medium; color: var(--ink-dark); font-weight: normal;\">El kuo-toa puede respirar tanto dentro del agua como fuera de ella.</span></h4><p style=\"margin: 0px 0px 10px; line-height: 1.6; font-size: medium;\"><strong>Percepción Sobrenatural:</strong>&nbsp;El kuo-toa puede sentir la presencia de cualquier criatura situada a 30 pies o menos y que sea invisible o se encuentre en el Plano Etéreo. También podrá indicar con precisión donde se hallan estas criaturas cuando se mueven.</p><p style=\"margin: 0px 0px 10px; line-height: 1.6; font-size: medium;\"><strong>Escurridizo:</strong>&nbsp;El kuo-toa tiene ventaja en las pruebas de característica y las tiradas de salvación para escapar de un agarre.</p><p style=\"margin: 0px 0px 10px; line-height: 1.6; font-size: medium;\"><strong>Sensibilidad a la Luz Solar:</strong>&nbsp;El kuo-toa tiene desventaja en las tiradas de ataque y las pruebas de Sabiduría (Percepción) que dependan de la vista hechas bajo la luz del sol.</p>"
+      },
+      "layout": {
+        "card-basic-info": {
+          "width": "398.889px",
+          "height": "770.667px",
+          "parentId": "left-column"
+        },
+        "card-passive-perception": {
+          "width": "398.889px",
+          "height": "334.778px",
+          "parentId": "left-column"
+        },
+        "card-attributes": {
+          "width": "398.889px",
+          "height": "1615.89px",
+          "parentId": "left-column"
+        },
+        "card-character-image": {
+          "width": "478.667px",
+          "height": "606.306px",
+          "parentId": "right-column"
+        },
+        "card-saving-throws": {
+          "width": "478.667px",
+          "height": "358.444px",
+          "parentId": "right-column"
+        },
+        "card-death-saves": {
+          "width": "478.667px",
+          "height": "252.889px",
+          "parentId": "right-column"
+        },
+        "card-resources": {
+          "width": "478.667px",
+          "height": "512.778px",
+          "parentId": "right-column"
+        },
+        "card-proficiencies": {
+          "width": "478.667px",
+          "height": "292.222px",
+          "parentId": "right-column"
+        },
+        "card-inventory": {
+          "width": "478.667px",
+          "height": "651.444px",
+          "parentId": "right-column"
+        },
+        "card-combat-stats": {
+          "width": "398.889px",
+          "height": "238.222px",
+          "parentId": "center-column"
+        },
+        "card-hit-points": {
+          "width": "398.889px",
+          "height": "512.222px",
+          "parentId": "center-column"
+        },
+        "card-skills": {
+          "width": "398.889px",
+          "height": "1726.22px",
+          "parentId": "center-column"
+        },
+        "card-attacks-spells": {
+          "width": "398.889px",
+          "height": "341.333px",
+          "parentId": "center-column"
+        },
+        "card-traits": {
+          "width": "1336.44px",
+          "height": "742.222px",
+          "parentId": "full-width"
+        },
+        "card-spells": {
+          "width": "1336.44px",
+          "height": "318.556px",
+          "parentId": "full-width"
+        }
+      },
+      "fecha_creacion": "2026-06-07T23:50:39.863Z",
+      "version": "3.2"
+    }
+  ],
+  "creado": "2026-06-07T23:37:26.867Z",
+  "sesion": "Sesión del 2026-06-07"
+}

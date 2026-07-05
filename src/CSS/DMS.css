@@ -2949,3 +2949,733 @@ body.with-sidebar {
         max-width: 95%;
     }
 }
+/* ===== MODAL PARA EDITAR VIDA ===== */
+.hp-modal {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    overflow: auto;
+    animation: modalFadeIn 0.3s ease;
+}
+
+.hp-modal-content {
+    background: linear-gradient(135deg, var(--parchment-light), var(--parchment-dark));
+    margin: 100px auto;
+    padding: 30px;
+    border: 3px solid var(--accent-gold);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* En DMS.css, dentro de .hp-modal-content */
+.hp-modal-content .hp-ca-display {
+    font-size: 1.1rem;
+    color: var(--accent-blue);
+    padding: 5px 0;
+}
+
+.hp-modal-content .hp-ca-display i {
+    color: var(--accent-gold);
+    margin-right: 5px;
+}
+
+.hp-modal-content #hpCAInput {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid var(--accent-gold);
+    border-radius: 6px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.hp-modal-content #hpCAInput:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.2);
+}
+
+.hp-modal-content h2 {
+    font-family: 'MedievalSharp', cursive;
+    color: var(--accent-blue);
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+    border-bottom: 2px solid var(--accent-gold);
+    padding-bottom: 10px;
+}
+
+.hp-modal-content .hp-display {
+    text-align: center;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    border: 1px solid var(--accent-gold);
+    margin-bottom: 20px;
+}
+
+.hp-modal-content .hp-display .hp-current {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--accent-blue);
+}
+
+.hp-modal-content .hp-display .hp-max {
+    font-size: 1.5rem;
+    color: var(--ink-light);
+}
+
+.hp-modal-content .hp-display .hp-max span {
+    font-weight: bold;
+    color: var(--accent-blue);
+}
+
+.hp-modal-content .hp-display .hp-temp {
+    font-size: 1.1rem;
+    color: var(--accent-teal);
+    margin-top: 5px;
+}
+
+.hp-modal-content .hp-input-group {
+    margin-bottom: 15px;
+}
+
+.hp-modal-content .hp-input-group label {
+    display: block;
+    font-family: 'Cinzel', serif;
+    color: var(--ink-dark);
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.hp-modal-content .hp-input-group input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid var(--accent-gold);
+    border-radius: 6px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.hp-modal-content .hp-input-group input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.2);
+}
+
+.hp-modal-content .hp-quick-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 15px 0;
+    justify-content: center;
+}
+
+.hp-modal-content .hp-quick-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--accent-gold);
+    border-radius: 4px;
+    background: white;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.hp-modal-content .hp-quick-btn:hover {
+    background: var(--accent-gold);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.hp-modal-content .hp-quick-btn.temp {
+    border-color: var(--accent-teal);
+    color: var(--accent-teal);
+}
+
+.hp-modal-content .hp-quick-btn.temp:hover {
+    background: var(--accent-teal);
+    color: white;
+}
+
+.hp-modal-content .hp-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: center;
+}
+
+.hp-modal-content .hp-actions button {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+}
+
+.hp-modal-content .hp-actions .hp-apply-btn {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.hp-modal-content .hp-actions .hp-apply-btn:hover {
+    background: var(--accent-purple);
+    transform: translateY(-2px);
+}
+
+.hp-modal-content .hp-actions .hp-close-btn {
+    background: #666;
+    color: white;
+}
+
+.hp-modal-content .hp-actions .hp-close-btn:hover {
+    background: #444;
+    transform: translateY(-2px);
+}
+
+.hp-modal-content .close-modal {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: var(--accent-blue);
+    transition: color 0.3s ease;
+}
+
+.hp-modal-content .close-modal:hover {
+    color: var(--accent-red);
+}
+
+.hp-modal .hp-error {
+    color: var(--dm-danger);
+    font-size: 0.9rem;
+    text-align: center;
+    margin-top: 10px;
+    display: none;
+}
+
+.hp-modal .hp-error.show {
+    display: block;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .hp-modal-content {
+        margin: 50px auto;
+        padding: 20px;
+        width: 95%;
+    }
+    
+    .hp-modal-content h2 {
+        font-size: 1.4rem;
+    }
+    
+    .hp-modal-content .hp-display .hp-current {
+        font-size: 2rem;
+    }
+    
+    .hp-modal-content .hp-quick-buttons {
+        gap: 5px;
+    }
+    
+    .hp-modal-content .hp-quick-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .hp-modal-content .hp-actions button {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+}
+/* ===== MODAL DE FICHA PERSONALIZADA - ESTILO CONSISTENTE ===== */
+
+.custom-sheet-modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    overflow: auto;
+    backdrop-filter: blur(5px);
+}
+
+.custom-sheet-modal-content {
+    background: linear-gradient(135deg, var(--parchment-light), var(--parchment-dark));
+    margin: 30px auto;
+    border: 3px solid var(--accent-gold);
+    border-radius: 8px;
+    width: 92%;
+    max-width: 1100px;
+    max-height: 90vh;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+    animation: modalFadeIn 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Estilos para los controles del PDF dentro del modal */
+.custom-sheet-modal .page-input {
+    width: 50px;
+    padding: 3px 5px;
+    border: 1px solid white;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+}
+
+.custom-sheet-modal .page-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.custom-sheet-modal .page-input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.custom-sheet-modal .pdf-control-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.custom-sheet-modal .pdf-control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.custom-sheet-modal .section-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+#customSheetRemovePdf:hover {
+    background: #d32f2f !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .custom-sheet-modal-content {
+        margin: 15px;
+        width: auto;
+        max-height: 95vh;
+    }
+    
+    .custom-sheet-modal .section-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .custom-sheet-modal .section-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .custom-sheet-modal .pdf-toolbar {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 15px;
+    }
+    
+    .custom-sheet-modal .pdf-info {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .custom-sheet-modal .pdf-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .custom-sheet-modal-content {
+        margin: 10px;
+        border-radius: 6px;
+    }
+    
+    .custom-sheet-modal .section-header h2 {
+        font-size: 1.1rem;
+    }
+    
+    .custom-sheet-modal .section-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .custom-sheet-modal .pdf-control-btn {
+        width: 32px;
+        height: 32px;
+    }
+}
+/* ===== MODAL DE INVOCACIÓN ===== */
+.summon-modal {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    animation: modalFadeIn 0.3s ease;
+}
+
+.summon-modal-content {
+    background: linear-gradient(135deg, var(--parchment-light), var(--parchment-dark));
+    margin: 80px auto;
+    padding: 35px;
+    border: 3px solid var(--accent-gold);
+    border-radius: 15px;
+    width: 90%;
+    max-width: 550px;
+    position: relative;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+}
+
+.summon-modal-title {
+    font-family: 'MedievalSharp', cursive;
+    color: var(--accent-purple);
+    text-align: center;
+    font-size: 1.8rem;
+    margin-bottom: 25px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--accent-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.summon-modal-title i {
+    color: var(--accent-gold);
+}
+
+.summon-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.summon-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.summon-field label {
+    font-family: 'Cinzel', serif;
+    color: var(--ink-dark);
+    font-size: 0.9rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.summon-field label i {
+    color: var(--accent-gold);
+}
+
+.summon-field input {
+    padding: 12px 15px;
+    border: 2px solid var(--accent-gold);
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.summon-field input:focus {
+    outline: none;
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 0 3px rgba(106, 13, 173, 0.2);
+}
+
+.summon-race-input-wrapper {
+    position: relative;
+}
+
+.summon-race-hint {
+    font-size: 0.8rem;
+    color: var(--ink-light);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.summon-race-hint i {
+    color: var(--accent-gold);
+}
+
+.summon-stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.summon-field.half {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.summon-info-box {
+    background: rgba(106, 13, 173, 0.08);
+    border: 1px solid var(--accent-purple);
+    border-radius: 8px;
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: var(--ink-dark);
+}
+
+.summon-info-box i {
+    color: var(--accent-gold);
+    font-size: 1.1rem;
+}
+
+.summon-info-box strong {
+    color: var(--accent-purple);
+}
+
+.summon-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+    justify-content: center;
+}
+
+.summon-btn-primary {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, var(--accent-purple), #4a0080);
+    color: white;
+    border: 2px solid var(--accent-gold);
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    font-weight: bold;
+}
+
+.summon-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(106, 13, 173, 0.4);
+    background: linear-gradient(135deg, #7b1fa2, #5c0099);
+}
+
+.summon-btn-secondary {
+    padding: 12px 30px;
+    background: transparent;
+    color: var(--ink-dark);
+    border: 2px solid var(--accent-gold);
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.summon-btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+}
+
+/* Botón de invocación en entity-card */
+.entity-btn.summon-btn {
+    background: var(--accent-gold);
+    color: var(--ink-dark);
+    font-size: 0.9rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.entity-btn.summon-btn:hover {
+    background: #f4c542;
+    transform: scale(1.15);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+}
+
+/* Badge de invocaciones en el header */
+#summonBadge {
+    background: var(--accent-purple);
+    color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .summon-modal-content {
+        margin: 40px auto;
+        padding: 25px;
+        width: 95%;
+    }
+    
+    .summon-modal-title {
+        font-size: 1.4rem;
+    }
+    
+    .summon-stats-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .summon-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .summon-btn-primary,
+    .summon-btn-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .summon-modal-content {
+        margin: 20px auto;
+        padding: 20px;
+    }
+    
+    .summon-modal-title {
+        font-size: 1.2rem;
+    }
+    
+    .summon-field input {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+    }
+}
+/* Estilos para invocaciones */
+.entity-card.summon {
+    border-color: var(--accent-purple) !important;
+    border-width: 3px !important;
+    background: linear-gradient(135deg, rgba(106, 13, 173, 0.08), rgba(255, 255, 255, 0.95)) !important;
+}
+
+.entity-card.summon .entity-avatar {
+    background: linear-gradient(135deg, var(--accent-purple), #4a0080) !important;
+}
+
+.entity-card.summon .entity-name {
+    color: var(--accent-purple) !important;
+}
+
+.entity-avatar.summon {
+    background: linear-gradient(135deg, var(--accent-purple), #4a0080) !important;
+}
+
+/* Indicador de invocación */
+.summon-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    color: var(--accent-purple);
+    font-style: italic;
+}
+
+.summon-indicator i {
+    font-size: 0.7rem;
+}
+
+/* Animación para nueva invocación */
+@keyframes summonAppear {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+        border-color: var(--accent-gold);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(106, 13, 173, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.entity-card.summon.new-summon {
+    animation: summonAppear 0.5s ease;
+}
+
+/* Estilo para el botón de invocar */
+#addSummonBtn {
+    background: var(--accent-purple) !important;
+}
+
+#addSummonBtn:hover {
+    background: #7b1fa2 !important;
+    transform: translateY(-2px);
+}
+
+/* Selector de invocador */
+#summonInvocadorSelect {
+    border-color: var(--accent-purple) !important;
+}
+
+#summonInvocadorSelect:focus {
+    border-color: var(--accent-purple) !important;
+    box-shadow: 0 0 0 3px rgba(106, 13, 173, 0.2);
+}
+
+/* Responsive para el control de invocaciones */
+@media (max-width: 768px) {
+    .control-group .quick-add select,
+    .control-group .quick-add input {
+        min-width: 100% !important;
+        width: 100% !important;
+        margin-bottom: 5px;
+    }
+    
+    #summonInvocadorSelect {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+}

@@ -436,93 +436,190 @@ class CharacterContextService {
         return uniqueMentions;
     }
 
-    /**
-     * Construir contexto completo para IA basado en el mensaje del usuario
-     */
-    async buildAIContext(userMessage, dmContext = null) {
-        // Cargar personajes actuales
-        await this.loadCurrentCharacters();
-        
-        if (this.currentCharacters.length === 0) {
-            return {
-                hasCharacters: false,
-                contextString: "No hay personajes registrados en la sesión actual.",
-                mentionedCharacters: [],
-                fullContext: null
-            };
-        }
-        
-        // Detectar menciones en el mensaje
-        const mentions = this.detectCharacterMentions(userMessage);
-        
-        let contextString = "";
-        let mentionedCharacters = [];
-        
-        if (mentions.length > 0) {
-            contextString += `🎲 **CONTEXTO DE PERSONAJES MENCIONADOS**\n\n`;
-            
-            for (const mention of mentions) {
-                const char = mention.character;
-                mentionedCharacters.push(char);
-                
-                contextString += `### ${char.nombre} (${char.clase || 'Clase desconocida'} nivel ${char.nivel || 1})\n`;
-                contextString += `- Jugador: ${char.jugador || 'N/A'}\n`;
-                contextString += `- Raza: ${char.raza || 'N/A'}\n`;
-                contextString += `- HP: ${char.hp?.current || 0}/${char.hp?.max || 0}\n`;
-                contextString += `- CA: ${char.ca || 10}\n`;
-                
-                // Atributos principales
-                if (char.attributes) {
-                    const mainAttrs = char.attributes.filter(a => 
-                        ['Fuerza', 'DESTREZA', 'CONSTITUCIÓN', 'INTELIGENCIA', 'SABIDURÍA', 'CARISMA']
-                        .includes(a.nombre?.toUpperCase() || a.nombre)
-                    );
-                    if (mainAttrs.length > 0) {
-                        const attrSummary = mainAttrs.map(a => `${a.nombre}: ${a.valor}`).join(', ');
-                        contextString += `- Atributos: ${attrSummary}\n`;
-                    }
-                }
-                
-                // Ataque principal
-                if (char.attacks && char.attacks.length > 0) {
-                    const mainAttack = char.attacks[0];
-                    contextString += `- Ataque principal: ${mainAttack.name} (${mainAttack.bonus}, ${mainAttack.damage})\n`;
-                }
-                
-                contextString += `\n`;
-            }
-        } else {
-            // Si no hay menciones específicas, dar contexto general
-            contextString += this.getCharactersContextSummary();
-            mentionedCharacters = this.currentCharacters;
-        }
-        
-        // Añadir contexto del DM si existe
-        if (dmContext) {
-            contextString += `\n📌 **CONTEXTO DEL DM**\n${dmContext}\n\n`;
-        }
-        
-        // Añadir instrucciones para la IA
-        contextString += `\n📖 **INSTRUCCIONES**\n`;
-        contextString += `- Usa la información de los personajes mostrada arriba para responder.\n`;
-        contextString += `- Si mencionan a un personaje, refiérete a él por su nombre y clase.\n`;
-        contextString += `- Puedes sugerir acciones basadas en las habilidades y atributos del personaje.\n`;
-        contextString += `- Considera el nivel y HP actual al sugerir tácticas de combate.\n`;
-        contextString += `- Personaliza tu respuesta según la clase y raza del personaje.\n`;
-        contextString += `- Si el personaje tiene habilidades especiales (como vuelo), menciónalas cuando sea relevante.\n`;
-        
+async buildAIContext(userMessage, dmContext = null) {
+    await this.loadCurrentCharacters();
+    
+    if (this.currentCharacters.length === 0) {
         return {
-            hasCharacters: true,
-            contextString: contextString,
-            mentionedCharacters: mentionedCharacters,
-            fullContext: {
-                allCharacters: this.currentCharacters,
-                summary: this.getCharactersContextSummary(),
-                sessionDate: this.lastUpdate ? new Date(this.lastUpdate).toISOString().split('T')[0] : 'desconocida',
-                totalCharacters: this.currentCharacters.length
-            }
+            hasCharacters: false,
+            contextString: "No hay personajes registrados en la sesión actual.",
+            mentionedCharacters: [],
+            fullContext: null
         };
     }
+    
+    const mentions = this.detectCharacterMentions(userMessage);
+    
+    let contextString = "";
+    let mentionedCharacters = [];
+    
+    if (mentions.length > 0) {
+        contextString += `🎲 **CONTEXTO DE PERSONAJES MENCIONADOS**\n\n`;
+        
+        for (const mention of mentions) {
+            const char = mention.character;
+            mentionedCharacters.push(char);
+            
+            contextString += `╔══════════════════════════════════════════════════════════════╗\n`;
+            contextString += `║ 🎭 ${char.nombre} (${char.clase || 'Clase desconocida'} nivel ${char.nivel || 1})\n`;
+            contextString += `╠══════════════════════════════════════════════════════════════╣\n`;
+            
+            // Información básica
+            contextString += `║ 📋 BÁSICO:\n`;
+            contextString += `║    Jugador: ${char.jugador || 'N/A'}\n`;
+            contextString += `║    Raza: ${char.raza || 'N/A'}\n`;
+            contextString += `║    Trasfondo: ${char.trasfondo || 'N/A'}\n`;
+            contextString += `║    Alineamiento: ${char.alineamiento || 'N/A'}\n`;
+            contextString += `║\n`;
+            
+            // Salud y combate
+            contextString += `║ ❤️ SALUD Y COMBATE:\n`;
+            contextString += `║    HP: ${char.hp?.current || 0}/${char.hp?.max || 0}`;
+            if (char.hp?.temp) contextString += ` (Temp: ${char.hp.temp})`;
+            contextString += `\n`;
+            if (char.mana) contextString += `║    Maná: ${char.mana?.current || 0}/${char.mana?.max || 0}\n`;
+            contextString += `║    CA: ${char.ca || 10}\n`;
+            contextString += `║    Velocidad: ${char.velocidad || 30} pies\n`;
+            contextString += `║    Iniciativa: +${char.iniciativa || 0}\n`;
+            contextString += `║\n`;
+            
+            // Atributos
+            if (char.attributes && char.attributes.length > 0) {
+                contextString += `║ 📊 ATRIBUTOS:\n`;
+                for (const attr of char.attributes) {
+                    const mod = attr.modificador !== undefined ? attr.modificador : Math.floor((attr.valor - 10) / 2);
+                    const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
+                    contextString += `║    ${attr.nombre}: ${attr.valor} (${modStr})\n`;
+                }
+                contextString += `║\n`;
+            }
+            
+            // Tiradas de salvación con competencia
+            if (char.savingThrows && char.savingThrows.length > 0) {
+                const proficientThrows = char.savingThrows.filter(s => s.proficient === true);
+                if (proficientThrows.length > 0) {
+                    contextString += `║ 🛡️ SALVACIONES CON COMPETENCIA:\n`;
+                    for (const st of proficientThrows) {
+                        const value = st.value || 0;
+                        const mod = st.modifier || 0;
+                        contextString += `║    ${st.name}: +${value} (Mod: ${mod >= 0 ? `+${mod}` : `${mod}`})\n`;
+                    }
+                    contextString += `║\n`;
+                }
+            }
+            
+            // Habilidades con competencia
+            if (char.skills && char.skills.length > 0) {
+                const proficientSkills = char.skills.filter(s => s.proficient === true);
+                if (proficientSkills.length > 0) {
+                    contextString += `║ 🎯 HABILIDADES CON COMPETENCIA:\n`;
+                    for (const skill of proficientSkills.slice(0, 8)) {
+                        const bonus = skill.bonus || 0;
+                        contextString += `║    ${skill.name}: +${bonus}\n`;
+                    }
+                    contextString += `║\n`;
+                }
+            }
+            
+            // Ataques
+            if (char.attacks && char.attacks.length > 0) {
+                contextString += `║ ⚔️ ATAQUES:\n`;
+                for (const attack of char.attacks.slice(0, 4)) {
+                    contextString += `║    ${attack.name}: +${attack.bonus || 0} | Daño: ${attack.damage || 'N/A'}\n`;
+                }
+                contextString += `║\n`;
+            }
+            
+            // Equipo/Inventario
+            if (char.inventory?.equipo && char.inventory.equipo.length > 0) {
+                contextString += `║ 🎒 EQUIPO:\n`;
+                for (const item of char.inventory.equipo.slice(0, 6)) {
+                    contextString += `║    • ${item.name}`;
+                    if (item.description) contextString += ` - ${item.description.substring(0, 40)}`;
+                    contextString += `\n`;
+                }
+                if (char.inventory.equipo.length > 6) {
+                    contextString += `║    ... y ${char.inventory.equipo.length - 6} objetos más\n`;
+                }
+                contextString += `║\n`;
+            }
+            
+            // Monedas
+            if (char.inventory?.monedas) {
+                const coins = char.inventory.monedas;
+                contextString += `║ 💰 MONEDAS:\n`;
+                contextString += `║    Oro: ${coins.gold || 0} | Plata: ${coins.silver || 0} | Cobre: ${coins.copper || 0}\n`;
+                contextString += `║\n`;
+            }
+            
+            // Conjuros (si tiene)
+            if (char.spells && char.spells.length > 0) {
+                contextString += `║ 🔮 CONJUROS:\n`;
+                for (const spell of char.spells.slice(0, 5)) {
+                    contextString += `║    • ${spell.name || spell}\n`;
+                }
+                contextString += `║\n`;
+            }
+            
+            // Competencias importantes
+            if (char.proficiencies && char.proficiencies.length > 0) {
+                const weapons = char.proficiencies.filter(p => p.type === 'weapon');
+                const languages = char.proficiencies.filter(p => p.type === 'language');
+                
+                if (weapons.length > 0) {
+                    contextString += `║ 🗡️ COMPETENCIA EN ARMAS:\n`;
+                    contextString += `║    ${weapons.slice(0, 5).map(w => w.name).join(', ')}\n`;
+                    contextString += `║\n`;
+                }
+                
+                if (languages.length > 0) {
+                    contextString += `║ 🗣️ IDIOMAS:\n`;
+                    contextString += `║    ${languages.map(l => l.name).join(', ')}\n`;
+                    contextString += `║\n`;
+                }
+            }
+            
+            // Rasgos especiales
+            if (char.notas?.rasgos) {
+                contextString += `║ ✨ RASGOS ESPECIALES:\n`;
+                const rasgos = char.notas.rasgos.split('\n').filter(r => r.trim());
+                for (const rasgo of rasgos.slice(0, 4)) {
+                    contextString += `║    • ${rasgo.substring(0, 60)}\n`;
+                }
+                contextString += `║\n`;
+            }
+            
+            contextString += `╚══════════════════════════════════════════════════════════════╝\n\n`;
+        }
+    } else {
+        contextString += this.getCharactersContextSummary();
+        mentionedCharacters = this.currentCharacters;
+    }
+    
+    if (dmContext) {
+        contextString += `\n📌 **CONTEXTO DEL DM**\n${dmContext}\n\n`;
+    }
+    
+    contextString += `\n📖 **INSTRUCCIONES IMPORTANTES PARA LA IA**\n`;
+    contextString += `1. TIENES ACCESO COMPLETO a la información de los personajes: HP, equipo, atributos, etc.\n`;
+    contextString += `2. Cuando respondas, USA los datos específicos como HP actual, equipo que tienen, etc.\n`;
+    contextString += `3. Si un personaje está herido (HP bajo), MENCIONALO y sugiere curarse.\n`;
+    contextString += `4. Si tienen objetos específicos en su inventario, SUGIERE usarlos cuando sea relevante.\n`;
+    contextString += `5. Personaliza las respuestas según su clase, raza y equipo disponible.\n`;
+    contextString += `6. SI NO VES INFORMACIÓN COMPLETA, ES PORQUE EL SISTEMA NO LA ENVIÓ, NO PORQUE NO EXISTA.\n`;
+    
+    return {
+        hasCharacters: true,
+        contextString: contextString,
+        mentionedCharacters: mentionedCharacters,
+        fullContext: {
+            allCharacters: this.currentCharacters,
+            summary: this.getCharactersContextSummary(),
+            sessionDate: this.lastUpdate ? new Date(this.lastUpdate).toISOString().split('T')[0] : 'desconocida',
+            totalCharacters: this.currentCharacters.length
+        }
+    };
+}
 }
 
 // Exportar instancia única (singleton)

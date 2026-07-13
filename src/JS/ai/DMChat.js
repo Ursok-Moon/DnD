@@ -199,7 +199,7 @@ class DMChat {
                     statusDiv.style.color = '#fbbf24';
                 }
                 this.enableChat(false);
-                this.addSystemMessage('⚠️ No se pudo conectar con la IA. Verifica tu API key de Groq.');
+                this.addSystemMessage('⚠️ No se pudo conectar con la IA. Verifica tu API key.');
             }
         } catch (error) {
             this.isConnected = false;

@@ -1880,6 +1880,7 @@ class DMScreen {
             if (stats.tipo) html += `<p><strong>Tipo:</strong> ${stats.tipo}</p>`;
             if (stats.ca) html += `<p><strong>CA:</strong> ${stats.ca}</p>`;
             if (stats.pg) html += `<p><strong>PG:</strong> ${stats.pg}</p>`;
+            if (stats.pm) html += `<p><strong>PM:</strong> ${stats.pm}</p>`;
             if (stats.velocidad) html += `<p><strong>Velocidad:</strong> ${stats.velocidad}</p>`;
             
             html += `<div class="stat-grid">`;
@@ -1919,6 +1920,13 @@ class DMScreen {
                     html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
                 });
             }
+
+            if (stats.reacciones && stats.reacciones.length > 0) {
+                html += `<h4>reacciones</h4>`;
+                stats.reacciones.forEach(attr => {
+                    html += `<p><strong>${attr.nombre}:</strong> ${attr.descripcion}</p>`;
+                });
+            }
             
             if (stats.variantes && stats.variantes.length > 0) {
                 html += `<div class="variants-section">`;
@@ -1941,6 +1949,12 @@ class DMScreen {
                         html += `<h5 style="margin-top: 10px;">Acciones</h5>`;
                         variante.acciones.forEach(action => {
                             html += `<p><strong>${action.nombre}:</strong> ${action.descripcion}</p>`;
+                        });
+                    }
+
+                    if (variante.reacciones && variante.reacciones.length > 0) {
+                        variante.reacciones.forEach(attr => {
+                            html += `<p><strong>${attr.nombre}:</strong> ${attr.descripcion}</p>`;
                         });
                     }
                     

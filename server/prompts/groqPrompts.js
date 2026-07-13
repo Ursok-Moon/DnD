@@ -244,6 +244,7 @@ Proporciona:
 2. Tiradas de dados recomendadas para cada acción
 3. Dificultad estimada (CD)
 4. Consejos de roleplay
+5. no tienes que responder todo el tiempo con la información de los jugadores
 
 Responde en español.`;
 

@@ -1,28 +1,44 @@
+// js/modules/attributes/AttributeUI.js
 import { Helpers } from '../../utils/Helpers.js';
 
 export class AttributeUI {
-    constructor(attributeManager, colorManager, eventBus) {
+    constructor(attributeManager, colorManager, eventBus, container = null) {
         this.attributeManager = attributeManager;
         this.colorManager = colorManager;
         this.eventBus = eventBus;
-        this.container = document.getElementById('attributesContainer');
         
-        if (!this.container) {
-            console.error('❌ attributesContainer no encontrado');
-            return;
+        // Usar el contenedor proporcionado o buscar por defecto
+        this.container = container || document;
+        this.containerElement = this.container.querySelector ? this.container : document;
+        
+        // Buscar el contenedor de atributos dentro del contexto
+        this.attributesContainer = this.containerElement.querySelector('#attributesContainer');
+        
+        if (!this.attributesContainer) {
+            console.error('❌ attributesContainer no encontrado en el contexto proporcionado');
+            // Intentar buscar en todo el documento como fallback
+            this.attributesContainer = document.getElementById('attributesContainer');
         }
         
-        this.attributeManager.subscribe((attributes) => {
-            this.render(attributes);
-        });
+        if (this.attributesContainer) {
+            this.attributeManager.subscribe((attributes) => {
+                this.render(attributes);
+            });
+        } else {
+            console.error('❌ No se pudo encontrar attributesContainer');
+        }
         
         this.setupAddButton();
     }
 
     setupAddButton() {
-        const addBtn = document.getElementById('addAttributeBtn');
+        const addBtn = this.containerElement.querySelector('#addAttributeBtn');
         if (addBtn) {
-            addBtn.addEventListener('click', () => {
+            // Remover event listeners anteriores
+            const newBtn = addBtn.cloneNode(true);
+            addBtn.parentNode.replaceChild(newBtn, addBtn);
+            
+            newBtn.addEventListener('click', () => {
                 this.attributeManager.add();
                 Helpers.showMessage('Atributo añadido', 'info');
             });
@@ -30,11 +46,13 @@ export class AttributeUI {
     }
 
     render(attributes) {
-        this.container.innerHTML = '';
+        if (!this.attributesContainer) return;
+        
+        this.attributesContainer.innerHTML = '';
         
         attributes.forEach(attr => {
             const element = this.createAttributeElement(attr);
-            this.container.appendChild(element);
+            this.attributesContainer.appendChild(element);
         });
     }
 
@@ -95,7 +113,7 @@ export class AttributeUI {
         });
 
         removeBtn.addEventListener('click', () => {
-            const totalAttributes = document.querySelectorAll('.attribute-item').length;
+            const totalAttributes = this.attributesContainer.querySelectorAll('.attribute-item').length;
             if (totalAttributes <= 3) {
                 Helpers.showMessage('Debes mantener al menos 3 atributos', 'warning');
                 return;

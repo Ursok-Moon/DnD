@@ -32,13 +32,44 @@ import { EquipmentManager } from '../modules/inventory/EquipmentManager.js';
 import { SpellSlotsManager } from '../modules/spells/SpellSlotsManager.js';
 import { SpellManager } from '../modules/spells/SpellManager.js';
 import { SpellUI } from '../modules/spells/SpellUI.js';
-import { SpellStatsManager } from '../modules/spells/SpellStatsManager.js'; // <-- IMPORTAR
+import { SpellStatsManager } from '../modules/spells/SpellStatsManager.js';
 
 export class CharacterSheet {
-    constructor() {
-        // Core services
+    constructor(containerId = null, tabId = null) {
+        // Si no se proporciona containerId, usar el contenedor por defecto
+        this.containerId = containerId || 'hojaPrincipal';
+        this.tabId = tabId || `tab-${Date.now()}`;
+        
+        // Buscar el contenedor
+        this.container = document.getElementById(this.containerId);
+        
+        // Si no se encuentra el contenedor por ID, buscar por clase
+        if (!this.container) {
+            this.container = document.querySelector('.character-sheet');
+            if (this.container) {
+                this.containerId = this.container.id || 'hojaPrincipal';
+            }
+        }
+        
+        // Si aún no hay contenedor, crear uno
+        if (!this.container) {
+            console.warn('⚠️ No se encontró contenedor, creando uno...');
+            this.container = document.createElement('main');
+            this.container.className = 'character-sheet';
+            this.container.id = this.containerId;
+            const contentArea = document.getElementById('tabContentArea');
+            if (contentArea) {
+                contentArea.appendChild(this.container);
+            } else {
+                document.querySelector('.parchment')?.appendChild(this.container);
+            }
+        }
+        
+        console.log(`📄 Inicializando CharacterSheet para contenedor: ${this.containerId} (tab: ${this.tabId})`);
+
+        // Core services - usar storage aislado por tab
         this.eventBus = new EventBus();
-        this.storage = new StorageService('dnd_');
+        this.storage = new StorageService(`dnd_${this.tabId}_`);
         this.api = new ApiService();
         this.userManager = new UserManager(this.storage); 
 
@@ -59,8 +90,8 @@ export class CharacterSheet {
         this.initUI();
 
         setTimeout(() => {
-    this.createAIImportButton();
-    }, 500);
+            this.createAIImportButton();
+        }, 500);
         
         // Setup global events
         this.setupGlobalEvents();
@@ -79,6 +110,155 @@ export class CharacterSheet {
         if (savedName === 'Aventurero' || savedName === 'Anónimo' || !savedName) {
             localStorage.removeItem('jugadorNombre');
         }
+        
+        console.log(`✅ CharacterSheet inicializado para ${this.containerId}`);
+    }
+
+    // ===== MÉTODO DE UTILIDAD PARA BUSCAR DENTRO DEL CONTENEDOR =====
+    $(selector) {
+        return this.container.querySelector(selector);
+    }
+
+    $$(selector) {
+        return this.container.querySelectorAll(selector);
+    }
+
+    // ===== INICIALIZACIÓN DE MANAGERS =====
+initManagers() {
+    this.colorManager = new ColorManager(this.storage);
+    this.attributeManager = new AttributeManager(this.storage);
+    this.healthManager = new HealthManager(this.storage, this.eventBus);
+    this.manaManager = new ManaManager(this.storage, this.eventBus);
+    this.deathSavesManager = new DeathSavesManager(this.storage, this.eventBus);
+    this.loadDeathSavesFromStorage();
+    this.loadPassivePerceptionFromStorage();
+    this.expManager = new ExpManager(this.storage, this.eventBus);
+    this.skillsManager = new SkillsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
+    this.proficiencyManager = new ProficiencyManager(this.storage, this.eventBus);
+    this.savingThrowsManager = new SavingThrowsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
+    
+    this.currencyManager = new CurrencyManager(this.storage, this.eventBus);
+    this.treasureManager = new TreasureManager(this.storage, this.eventBus);
+    this.potionManager = new PotionManager(this.storage, this.eventBus);
+    this.equipmentManager = new EquipmentManager(this.storage, this.eventBus, this.attributeManager);
+    
+    this.spellSlotsManager = new SpellSlotsManager(this.storage, this.eventBus);
+    this.spellManager = new SpellManager(this.storage, this.eventBus);
+    this.spellStatsManager = new SpellStatsManager(this.storage, this.eventBus, this.attributeManager, this.expManager);
+    
+    // PASAR EL CONTENEDOR A ImageManager
+    this.imageManager = new ImageManager(this.api, this.eventBus, this.storage, this.container);
+    this.dragDropManager = new DragDropManager(this.storage);
+    this.resizeManager = new ResizeManager(this.storage);
+    this.loadAttacksFromStorage();
+}
+    // ===== INICIALIZACIÓN DE UI =====
+initUI() {
+    // Pasar el contenedor a AttributeUI
+    this.attributeUI = new AttributeUI(
+        this.attributeManager, 
+        this.colorManager, 
+        this.eventBus,
+        this.container  
+    );
+    
+    // Pasar el contenedor a SpellUI
+    this.spellUI = new SpellUI(
+        this.spellManager, 
+        this.spellSlotsManager, 
+        this.eventBus,
+        this.container  
+    );
+
+    if (this.spellManager) {
+        setTimeout(() => {
+            this.spellManager.setupAutocomplete();
+        }, 500);
+    }
+    
+    this.setupSubscriptions();
+    this.setupQuickHPControls();
+    this.setupInventoryCollapse();
+    this.setupBasicInfo();
+    this.setupAddButtons();
+    this.setupAttributeEvents();
+    this.setupAttackEvents();
+    this.setupSpellEvents();
+    this.setupCurrencyEvents();
+    this.setupDeathSavesEvents();
+    this.setupSpellStatsEvents();
+    this.loadTraitsFromStorage();
+    this.setupRaceAutocomplete();
+    this.setupRaceClearHandler();
+    this.initRichTextEditor();
+}
+
+    // ===== MÉTODO PARA RECARGAR TODA LA HOJA =====
+    refresh() {
+        console.log(`🔄 Recargando hoja ${this.containerId}`);
+        // Recargar todos los managers
+        if (this.attributeManager) {
+            this.attributeManager.load();
+            this.attributeManager.notify();
+        }
+        if (this.healthManager) {
+            this.healthManager.load();
+            this.healthManager.notify();
+        }
+        if (this.manaManager) {
+            this.manaManager.load();
+            this.manaManager.notify();
+        }
+        if (this.skillsManager) {
+            this.skillsManager.load();
+            this.skillsManager.notify();
+        }
+        if (this.proficiencyManager) {
+            this.proficiencyManager.load();
+            this.proficiencyManager.notify();
+        }
+        if (this.savingThrowsManager) {
+            this.savingThrowsManager.load();
+            this.savingThrowsManager.notify();
+        }
+        if (this.expManager) {
+            this.expManager.load();
+            this.expManager.notify();
+        }
+        if (this.currencyManager) {
+            this.currencyManager.load();
+            this.currencyManager.notify();
+        }
+        if (this.spellSlotsManager) {
+            this.spellSlotsManager.load();
+            this.spellSlotsManager.notify();
+        }
+        if (this.spellStatsManager) {
+            this.spellStatsManager.load();
+            this.spellStatsManager.calculateStats();
+        }
+        if (this.spellManager) {
+            this.spellManager.load();
+            this.spellManager.notify();
+        }
+        if (this.deathSavesManager) {
+            this.deathSavesManager.load();
+            this.deathSavesManager.notify();
+        }
+        if (this.treasureManager) {
+            this.treasureManager.load();
+            this.treasureManager.notify();
+        }
+        if (this.potionManager) {
+            this.potionManager.load();
+            this.potionManager.notify();
+        }
+        if (this.equipmentManager) {
+            this.equipmentManager.load();
+            this.equipmentManager.notify();
+        }
+        this.loadAttacksFromStorage();
+        this.calcularPercepcionPasiva();
     }
 
     waitForWebSocket() {
@@ -107,449 +287,394 @@ export class CharacterSheet {
         setTimeout(() => clearInterval(checkInterval), 5000);
     }
 
-
-async analyzePDFWithAI(pdfFile) {
-    if (!pdfFile || pdfFile.type !== 'application/pdf') {
-        Helpers.showMessage('Por favor, selecciona un archivo PDF válido', 'error');
-        return null;
-    }
-
-    console.log('📄 Iniciando análisis de PDF:', pdfFile.name);
-
-    // Verificar conexión con Groq
-    try {
-        const statusResponse = await fetch('/api/ai/status');
-        if (!statusResponse.ok) {
-            throw new Error(`HTTP ${statusResponse.status}`);
-        }
-        const status = await statusResponse.json();
-        
-        if (!status.available) {
-            Helpers.showMessage('IA no disponible. Verifica tu conexión con Groq.', 'error');
+    // ===== MÉTODO PARA ANALIZAR PDF CON IA =====
+    async analyzePDFWithAI(pdfFile) {
+        if (!pdfFile || pdfFile.type !== 'application/pdf') {
+            Helpers.showMessage('Por favor, selecciona un archivo PDF válido', 'error');
             return null;
         }
-        console.log('✅ IA disponible, modelo:', status.model);
-    } catch (error) {
-        console.error('Error verificando IA:', error);
-        Helpers.showMessage('Error de conexión con el servidor de IA. ¿Está el servidor corriendo?', 'error');
-        return null;
-    }
 
-    // Mostrar indicador de carga
-    const loadingDiv = this.showLoadingIndicator('Analizando PDF...');
-    console.log('Mostrando indicador de carga');
+        console.log('📄 Iniciando análisis de PDF:', pdfFile.name);
 
-    try {
-        // Crear FormData para enviar el PDF
-        const formData = new FormData();
-        formData.append('pdf', pdfFile);
-        
-        console.log('Enviando PDF al servidor...');
-        
-        // Llamar al endpoint de análisis de PDF
-        const response = await fetch('/api/ai/analyze-pdf', {
-            method: 'POST',
-            body: formData
-        });
-
-        console.log('📥 Respuesta recibida, status:', response.status);
-        
-        const result = await response.json();
-        console.log('📦 Datos recibidos:', result);
-
-        if (!response.ok) {
-            throw new Error(result.error || `Error HTTP ${response.status}`);
+        try {
+            const statusResponse = await fetch('/api/ai/status');
+            if (!statusResponse.ok) {
+                throw new Error(`HTTP ${statusResponse.status}`);
+            }
+            const status = await statusResponse.json();
+            
+            if (!status.available) {
+                Helpers.showMessage('IA no disponible. Verifica tu conexión con Groq.', 'error');
+                return null;
+            }
+            console.log('✅ IA disponible, modelo:', status.model);
+        } catch (error) {
+            console.error('Error verificando IA:', error);
+            Helpers.showMessage('Error de conexión con el servidor de IA. ¿Está el servidor corriendo?', 'error');
+            return null;
         }
 
-        if (result.success && result.analysis) {
-            console.log('✅ Análisis recibido, procesando JSON...');
+        const loadingDiv = this.showLoadingIndicator('Analizando PDF...');
+
+        try {
+            const formData = new FormData();
+            formData.append('pdf', pdfFile);
             
-            // Extraer JSON de la respuesta
-            let jsonString = result.analysis;
-            
-            // Limpiar markdown si está presente
-            jsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            
-            // Buscar el objeto JSON
-            const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new Error('No se encontró JSON válido en la respuesta');
+            const response = await fetch('/api/ai/analyze-pdf', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Error HTTP ${response.status}`);
             }
-            
-            console.log('🔍 JSON encontrado, parseando...');
-            const characterData = JSON.parse(jsonMatch[0]);
-            
-            // Validar y completar datos faltantes
-            const validatedData = this.validateCharacterData(characterData);
-            
-            console.log('📋 Datos validados:', validatedData.basicInfo);
-            
-            // Cargar el personaje en la hoja
-            this.loadCharacterFromData(validatedData);
-            
-            // Mostrar mensaje de éxito
-            Helpers.showMessage('✅ Personaje generado desde PDF correctamente', 'success');
-            
-            // Guardar automáticamente
-            setTimeout(() => {
-                this.saveCharacter();
-                console.log('💾 Personaje guardado automáticamente');
-            }, 500);
-            
-            return validatedData;
+
+            if (result.success && result.analysis) {
+                let jsonString = result.analysis;
+                jsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                
+                const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('No se encontró JSON válido en la respuesta');
+                }
+                
+                const characterData = JSON.parse(jsonMatch[0]);
+                const validatedData = this.validateCharacterData(characterData);
+                
+                this.loadCharacterFromData(validatedData);
+                
+                Helpers.showMessage('✅ Personaje generado desde PDF correctamente', 'success');
+                
+                setTimeout(() => {
+                    this.saveCharacter();
+                    console.log('💾 Personaje guardado automáticamente');
+                }, 500);
+                
+                return validatedData;
+            } else {
+                throw new Error(result.error || 'Error al analizar el PDF');
+            }
+
+        } catch (error) {
+            console.error('❌ Error analizando PDF:', error);
+            Helpers.showMessage(`Error al analizar PDF: ${error.message}`, 'error');
+            return null;
+        } finally {
+            this.hideLoadingIndicator(loadingDiv);
+        }
+    }
+
+    // ===== VALIDAR DATOS DEL PERSONAJE =====
+    validateCharacterData(data) {
+        const SKILL_ATTRIBUTE_MAP = {
+            'acrobacias': 'DESTREZA',
+            'arcano': 'INTELIGENCIA',
+            'atletismo': 'FUERZA',
+            'engaño': 'CARISMA',
+            'historia': 'INTELIGENCIA',
+            'interpretación': 'CARISMA',
+            'intimidación': 'CARISMA',
+            'investigación': 'INTELIGENCIA',
+            'juego de manos': 'DESTREZA',
+            'medicina': 'SABIDURÍA',
+            'naturaleza': 'INTELIGENCIA',
+            'percepción': 'SABIDURÍA',
+            'perspicacia': 'SABIDURÍA',
+            'persuasión': 'CARISMA',
+            'religión': 'INTELIGENCIA',
+            'sigilo': 'DESTREZA',
+            'supervivencia': 'SABIDURÍA',
+            'trato con animales': 'SABIDURÍA'
+        };
+
+        const defaultData = {
+            basicInfo: { name: '', class: '', race: '', background: '', alignment: '' },
+            attributes: [],
+            hp: { current: 10, max: 10, temp: 0 },
+            attacks: [],
+            exp: { current: 0, max: 300, level: 1 },
+            skills: [],
+            proficiencies: [],
+            savingThrows: [],
+            notas: { personalidad: '', ideales: '', vinculos: '', defectos: '', rasgos: '' },
+            equipment: [],
+            treasures: [],
+            potions: []
+        };
+        
+        const result = { ...defaultData, ...data };
+        
+        const defaultAttributes = [
+            { nombre: 'Fuerza', valor: 10, modificador: 0 },
+            { nombre: 'DESTREZA', valor: 10, modificador: 0 },
+            { nombre: 'CONSTITUCIÓN', valor: 10, modificador: 0 },
+            { nombre: 'INTELIGENCIA', valor: 10, modificador: 0 },
+            { nombre: 'SABIDURÍA', valor: 10, modificador: 0 },
+            { nombre: 'CARISMA', valor: 10, modificador: 0 }
+        ];
+        
+        if (!result.attributes || result.attributes.length === 0) {
+            result.attributes = defaultAttributes;
         } else {
-            throw new Error(result.error || 'Error al analizar el PDF');
-        }
-
-    } catch (error) {
-        console.error('❌ Error analizando PDF:', error);
-        Helpers.showMessage(`Error al analizar PDF: ${error.message}`, 'error');
-        return null;
-    } finally {
-        this.hideLoadingIndicator(loadingDiv);
-        console.log('🏁 Proceso finalizado');
-    }
-}
-
-validateCharacterData(data) {
-    // Mapeo de habilidades estándar con sus atributos en D&D 5e
-    const SKILL_ATTRIBUTE_MAP = {
-        'acrobacias': 'DESTREZA',
-        'arcano': 'INTELIGENCIA',
-        'atletismo': 'FUERZA',
-        'engaño': 'CARISMA',
-        'historia': 'INTELIGENCIA',
-        'interpretación': 'CARISMA',
-        'intimidación': 'CARISMA',
-        'investigación': 'INTELIGENCIA',
-        'juego de manos': 'DESTREZA',
-        'medicina': 'SABIDURÍA',
-        'naturaleza': 'INTELIGENCIA',
-        'percepción': 'SABIDURÍA',
-        'perspicacia': 'SABIDURÍA',
-        'persuasión': 'CARISMA',
-        'religión': 'INTELIGENCIA',
-        'sigilo': 'DESTREZA',
-        'supervivencia': 'SABIDURÍA',
-        'trato con animales': 'SABIDURÍA'
-    };
-
-    // Estructura base
-    const defaultData = {
-        basicInfo: { name: '', class: '', race: '', background: '', alignment: '' },
-        attributes: [],
-        hp: { current: 10, max: 10, temp: 0 },
-        attacks: [],
-        exp: { current: 0, max: 300, level: 1 },
-        skills: [],
-        proficiencies: [],
-        savingThrows: [],
-        notas: { personalidad: '', ideales: '', vinculos: '', defectos: '', rasgos: '' },
-        equipment: [],
-        treasures: [],
-        potions: []
-    };
-    
-    const result = { ...defaultData, ...data };
-    
-    // Asegurar que haya 6 atributos
-    const defaultAttributes = [
-        { nombre: 'Fuerza', valor: 10, modificador: 0 },
-        { nombre: 'DESTREZA', valor: 10, modificador: 0 },
-        { nombre: 'CONSTITUCIÓN', valor: 10, modificador: 0 },
-        { nombre: 'INTELIGENCIA', valor: 10, modificador: 0 },
-        { nombre: 'SABIDURÍA', valor: 10, modificador: 0 },
-        { nombre: 'CARISMA', valor: 10, modificador: 0 }
-    ];
-    
-    if (!result.attributes || result.attributes.length === 0) {
-        result.attributes = defaultAttributes;
-    } else {
-        for (let i = 0; i < defaultAttributes.length; i++) {
-            if (!result.attributes[i]) {
-                result.attributes.push(defaultAttributes[i]);
+            for (let i = 0; i < defaultAttributes.length; i++) {
+                if (!result.attributes[i]) {
+                    result.attributes.push(defaultAttributes[i]);
+                }
             }
         }
-    }
-    
-    // Calcular modificadores si faltan
-    result.attributes.forEach(attr => {
-        if (attr.valor && (attr.modificador === undefined || attr.modificador === null)) {
-            attr.modificador = Math.floor((attr.valor - 10) / 2);
-        }
-    });
-    
-    // Crear mapa de atributos
-    const attributeMap = {};
-    result.attributes.forEach(attr => {
-        const nombreKey = attr.nombre.toUpperCase();
-        attributeMap[nombreKey] = attr;
-        attributeMap[attr.nombre] = attr;
-    });
-    
-    // Lista completa de habilidades estándar
-    const defaultSkills = [
-        'Acrobacias', 'Arcano', 'Atletismo', 'Engaño', 'Historia',
-        'Interpretación', 'Intimidación', 'Investigación', 'Juego de Manos',
-        'Medicina', 'Naturaleza', 'Percepción', 'Perspicacia', 'Persuasión',
-        'Religión', 'Sigilo', 'Supervivencia', 'Trato con Animales'
-    ];
-    
-    // Procesar habilidades
-    if (!result.skills || result.skills.length === 0) {
-        result.skills = defaultSkills.map(name => {
-            const skillNameLower = name.toLowerCase();
-            const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
-            return { 
-                name: name, 
-                bonus: 0,
-                attribute: assignedAttribute,
-                proficient: false,
-                expertise: false,
-                misc: 0
-            };
-        });
-    } else {
-        const processedSkills = [];
-        const existingSkillNames = new Set();
         
-        result.skills.forEach(skill => {
-            const skillName = skill.name;
-            const skillNameLower = skillName.toLowerCase();
-            existingSkillNames.add(skillName);
-            
-            // Asignar atributo si falta
-            if (!skill.attribute || skill.attribute === '') {
-                const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower];
-                if (assignedAttribute) {
-                    skill.attribute = assignedAttribute;
-                    console.log(`✅ Asignado atributo ${assignedAttribute} a habilidad ${skillName}`);
-                }
+        result.attributes.forEach(attr => {
+            if (attr.valor && (attr.modificador === undefined || attr.modificador === null)) {
+                attr.modificador = Math.floor((attr.valor - 10) / 2);
             }
-            
-            // Asegurar campos necesarios
-            skill.proficient = skill.proficient || false;
-            skill.expertise = skill.expertise || false;
-            skill.misc = skill.misc || 0;
-            
-            // Calcular bonus si falta
-            if (skill.bonus === undefined || skill.bonus === null) {
-                let bonus = 0;
-                if (skill.attribute && attributeMap[skill.attribute]) {
-                    bonus += attributeMap[skill.attribute].modificador || 0;
-                }
-                if (skill.proficient) {
-                    const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
-                    bonus += skill.expertise ? profBonus * 2 : profBonus;
-                }
-                bonus += skill.misc || 0;
-                skill.bonus = bonus;
-            }
-            
-            processedSkills.push(skill);
         });
         
-        // Agregar habilidades faltantes
-        defaultSkills.forEach(defaultSkill => {
-            if (!existingSkillNames.has(defaultSkill)) {
-                const skillNameLower = defaultSkill.toLowerCase();
+        const attributeMap = {};
+        result.attributes.forEach(attr => {
+            const nombreKey = attr.nombre.toUpperCase();
+            attributeMap[nombreKey] = attr;
+            attributeMap[attr.nombre] = attr;
+        });
+        
+        const defaultSkills = [
+            'Acrobacias', 'Arcano', 'Atletismo', 'Engaño', 'Historia',
+            'Interpretación', 'Intimidación', 'Investigación', 'Juego de Manos',
+            'Medicina', 'Naturaleza', 'Percepción', 'Perspicacia', 'Persuasión',
+            'Religión', 'Sigilo', 'Supervivencia', 'Trato con Animales'
+        ];
+        
+        if (!result.skills || result.skills.length === 0) {
+            result.skills = defaultSkills.map(name => {
+                const skillNameLower = name.toLowerCase();
                 const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
-                processedSkills.push({
-                    id: Date.now() + Math.random(),
-                    name: defaultSkill,
+                return { 
+                    name: name, 
                     bonus: 0,
                     attribute: assignedAttribute,
                     proficient: false,
                     expertise: false,
                     misc: 0
-                });
-                console.log(`➕ Agregada habilidad estándar faltante: ${defaultSkill} (${assignedAttribute})`);
+                };
+            });
+        } else {
+            const processedSkills = [];
+            const existingSkillNames = new Set();
+            
+            result.skills.forEach(skill => {
+                const skillName = skill.name;
+                const skillNameLower = skillName.toLowerCase();
+                existingSkillNames.add(skillName);
+                
+                if (!skill.attribute || skill.attribute === '') {
+                    const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower];
+                    if (assignedAttribute) {
+                        skill.attribute = assignedAttribute;
+                    }
+                }
+                
+                skill.proficient = skill.proficient || false;
+                skill.expertise = skill.expertise || false;
+                skill.misc = skill.misc || 0;
+                
+                if (skill.bonus === undefined || skill.bonus === null) {
+                    let bonus = 0;
+                    if (skill.attribute && attributeMap[skill.attribute]) {
+                        bonus += attributeMap[skill.attribute].modificador || 0;
+                    }
+                    if (skill.proficient) {
+                        const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
+                        bonus += skill.expertise ? profBonus * 2 : profBonus;
+                    }
+                    bonus += skill.misc || 0;
+                    skill.bonus = bonus;
+                }
+                
+                processedSkills.push(skill);
+            });
+            
+            defaultSkills.forEach(defaultSkill => {
+                if (!existingSkillNames.has(defaultSkill)) {
+                    const skillNameLower = defaultSkill.toLowerCase();
+                    const assignedAttribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
+                    processedSkills.push({
+                        id: Date.now() + Math.random(),
+                        name: defaultSkill,
+                        bonus: 0,
+                        attribute: assignedAttribute,
+                        proficient: false,
+                        expertise: false,
+                        misc: 0
+                    });
+                }
+            });
+            
+            result.skills = processedSkills;
+        }
+        
+        const defaultSavingThrows = [
+            { name: 'Fuerza', basedOn: 'Fuerza', proficient: false, value: 0 },
+            { name: 'DESTREZA', basedOn: 'DESTREZA', proficient: false, value: 0 },
+            { name: 'CONSTITUCIÓN', basedOn: 'CONSTITUCIÓN', proficient: false, value: 0 },
+            { name: 'INTELIGENCIA', basedOn: 'INTELIGENCIA', proficient: false, value: 0 },
+            { name: 'SABIDURÍA', basedOn: 'SABIDURÍA', proficient: false, value: 0 },
+            { name: 'CARISMA', basedOn: 'CARISMA', proficient: false, value: 0 }
+        ];
+        
+        if (!result.savingThrows || result.savingThrows.length === 0) {
+            result.savingThrows = defaultSavingThrows;
+        } else {
+            const existingThrowNames = new Set(result.savingThrows.map(st => st.name));
+            defaultSavingThrows.forEach(defaultThrow => {
+                if (!existingThrowNames.has(defaultThrow.name)) {
+                    result.savingThrows.push(defaultThrow);
+                }
+            });
+        }
+        
+        result.savingThrows.forEach(st => {
+            const attributeKey = st.basedOn || st.name;
+            const attribute = attributeMap[attributeKey] || attributeMap[attributeKey.toUpperCase()];
+            let value = attribute?.modificador || 0;
+            if (st.proficient) {
+                const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
+                value += profBonus;
             }
+            st.value = value;
         });
         
-        result.skills = processedSkills;
-    }
-    
-    // Procesar tiradas de salvación
-    const defaultSavingThrows = [
-        { name: 'Fuerza', basedOn: 'Fuerza', proficient: false, value: 0 },
-        { name: 'DESTREZA', basedOn: 'DESTREZA', proficient: false, value: 0 },
-        { name: 'CONSTITUCIÓN', basedOn: 'CONSTITUCIÓN', proficient: false, value: 0 },
-        { name: 'INTELIGENCIA', basedOn: 'INTELIGENCIA', proficient: false, value: 0 },
-        { name: 'SABIDURÍA', basedOn: 'SABIDURÍA', proficient: false, value: 0 },
-        { name: 'CARISMA', basedOn: 'CARISMA', proficient: false, value: 0 }
-    ];
-    
-    if (!result.savingThrows || result.savingThrows.length === 0) {
-        result.savingThrows = defaultSavingThrows;
-    } else {
-        const existingThrowNames = new Set(result.savingThrows.map(st => st.name));
-        defaultSavingThrows.forEach(defaultThrow => {
-            if (!existingThrowNames.has(defaultThrow.name)) {
-                result.savingThrows.push(defaultThrow);
+        result.attributes = result.attributes.map(attr => {
+            const nameMap = {
+                'str': 'Fuerza', 'strength': 'Fuerza',
+                'dex': 'DESTREZA', 'dexterity': 'DESTREZA',
+                'con': 'CONSTITUCIÓN', 'constitution': 'CONSTITUCIÓN',
+                'int': 'INTELIGENCIA', 'intelligence': 'INTELIGENCIA',
+                'wis': 'SABIDURÍA', 'wisdom': 'SABIDURÍA',
+                'cha': 'CARISMA', 'charisma': 'CARISMA'
+            };
+            const lowerName = (attr.nombre || '').toLowerCase();
+            if (nameMap[lowerName]) {
+                attr.nombre = nameMap[lowerName];
             }
+            return attr;
         });
-    }
-    
-    // Calcular valores de tiradas de salvación
-    result.savingThrows.forEach(st => {
-        const attributeKey = st.basedOn || st.name;
-        const attribute = attributeMap[attributeKey] || attributeMap[attributeKey.toUpperCase()];
-        let value = attribute?.modificador || 0;
-        if (st.proficient) {
-            const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
-            value += profBonus;
-        }
-        st.value = value;
-    });
-    
-    // Normalizar nombres de atributos
-    result.attributes = result.attributes.map(attr => {
-        const nameMap = {
-            'str': 'Fuerza', 'strength': 'Fuerza',
-            'dex': 'DESTREZA', 'dexterity': 'DESTREZA',
-            'con': 'CONSTITUCIÓN', 'constitution': 'CONSTITUCIÓN',
-            'int': 'INTELIGENCIA', 'intelligence': 'INTELIGENCIA',
-            'wis': 'SABIDURÍA', 'wisdom': 'SABIDURÍA',
-            'cha': 'CARISMA', 'charisma': 'CARISMA'
-        };
-        const lowerName = (attr.nombre || '').toLowerCase();
-        if (nameMap[lowerName]) {
-            attr.nombre = nameMap[lowerName];
-        }
-        return attr;
-    });
-    
-    // Calcular percepción pasiva
-    const sabiduriaAttr = result.attributes.find(attr => 
-        attr.nombre === 'SABIDURÍA' || attr.nombre === 'Sabiduría'
-    );
-    if (sabiduriaAttr) {
-        const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
-        const wisdomMod = sabiduriaAttr.modificador || 0;
-        const isPerceptionProficient = result.skills?.find(s => 
-            s.name === 'Percepción' && s.proficient
+        
+        const sabiduriaAttr = result.attributes.find(attr => 
+            attr.nombre === 'SABIDURÍA' || attr.nombre === 'Sabiduría'
         );
-        result.passivePerception = 10 + wisdomMod + (isPerceptionProficient ? profBonus : 0);
-    } else {
-        result.passivePerception = 10;
-    }
-    
-    // Procesar proficiencies - eliminar duplicados
-    if (result.proficiencies && result.proficiencies.length > 0) {
-        const uniqueProficiencies = [];
-        const seen = new Set();
-        for (const prof of result.proficiencies) {
-            const key = `${prof.name}-${prof.type}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniqueProficiencies.push(prof);
-            }
+        if (sabiduriaAttr) {
+            const profBonus = result.exp?.level ? Math.floor((result.exp.level + 7) / 4) : 2;
+            const wisdomMod = sabiduriaAttr.modificador || 0;
+            const isPerceptionProficient = result.skills?.find(s => 
+                s.name === 'Percepción' && s.proficient
+            );
+            result.passivePerception = 10 + wisdomMod + (isPerceptionProficient ? profBonus : 0);
+        } else {
+            result.passivePerception = 10;
         }
-        result.proficiencies = uniqueProficiencies;
-    }
-    
-    return result;
-}
-
-/**
- * Mostrar indicador de carga
- */
-showLoadingIndicator(message) {
-    const overlay = document.createElement('div');
-    overlay.className = 'loading-overlay';
-    overlay.innerHTML = `
-        <div class="loading-spinner">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>${message}</p>
-            <small>Esto puede tomar unos segundos...</small>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-    return overlay;
-}
-
-/**
- * Ocultar indicador de carga
- */
-hideLoadingIndicator(element) {
-    if (element && element.parentNode) {
-        element.remove();
-    }
-}
-
-/**
- * Crear botón de importación con IA
- */
-createAIImportButton() {
-    // Buscar el contenedor correcto (footer-buttons en tu HTML)
-    const container = document.querySelector('.footer-buttons');
-    if (!container) {
-        console.warn('No se encontró el contenedor .footer-buttons');
-        return;
-    }
-    
-    const existingBtn = document.getElementById('aiImportPdfBtn');
-    if (existingBtn) return;
-    
-    const aiButton = document.createElement('button');
-    aiButton.id = 'aiImportPdfBtn';
-    aiButton.className = 'btn-import';
-    aiButton.innerHTML = 'IMPORTAR PDF (demo)';
-    aiButton.title = 'Analizar PDF y crear personaje automáticamente';
-    aiButton.style.background = 'linear-gradient(135deg, #6a0dad, #4a90e2)';
-    aiButton.style.margin = '0 5px';
-    aiButton.style.border = 'none';
-    aiButton.style.color = 'white';
-    aiButton.style.cursor = 'pointer';
-    aiButton.style.padding = '10px 15px';
-    aiButton.style.borderRadius = '6px';
-    aiButton.style.fontFamily = 'Cinzel, serif';
-    aiButton.style.fontWeight = 'bold';
-    aiButton.style.transition = 'all 0.3s ease';
-    
-    aiButton.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.pdf';
-        input.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                console.log('📄 Archivo seleccionado:', file.name);
-                await this.analyzePDFWithAI(file);
+        
+        if (result.proficiencies && result.proficiencies.length > 0) {
+            const uniqueProficiencies = [];
+            const seen = new Set();
+            for (const prof of result.proficiencies) {
+                const key = `${prof.name}-${prof.type}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueProficiencies.push(prof);
+                }
             }
-        };
-        input.click();
-    });
-    
-    // Insertar después del botón de importar existente o al inicio
-    const importBtn = document.getElementById('importBtn');
-    if (importBtn) {
-        importBtn.insertAdjacentElement('afterend', aiButton);
-    } else {
-        container.appendChild(aiButton);
+            result.proficiencies = uniqueProficiencies;
+        }
+        
+        return result;
     }
-    
-    console.log('✅ Botón creado correctamente');
-}
 
+    // ===== MOSTRAR INDICADOR DE CARGA =====
+    showLoadingIndicator(message) {
+        const overlay = document.createElement('div');
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>${message}</p>
+                <small>Esto puede tomar unos segundos...</small>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        return overlay;
+    }
+
+    hideLoadingIndicator(element) {
+        if (element && element.parentNode) {
+            element.remove();
+        }
+    }
+
+    // ===== CREAR BOTÓN DE IMPORTACIÓN CON IA =====
+    createAIImportButton() {
+        const container = document.querySelector('.footer-buttons');
+        if (!container) {
+            console.warn('No se encontró el contenedor .footer-buttons');
+            return;
+        }
+        
+        const existingBtn = document.getElementById('aiImportPdfBtn');
+        if (existingBtn) return;
+        
+        const aiButton = document.createElement('button');
+        aiButton.id = 'aiImportPdfBtn';
+        aiButton.className = 'btn-import';
+        aiButton.innerHTML = 'IMPORTAR PDF (demo)';
+        aiButton.title = 'Analizar PDF y crear personaje automáticamente';
+        aiButton.style.background = 'linear-gradient(135deg, #6a0dad, #4a90e2)';
+        aiButton.style.margin = '0 5px';
+        aiButton.style.border = 'none';
+        aiButton.style.color = 'white';
+        aiButton.style.cursor = 'pointer';
+        aiButton.style.padding = '10px 15px';
+        aiButton.style.borderRadius = '6px';
+        aiButton.style.fontFamily = 'Cinzel, serif';
+        aiButton.style.fontWeight = 'bold';
+        aiButton.style.transition = 'all 0.3s ease';
+        
+        aiButton.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    console.log('📄 Archivo seleccionado:', file.name);
+                    await this.analyzePDFWithAI(file);
+                }
+            };
+            input.click();
+        });
+        
+        const importBtn = document.getElementById('importBtn');
+        if (importBtn) {
+            importBtn.insertAdjacentElement('afterend', aiButton);
+        } else {
+            container.appendChild(aiButton);
+        }
+        
+        console.log('✅ Botón creado correctamente');
+    }
+
+    // ===== ASEGURAR QUE EL USUARIO ESTÉ CONFIGURADO =====
     async ensureUserIsSet() {
-        // Esperar a que el DOM esté listo
         if (document.readyState === 'loading') {
             await new Promise(resolve => {
                 document.addEventListener('DOMContentLoaded', resolve);
             });
         }
         
-        // Si no hay usuario configurado, mostrar prompt
         if (!this.userManager.isUserSet()) {
             await this.userManager.showUserPrompt();
         }
         
-        // Actualizar cualquier UI que muestre el nombre del jugador
         this.updatePlayerNameDisplay();
-        
-        // Sincronizar con WebSocket
         this.syncCharacterWithWebSocket();
     }
 
@@ -568,149 +693,158 @@ createAIImportButton() {
         }
     }
 
-    async saveCharacter() {
-        const personajeNombre = document.getElementById('char-name')?.value.trim() || 'Sin nombre';
-        const clase = document.getElementById('char-class')?.value || '';
-        const raza = document.getElementById('char-race')?.value || '';
-        const trasfondo = document.getElementById('char-bg')?.value || '';
-        const alineamiento = document.getElementById('char-align')?.value || '';
-        const jugadorNombre = this.getPlayerName();
-        if (jugadorNombre === 'Aventurero' || jugadorNombre === 'Anónimo') {
-            console.warn('⚠️ Jugador sin registrar, mostrando prompt');
-            await this.userManager.showUserPrompt();
-            const nuevoNombre = this.getPlayerName();
-            if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
-                Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
-                return;
-            }
-        }
-
-        const inventoryCard = document.getElementById('card-inventory');
-        const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
-        
-        const imagenUrl = localStorage.getItem('imagenUrl') || null;
-        
-        const atributosDOM = [];
-        document.querySelectorAll('.attribute-item').forEach(item => {
-            const nameInput = item.querySelector('.attribute-name');
-            const valueInput = item.querySelector('.ability-value');
-            const modifierElement = item.querySelector('.ability-modifier');
-            
-            if (nameInput && valueInput) {
-                const nombre = nameInput.value.trim() || 'ATRIBUTO';
-                const valor = parseInt(valueInput.value) || 10;
-                let modifier = 0;
-                
-                if (modifierElement) {
-                    const modifierText = modifierElement.textContent;
-                    modifier = parseInt(modifierText) || 0;
-                } else {
-                    modifier = Helpers.calculateModifier(valor);
-                }
-                
-                atributosDOM.push({
-                    nombre: nombre,
-                    valor: valor,
-                    modificador: modifier
-                });
-            }
-        });
-        
-        const notas = {
-            personalidad: document.getElementById('personality')?.value || '',
-            ideales: document.getElementById('ideals')?.value || '',
-            vinculos: document.getElementById('bonds')?.value || '',
-            defectos: document.getElementById('flaws')?.value || '',
-            rasgos: document.getElementById('features')?.value || ''
-        };
-        
-        const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
-        const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
-        
-        const layout = {};
-        document.querySelectorAll('.card').forEach((card, index) => {
-            const id = card.id || `card-${index}`;
-            layout[id] = {
-                width: card.style.width || getComputedStyle(card).width,
-                height: card.style.height || getComputedStyle(card).height,
-                parentId: card.parentNode?.id || card.parentNode?.className || ''
-            };
-        });
-
-        const characterData = {
-            id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            nombre: personajeNombre,
-            clase: clase,
-            raza: raza,
-            nivel: this.expManager?.getData().level || 1,
-            jugador: this.getPlayerName(),
-            trasfondo: trasfondo,
-            alineamiento: alineamiento, 
-            imagen: imagenUrl,
-            colores_personalizados: {
-                background: coloresGuardados.background || null,
-                parchment: coloresGuardados.parchment || null,
-                accent: coloresGuardados.accent || null,
-                mana: coloresGuardados.mana || null,
-                hp: coloresGuardados.hp || null,
-                gems: coloresGuardados.gems || null,
-                textColors: textColorsGuardados
-            },
-            stats: {
-                hp: this.healthManager.getData(),
-                mana: this.manaManager.getData(),
-                ca: parseInt(document.getElementById('armor-class')?.value) || 12,
-                velocidad: parseInt(document.getElementById('speed')?.value) || 30,
-                iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
-                atributos: atributosDOM
-            },
-            spellSlots: this.spellSlotsManager.getData(),
-            spellStats: this.spellStatsManager.getData(),
-            ataques: this.getAttacks(),
-            conjuros: this.getSpells(),
-            inventario: {
-                monedas: this.currencyManager.getData(),
-                tesoros: this.treasureManager.getAll(),
-                pociones: this.potionManager.getAll(),
-                equipo: this.equipmentManager.getAll(),
-                collapsed: isInventoryCollapsed
-            },
-            deathSaves: this.deathSavesManager.getData(),
-            skills: this.skillsManager.getAll(),
-            passivePerception: this.calcularPercepcionPasiva() || 10,
-            proficiencies: this.proficiencyManager.getAll(),
-            savingThrows: this.savingThrowsManager.getAll(),
-            notas: notas,
-            layout: layout,
-            fecha_creacion: new Date().toISOString(),
-            version: '3.2'
-        };
-        
-        localStorage.setItem('dndCharacterSheet', JSON.stringify(characterData));
-        localStorage.setItem('personajeNombre', personajeNombre);
-        
-        this.storage.save('basicInfo', {
-            name: personajeNombre,
-            class: clase,
-            race: raza,
-            background: trasfondo,
-            alignment: alineamiento
-        });
-        
-        if (personajeNombre === 'Sin nombre' && !document.getElementById('char-name')?.value.trim()) {
+    // ===== GUARDAR PERSONAJE =====
+        async saveCharacter() {
+    const personajeNombre = this.$('#char-name')?.value?.trim() || 'Sin nombre';
+    const clase = this.$('#char-class')?.value || '';
+    const raza = this.$('#char-race')?.value || '';
+    const trasfondo = this.$('#char-bg')?.value || '';
+    const alineamiento = this.$('#char-align')?.value || '';
+    const jugadorNombre = this.getPlayerName();
+    
+    if (jugadorNombre === 'Aventurero' || jugadorNombre === 'Anónimo') {
+        console.warn('⚠️ Jugador sin registrar, mostrando prompt');
+        await this.userManager.showUserPrompt();
+        const nuevoNombre = this.getPlayerName();
+        if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
+            Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
             return;
         }
+    }
 
-        this.storage.save('traits', {
-            personality: notas.personalidad,
-            ideals: notas.ideales,
-            bonds: notas.vinculos,
-            flaws: notas.defectos,
-            features: notas.rasgos
-        });
-        this.storage.save('passivePerception', this.passivePerception);
+    const inventoryCard = this.$('#card-inventory');
+    const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
+    
+    // Obtener imagen del storage aislado
+    const imagenUrl = this.storage.load('imagenUrl') || null;
+    
+    const atributosDOM = [];
+    this.$$('.attribute-item').forEach(item => {
+        const nameInput = item.querySelector('.attribute-name');
+        const valueInput = item.querySelector('.ability-value');
+        const modifierElement = item.querySelector('.ability-modifier');
         
-        // Sincronizar con WebSocket con datos completos
+        if (nameInput && valueInput) {
+            const nombre = nameInput.value.trim() || 'ATRIBUTO';
+            const valor = parseInt(valueInput.value) || 10;
+            let modifier = 0;
+            
+            if (modifierElement) {
+                const modifierText = modifierElement.textContent;
+                modifier = parseInt(modifierText) || 0;
+            } else {
+                modifier = Helpers.calculateModifier(valor);
+            }
+            
+            atributosDOM.push({
+                nombre: nombre,
+                valor: valor,
+                modificador: modifier
+            });
+        }
+    });
+    
+    const notas = {
+        personalidad: this.$('#personality')?.value || '',
+        ideales: this.$('#ideals')?.value || '',
+        vinculos: this.$('#bonds')?.value || '',
+        defectos: this.$('#flaws')?.value || '',
+        rasgos: this.$('#features')?.value || ''
+    };
+    
+    const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
+    const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
+    
+    const layout = {};
+    this.$$('.card').forEach((card, index) => {
+        const id = card.id || `card-${index}`;
+        layout[id] = {
+            width: card.style.width || getComputedStyle(card).width,
+            height: card.style.height || getComputedStyle(card).height,
+            parentId: card.parentNode?.id || card.parentNode?.className || ''
+        };
+    });
+
+    const characterData = {
+        id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        nombre: personajeNombre,
+        clase: clase,
+        raza: raza,
+        nivel: this.expManager?.getData().level || 1,
+        jugador: this.getPlayerName(),
+        trasfondo: trasfondo,
+        alineamiento: alineamiento, 
+        imagen: imagenUrl,
+        colores_personalizados: {
+            background: coloresGuardados.background || null,
+            parchment: coloresGuardados.parchment || null,
+            accent: coloresGuardados.accent || null,
+            mana: coloresGuardados.mana || null,
+            hp: coloresGuardados.hp || null,
+            gems: coloresGuardados.gems || null,
+            textColors: textColorsGuardados
+        },
+        stats: {
+            hp: this.healthManager.getData(),
+            mana: this.manaManager.getData(),
+            ca: parseInt(this.$('#armor-class')?.value) || 12,
+            velocidad: parseInt(this.$('#speed')?.value) || 30,
+            iniciativa: parseInt(this.$('#initiative')?.value) || 1,
+            atributos: atributosDOM
+        },
+        spellSlots: this.spellSlotsManager.getData(),
+        spellStats: this.spellStatsManager.getData(),
+        ataques: this.getAttacks(),
+        conjuros: this.getSpells(),
+        inventario: {
+            monedas: this.currencyManager.getData(),
+            tesoros: this.treasureManager.getAll(),
+            pociones: this.potionManager.getAll(),
+            equipo: this.equipmentManager.getAll(),
+            collapsed: isInventoryCollapsed
+        },
+        deathSaves: this.deathSavesManager.getData(),
+        skills: this.skillsManager.getAll(),
+        passivePerception: this.calcularPercepcionPasiva() || 10,
+        proficiencies: this.proficiencyManager.getAll(),
+        savingThrows: this.savingThrowsManager.getAll(),
+        notas: notas,
+        layout: layout,
+        fecha_creacion: new Date().toISOString(),
+        version: '3.2',
+        tabId: this.tabId
+    };
+    
+    // Guardar en storage aislado
+    this.storage.save('characterData', characterData);
+    this.storage.save('personajeNombre', personajeNombre);
+    
+    // También guardar imagen en storage aislado si existe
+    if (imagenUrl) {
+        this.storage.save('imagenUrl', imagenUrl);
+    }
+    
+    this.storage.save('basicInfo', {
+        name: personajeNombre,
+        class: clase,
+        race: raza,
+        background: trasfondo,
+        alignment: alineamiento
+    });
+    
+    if (personajeNombre === 'Sin nombre' && !this.$('#char-name')?.value.trim()) {
+        return;
+    }
+
+    this.storage.save('traits', {
+        personality: notas.personalidad,
+        ideals: notas.ideales,
+        bonds: notas.vinculos,
+        flaws: notas.defectos,
+        features: notas.rasgos
+    });
+    this.storage.save('passivePerception', this.passivePerception);
+        // Sincronizar con WebSocket
         if (window.wsClient && window.wsClient.isConectado()) {
             const notificacionCompleta = {
                 id: characterData.id,
@@ -735,7 +869,8 @@ createAIImportButton() {
                 proficiencies: characterData.proficiencies,
                 imagen: characterData.imagen,
                 colores_personalizados: characterData.colores_personalizados,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                tabId: this.tabId
             };
             
             window.wsClient.emit('personaje-guardado', {
@@ -749,7 +884,7 @@ createAIImportButton() {
             const result = await this.api.saveCharacter(characterData);
             
             if (result.success) {
-                console.log('✅ Personaje guardado en servidor', result.data);
+                console.log(`✅ Personaje "${personajeNombre}" guardado (${this.tabId})`);
                 this.showSaveConfirmation();
             } else {
                 console.error('❌ Error guardando personaje:', result.error);
@@ -761,6 +896,7 @@ createAIImportButton() {
         }
     }
 
+    // ===== REFRESCAR PERSONAJE DESDE EL SERVIDOR =====
     async refreshCharacterFromServer() {
         try {
             const nombrePersonaje = this.getCharacterName();
@@ -783,6 +919,7 @@ createAIImportButton() {
         }
     }
 
+    // ===== CONFIGURAR LISTENERS DE WEBSOCKET =====
     setupWebSocketListeners() {
         if (!this.ws) return;
         
@@ -794,7 +931,6 @@ createAIImportButton() {
 
         this.ws.on('personaje-guardado', (data) => {
             const personajeRecibido = data.personaje;
-            
             if (personajeRecibido?.nombre === this.getCharacterName() && 
                 personajeRecibido?.jugador === this.getPlayerName()) {
                 // Actualización recibida
@@ -812,866 +948,640 @@ createAIImportButton() {
         });
     }
 
-    initManagers() {
-        this.colorManager = new ColorManager(this.storage);
-        this.attributeManager = new AttributeManager(this.storage);
-        this.healthManager = new HealthManager(this.storage, this.eventBus);
-        this.manaManager = new ManaManager(this.storage, this.eventBus);
-        this.deathSavesManager = new DeathSavesManager(this.storage, this.eventBus);
-        this.loadDeathSavesFromStorage();
-        this.loadPassivePerceptionFromStorage();
-        this.expManager = new ExpManager(this.storage, this.eventBus);
-        this.skillsManager = new SkillsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
-        this.proficiencyManager = new ProficiencyManager(this.storage, this.eventBus);
-        this.savingThrowsManager = new SavingThrowsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
-        
-        this.currencyManager = new CurrencyManager(this.storage, this.eventBus);
-        this.treasureManager = new TreasureManager(this.storage, this.eventBus);
-        this.potionManager = new PotionManager(this.storage, this.eventBus);
-        this.equipmentManager = new EquipmentManager(this.storage, this.eventBus, this.attributeManager);
-        
-        this.spellSlotsManager = new SpellSlotsManager(this.storage, this.eventBus);
-        this.spellManager = new SpellManager(this.storage, this.eventBus);
-        this.spellStatsManager = new SpellStatsManager(this.storage, this.eventBus, this.attributeManager, this.expManager);
-        
-        this.imageManager = new ImageManager(this.api, this.eventBus);
-        this.dragDropManager = new DragDropManager(this.storage);
-        this.resizeManager = new ResizeManager(this.storage);
-        this.loadAttacksFromStorage();
-    }
-
-    initUI() {
-        this.attributeUI = new AttributeUI(this.attributeManager, this.colorManager, this.eventBus);
-        this.spellUI = new SpellUI(this.spellManager, this.spellSlotsManager, this.eventBus);
-
-        if (this.spellManager) {
-    // Pequeño delay para asegurar DOM
-    setTimeout(() => {
-        this.spellManager.setupAutocomplete();
-    }, 500);
-}
-        
-        this.setupSubscriptions();
-        
-        this.setupQuickHPControls();
-        this.setupInventoryCollapse();
-        this.setupBasicInfo();
-        this.setupAddButtons();
-        this.setupAttributeEvents();
-        this.setupAttackEvents();
-        this.setupSpellEvents();
-        this.setupCurrencyEvents();
-        this.setupDeathSavesEvents();
-        this.setupSpellStatsEvents();
-        this.loadTraitsFromStorage();
-        this.setupRaceAutocomplete();
-        this.setupRaceClearHandler();
-        this.initRichTextEditor();
-    }
-
+    // ===== INICIALIZAR RICH TEXT EDITOR =====
     initRichTextEditor() {
-    this.richTextEditor = new RichTextEditor();
-    this.richTextEditor.initRichTextAreas();
-    
-    // Escuchar cambios para guardar automáticamente
-    const textareaIds = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
-    textareaIds.forEach(id => {
-        const textarea = document.getElementById(id);
-        if (textarea) {
-            textarea.addEventListener('change', () => {
-                if (this.hasValidCharacterName()) {
-                    this.saveCharacter();
-                }
-            });
-        }
-    });
-}
+        this.richTextEditor = new RichTextEditor();
+        this.richTextEditor.initRichTextAreas();
+        
+        const textareaIds = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
+        textareaIds.forEach(id => {
+            const textarea = this.$(`#${id}`);
+            if (textarea) {
+                textarea.addEventListener('change', () => {
+                    if (this.hasValidCharacterName()) {
+                        this.saveCharacter();
+                    }
+                });
+            }
+        });
+    }
 
+    // ===== CONFIGURAR AUTOCOMPLETADO DE RAZAS =====
     async setupRaceAutocomplete() {
-    const raceInput = document.getElementById('char-race');
-    if (!raceInput) return;
-    
-    // Cargar especies
-    await this.speciesService.loadSpecies();
-    const speciesList = this.speciesService.getSpeciesDenominaciones();
-    
-    // Crear contenedor de resultados
-    let resultsList = document.getElementById('raceSearchResults');
-    if (!resultsList) {
-        resultsList = document.createElement('ul');
-        resultsList.id = 'raceSearchResults';
-        resultsList.className = 'search-results';
+        const raceInput = this.$('#char-race');
+        if (!raceInput) return;
         
-        resultsList.style.cssText = `
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            max-height: 200px;
-            overflow-y: auto;
-            background: white;
-            border: 2px solid var(--accent-gold);
-            border-radius: 4px;
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            z-index: 10000;
-            display: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        `;
+        await this.speciesService.loadSpecies();
+        const speciesList = this.speciesService.getSpeciesDenominaciones();
         
-        if (raceInput.parentNode) {
-            raceInput.parentNode.style.position = 'relative';
-            raceInput.parentNode.appendChild(resultsList);
-        }
-    }
-    
-    // Manejador de entrada
-    const inputHandler = (e) => {
-        const searchTerm = raceInput.value.toLowerCase().trim();
-        resultsList.innerHTML = '';
-        
-        if (searchTerm.length === 0) {
-            resultsList.style.display = 'none';
-            return;
-        }
-        
-        const filtered = speciesList.filter(item => {
-            const itemText = item.text.toLowerCase();
-            if (itemText === searchTerm) return true;
-            if (itemText.startsWith(searchTerm)) return true;
-            const words = itemText.split(/\s+/);
-            if (words.some(word => word === searchTerm)) return true;
-            if (words.some(word => word.startsWith(searchTerm))) return true;
-            if (searchTerm.length >= 3 && itemText.includes(searchTerm)) return true;
-            return false;
-        }).slice(0, 15);
-        
-        if (filtered.length > 0) {
-            filtered.forEach(item => {
-                const li = document.createElement('li');
-                
-                let highlightedText = item.text;
-                const regex = new RegExp(`(${searchTerm})`, 'gi');
-                highlightedText = item.text.replace(regex, '<span class="highlight">$1</span>');
-                
-                li.innerHTML = `
-                    <div style="display: flex; flex-direction: column;">
-                        <span>${highlightedText}</span>
-                        <small style="color: var(--ink-light); font-size: 0.7rem;">
-                            ${item.book ? `📖 ${item.book}` : ''}
-                            ${item.publisher ? ` • ${item.publisher}` : ''}
-                        </small>
-                    </div>
-                `;
-                
-                li.style.cssText = `
-                    padding: 10px 15px;
-                    cursor: pointer;
-                    border-bottom: 1px solid var(--parchment-dark);
-                    font-family: 'Cinzel', serif;
-                    transition: background 0.2s ease;
-                `;
-                
-                li.addEventListener('mouseover', () => {
-                    li.style.background = 'var(--parchment-light)';
-                });
-                
-                li.addEventListener('mouseout', () => {
-                    li.style.background = 'white';
-                });
-                
-                li.addEventListener('click', () => {
-                    raceInput.value = item.text;
-                    // Obtener la especie completa y mostrar su descripción
-                    const especieCompleta = this.speciesService.getSpeciesByName(item.text);
-                    this.cargarDatosRaza(especieCompleta || item);
-                    resultsList.style.display = 'none';
-                });
-                
-                resultsList.appendChild(li);
-            });
-            resultsList.style.display = 'block';
-        } else {
-            resultsList.style.display = 'none';
-        }
-    };
-    
-    raceInput.removeEventListener('input', this._boundRaceInputHandler);
-    this._boundRaceInputHandler = inputHandler;
-    raceInput.addEventListener('input', this._boundRaceInputHandler);
-    
-    // También manejar selección manual (cuando el usuario escribe y presiona Enter o pierde foco)
-    raceInput.addEventListener('change', async () => {
-        const value = raceInput.value.trim();
-        if (value) {
-            const especieCompleta = this.speciesService.getSpeciesByName(value);
-            if (especieCompleta) {
-                this.cargarDatosRaza(especieCompleta);
-            }
-        }
-    });
-    
-    // Cerrar al hacer clic fuera
-    const documentClickHandler = (e) => {
-        if (e.target !== raceInput && !resultsList.contains(e.target)) {
-            resultsList.style.display = 'none';
-        }
-    };
-    
-    document.removeEventListener('click', this._boundRaceDocumentClickHandler);
-    this._boundRaceDocumentClickHandler = documentClickHandler;
-    document.addEventListener('click', this._boundRaceDocumentClickHandler);
-}
-
-cargarDatosRaza(speciesItem) {
-    const raceInput = document.getElementById('char-race');
-    if (raceInput) raceInput.value = speciesItem.text || speciesItem.name;
-    
-    let especieCompleta = speciesItem;
-    if (!speciesItem.description && speciesItem.text) {
-        especieCompleta = this.speciesService.getSpeciesByName(speciesItem.text);
-    }
-    
-    const nombreRaza = especieCompleta?.name || especieCompleta?.text;
-    if (this.razaActual === nombreRaza) {
-        console.log('Misma raza seleccionada, omitiendo cambios');
-        return;
-    }
-    
-    if (this.razaActual && this.atributosBaseGuardados) {
-        this.restaurarAtributosBase();
-    }
-    
-    this.razaActual = nombreRaza;
-    
-    if (especieCompleta && especieCompleta.description) {
-        // ... código existente de descripción ...
-        
-        // APLICAR atributos de la especie
-        if (especieCompleta.atributos) {
-            this.aplicarAtributosDeEspecie(especieCompleta.atributos);
-        }
-        
-        if (especieCompleta.properties && especieCompleta.properties['Ability Score Increase']) {
-            this.aplicarAtributosDeEspecie(especieCompleta.properties['Ability Score Increase']);
-        }
-        
-        // NUEVO: Verificar si la especie tiene atributos personalizables
-        this.verificarAtributosPersonalizables(especieCompleta);
-    }
-}
-
-/**
- * Verifica si la especie tiene atributos que requieren elección del jugador
- * y muestra un modal si es necesario
- */
-verificarAtributosPersonalizables(especieCompleta) {
-    const atributos = especieCompleta.atributos || 
-                      especieCompleta.properties?.['Ability Score Increase'];
-    
-    if (!atributos) return;
-    
-    // Buscar atributos con valor que parecen ser incrementos personalizables
-    // (valores como 2 o 1 que podrían ser para elegir)
-    const atributosParaElegir = [];
-    let tieneIncrementoFijo = false;
-    
-    for (const [attr, valor] of Object.entries(atributos)) {
-        // Si el atributo es un número positivo pequeño (1 o 2)
-        if (typeof valor === 'number' && valor > 0 && valor <= 3) {
-            // Verificar si el nombre del atributo es genérico
-            const nombreNormalizado = attr.toLowerCase();
-            if (nombreNormalizado === 'cualquier' || 
-                nombreNormalizado === 'elige' || 
-                nombreNormalizado === 'personalizable') {
-                atributosParaElegir.push({ atributo: null, valor });
-            } else {
-                // Es un atributo específico, es un incremento fijo
-                tieneIncrementoFijo = true;
-            }
-        }
-    }
-    
-    // Si hay atributos personalizables, mostrar modal
-    if (atributosParaElegir.length > 0) {
-        this.mostrarModalSeleccionAtributos(atributosParaElegir);
-    } else if (tieneIncrementoFijo) {
-        // Mostrar mensaje simple de confirmación
-        const cambios = Object.entries(atributos)
-            .map(([attr, val]) => `${attr} +${val}`)
-            .join(', ');
-        Helpers.showMessage(`✨ Atributos aplicados: ${cambios}`, 'success');
-    }
-}
-
-/**
- * Muestra modal para que el jugador elija qué atributos aumentar
- */
-mostrarModalSeleccionAtributos(atributosParaElegir) {
-    // Verificar si ya hay un modal abierto
-    let modal = document.getElementById('atributosModal');
-    if (modal) modal.remove();
-    
-    modal = document.createElement('div');
-    modal.id = 'atributosModal';
-    modal.className = 'modal';
-    modal.style.display = 'flex';
-    
-    // Obtener lista de atributos disponibles
-    const atributosDisponibles = this.attributeManager.getAll().map(attr => ({
-        id: attr.id,
-        name: attr.name,
-        currentValue: attr.value
-    }));
-    
-    // Si no hay atributos, crear los predeterminados
-    if (atributosDisponibles.length === 0) {
-        const defaultAttrs = ['Fuerza', 'DESTREZA', 'CONSTITUCIÓN', 'INTELIGENCIA', 'SABIDURÍA', 'CARISMA'];
-        defaultAttrs.forEach(name => {
-            this.attributeManager.add(name, 10);
-        });
-        // Recargar lista
-        atributosDisponibles.length = 0;
-        this.attributeManager.getAll().forEach(attr => {
-            atributosDisponibles.push({ id: attr.id, name: attr.name, currentValue: attr.value });
-        });
-    }
-    
-    let html = `
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3><i class="fas fa-dice-d20"></i> Aumentar Atributos</h3>
-                <button class="modal-close" id="closeAtributosModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Esta especie te permite aumentar tus atributos. Elige dónde aplicar los siguientes incrementos:</p>
-    `;
-    
-    for (const item of atributosParaElegir) {
-        html += `
-            <div class="atributo-choice-group" style="margin-bottom: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
-                <label style="font-weight: bold; color: var(--accent-gold);">
-                    <i class="fas fa-arrow-up"></i> +${item.valor} punto${item.valor !== 1 ? 's' : ''}
-                </label>
-                <select class="atributo-choice-select" data-valor="${item.valor}" style="width: 100%; margin-top: 8px; padding: 8px; border-radius: 6px; border: 1px solid var(--accent-gold); background: var(--parchment-light);">
-                    <option value="">Selecciona un atributo...</option>
-        `;
-        
-        atributosDisponibles.forEach(attr => {
-            html += `<option value="${attr.id}" data-name="${attr.name}" data-current="${attr.currentValue}">${attr.name} (actual: ${attr.currentValue})</option>`;
-        });
-        
-        html += `
-                </select>
-            </div>
-        `;
-    }
-    
-    html += `
-            </div>
-            <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px;">
-                <button type="button" class="btn-secondary btn-cancel" id="cancelAtributosBtn">Cancelar</button>
-                <button type="button" class="btn-secondary" id="confirmAtributosBtn" style="background: #4CAF50;">Aplicar</button>
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = html;
-    document.body.appendChild(modal);
-    
-    // Cerrar modal
-    const closeModal = () => modal.remove();
-    document.getElementById('closeAtributosModal')?.addEventListener('click', closeModal);
-    document.getElementById('cancelAtributosBtn')?.addEventListener('click', closeModal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
-    
-    // Confirmar selección
-    document.getElementById('confirmAtributosBtn')?.addEventListener('click', () => {
-        const selects = modal.querySelectorAll('.atributo-choice-select');
-        let seleccionesValidas = true;
-        const atributosAAplicar = [];
-        
-        selects.forEach(select => {
-            const valor = parseInt(select.dataset.valor);
-            const attrId = select.value;
-            const attrName = select.options[select.selectedIndex]?.dataset?.name;
+        let resultsList = this.$('#raceSearchResults');
+        if (!resultsList) {
+            resultsList = document.createElement('ul');
+            resultsList.id = 'raceSearchResults';
+            resultsList.className = 'search-results';
             
-            if (!attrId) {
-                seleccionesValidas = false;
-                select.style.borderColor = '#ff4444';
+            resultsList.style.cssText = `
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                max-height: 200px;
+                overflow-y: auto;
+                background: white;
+                border: 2px solid var(--accent-gold);
+                border-radius: 4px;
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                z-index: 10000;
+                display: none;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            `;
+            
+            if (raceInput.parentNode) {
+                raceInput.parentNode.style.position = 'relative';
+                raceInput.parentNode.appendChild(resultsList);
+            }
+        }
+        
+        const inputHandler = (e) => {
+            const searchTerm = raceInput.value.toLowerCase().trim();
+            resultsList.innerHTML = '';
+            
+            if (searchTerm.length === 0) {
+                resultsList.style.display = 'none';
                 return;
             }
-            select.style.borderColor = 'var(--accent-gold)';
-            atributosAAplicar.push({ id: parseInt(attrId), name: attrName, incremento: valor });
+            
+            const filtered = speciesList.filter(item => {
+                const itemText = item.text.toLowerCase();
+                if (itemText === searchTerm) return true;
+                if (itemText.startsWith(searchTerm)) return true;
+                const words = itemText.split(/\s+/);
+                if (words.some(word => word === searchTerm)) return true;
+                if (words.some(word => word.startsWith(searchTerm))) return true;
+                if (searchTerm.length >= 3 && itemText.includes(searchTerm)) return true;
+                return false;
+            }).slice(0, 15);
+            
+            if (filtered.length > 0) {
+                filtered.forEach(item => {
+                    const li = document.createElement('li');
+                    
+                    let highlightedText = item.text;
+                    const regex = new RegExp(`(${searchTerm})`, 'gi');
+                    highlightedText = item.text.replace(regex, '<span class="highlight">$1</span>');
+                    
+                    li.innerHTML = `
+                        <div style="display: flex; flex-direction: column;">
+                            <span>${highlightedText}</span>
+                            <small style="color: var(--ink-light); font-size: 0.7rem;">
+                                ${item.book ? `📖 ${item.book}` : ''}
+                                ${item.publisher ? ` • ${item.publisher}` : ''}
+                            </small>
+                        </div>
+                    `;
+                    
+                    li.style.cssText = `
+                        padding: 10px 15px;
+                        cursor: pointer;
+                        border-bottom: 1px solid var(--parchment-dark);
+                        font-family: 'Cinzel', serif;
+                        transition: background 0.2s ease;
+                    `;
+                    
+                    li.addEventListener('mouseover', () => {
+                        li.style.background = 'var(--parchment-light)';
+                    });
+                    
+                    li.addEventListener('mouseout', () => {
+                        li.style.background = 'white';
+                    });
+                    
+                    li.addEventListener('click', () => {
+                        raceInput.value = item.text;
+                        const especieCompleta = this.speciesService.getSpeciesByName(item.text);
+                        this.cargarDatosRaza(especieCompleta || item);
+                        resultsList.style.display = 'none';
+                    });
+                    
+                    resultsList.appendChild(li);
+                });
+                resultsList.style.display = 'block';
+            } else {
+                resultsList.style.display = 'none';
+            }
+        };
+        
+        raceInput.removeEventListener('input', this._boundRaceInputHandler);
+        this._boundRaceInputHandler = inputHandler;
+        raceInput.addEventListener('input', this._boundRaceInputHandler);
+        
+        raceInput.addEventListener('change', async () => {
+            const value = raceInput.value.trim();
+            if (value) {
+                const especieCompleta = this.speciesService.getSpeciesByName(value);
+                if (especieCompleta) {
+                    this.cargarDatosRaza(especieCompleta);
+                }
+            }
         });
         
-        if (!seleccionesValidas) {
-            Helpers.showMessage('Por favor, selecciona todos los atributos', 'warning');
+        const documentClickHandler = (e) => {
+            if (e.target !== raceInput && !resultsList.contains(e.target)) {
+                resultsList.style.display = 'none';
+            }
+        };
+        
+        document.removeEventListener('click', this._boundRaceDocumentClickHandler);
+        this._boundRaceDocumentClickHandler = documentClickHandler;
+        document.addEventListener('click', this._boundRaceDocumentClickHandler);
+    }
+
+    // ===== CARGAR DATOS DE RAZA =====
+    cargarDatosRaza(speciesItem) {
+        const raceInput = this.$('#char-race');
+        if (raceInput) raceInput.value = speciesItem.text || speciesItem.name;
+        
+        let especieCompleta = speciesItem;
+        if (!speciesItem.description && speciesItem.text) {
+            especieCompleta = this.speciesService.getSpeciesByName(speciesItem.text);
+        }
+        
+        const nombreRaza = especieCompleta?.name || especieCompleta?.text;
+        if (this.razaActual === nombreRaza) {
+            console.log('Misma raza seleccionada, omitiendo cambios');
             return;
         }
         
-        // Aplicar los incrementos seleccionados
-        for (const item of atributosAAplicar) {
-            const attr = this.attributeManager.getById(item.id);
-            if (attr) {
-                const nuevoValor = (attr.value || 10) + item.incremento;
-                const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-                console.log(`📈 Aplicando +${item.incremento} a ${item.name}: ${attr.value} -> ${valorLimitado}`);
-                this.attributeManager.update(item.id, { value: valorLimitado });
+        if (this.razaActual && this.atributosBaseGuardados) {
+            this.restaurarAtributosBase();
+        }
+        
+        this.razaActual = nombreRaza;
+        
+        if (especieCompleta && especieCompleta.description) {
+            const featuresTextarea = this.$('#features');
+            if (featuresTextarea) {
+                const descripcion = `🧬 ${especieCompleta.name || especieCompleta.text}\n\n${especieCompleta.description}`;
+                featuresTextarea.value = descripcion;
+                featuresTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            
+            if (especieCompleta.atributos) {
+                this.aplicarAtributosDeEspecie(especieCompleta.atributos);
+            }
+            
+            if (especieCompleta.properties && especieCompleta.properties['Ability Score Increase']) {
+                this.aplicarAtributosDeEspecie(especieCompleta.properties['Ability Score Increase']);
+            }
+            
+            this.verificarAtributosPersonalizables(especieCompleta);
+        }
+    }
+
+    // ===== VERIFICAR ATRIBUTOS PERSONALIZABLES =====
+    verificarAtributosPersonalizables(especieCompleta) {
+        const atributos = especieCompleta.atributos || 
+                          especieCompleta.properties?.['Ability Score Increase'];
+        
+        if (!atributos) return;
+        
+        const atributosParaElegir = [];
+        let tieneIncrementoFijo = false;
+        
+        for (const [attr, valor] of Object.entries(atributos)) {
+            if (typeof valor === 'number' && valor > 0 && valor <= 3) {
+                const nombreNormalizado = attr.toLowerCase();
+                if (nombreNormalizado === 'cualquier' || 
+                    nombreNormalizado === 'elige' || 
+                    nombreNormalizado === 'personalizable') {
+                    atributosParaElegir.push({ atributo: null, valor });
+                } else {
+                    tieneIncrementoFijo = true;
+                }
             }
         }
         
-        // Forzar actualización de UI
+        if (atributosParaElegir.length > 0) {
+            this.mostrarModalSeleccionAtributos(atributosParaElegir);
+        } else if (tieneIncrementoFijo) {
+            const cambios = Object.entries(atributos)
+                .map(([attr, val]) => `${attr} +${val}`)
+                .join(', ');
+            Helpers.showMessage(`✨ Atributos aplicados: ${cambios}`, 'success');
+        }
+    }
+
+    // ===== MOSTRAR MODAL DE SELECCIÓN DE ATRIBUTOS =====
+    mostrarModalSeleccionAtributos(atributosParaElegir) {
+        let modal = document.getElementById('atributosModal');
+        if (modal) modal.remove();
+        
+        modal = document.createElement('div');
+        modal.id = 'atributosModal';
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        
+        const atributosDisponibles = this.attributeManager.getAll().map(attr => ({
+            id: attr.id,
+            name: attr.name,
+            currentValue: attr.value
+        }));
+        
+        if (atributosDisponibles.length === 0) {
+            const defaultAttrs = ['Fuerza', 'DESTREZA', 'CONSTITUCIÓN', 'INTELIGENCIA', 'SABIDURÍA', 'CARISMA'];
+            defaultAttrs.forEach(name => {
+                this.attributeManager.add(name, 10);
+            });
+            atributosDisponibles.length = 0;
+            this.attributeManager.getAll().forEach(attr => {
+                atributosDisponibles.push({ id: attr.id, name: attr.name, currentValue: attr.value });
+            });
+        }
+        
+        let html = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-dice-d20"></i> Aumentar Atributos</h3>
+                    <button class="modal-close" id="closeAtributosModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Esta especie te permite aumentar tus atributos. Elige dónde aplicar los siguientes incrementos:</p>
+        `;
+        
+        for (const item of atributosParaElegir) {
+            html += `
+                <div class="atributo-choice-group" style="margin-bottom: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                    <label style="font-weight: bold; color: var(--accent-gold);">
+                        <i class="fas fa-arrow-up"></i> +${item.valor} punto${item.valor !== 1 ? 's' : ''}
+                    </label>
+                    <select class="atributo-choice-select" data-valor="${item.valor}" style="width: 100%; margin-top: 8px; padding: 8px; border-radius: 6px; border: 1px solid var(--accent-gold); background: var(--parchment-light);">
+                        <option value="">Selecciona un atributo...</option>
+            `;
+            
+            atributosDisponibles.forEach(attr => {
+                html += `<option value="${attr.id}" data-name="${attr.name}" data-current="${attr.currentValue}">${attr.name} (actual: ${attr.currentValue})</option>`;
+            });
+            
+            html += `
+                    </select>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px;">
+                    <button type="button" class="btn-secondary btn-cancel" id="cancelAtributosBtn">Cancelar</button>
+                    <button type="button" class="btn-secondary" id="confirmAtributosBtn" style="background: #4CAF50;">Aplicar</button>
+                </div>
+            </div>
+        `;
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        
+        const closeModal = () => modal.remove();
+        document.getElementById('closeAtributosModal')?.addEventListener('click', closeModal);
+        document.getElementById('cancelAtributosBtn')?.addEventListener('click', closeModal);
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        
+        document.getElementById('confirmAtributosBtn')?.addEventListener('click', () => {
+            const selects = modal.querySelectorAll('.atributo-choice-select');
+            let seleccionesValidas = true;
+            const atributosAAplicar = [];
+            
+            selects.forEach(select => {
+                const valor = parseInt(select.dataset.valor);
+                const attrId = select.value;
+                const attrName = select.options[select.selectedIndex]?.dataset?.name;
+                
+                if (!attrId) {
+                    seleccionesValidas = false;
+                    select.style.borderColor = '#ff4444';
+                    return;
+                }
+                select.style.borderColor = 'var(--accent-gold)';
+                atributosAAplicar.push({ id: parseInt(attrId), name: attrName, incremento: valor });
+            });
+            
+            if (!seleccionesValidas) {
+                Helpers.showMessage('Por favor, selecciona todos los atributos', 'warning');
+                return;
+            }
+            
+            for (const item of atributosAAplicar) {
+                const attr = this.attributeManager.getById(item.id);
+                if (attr) {
+                    const nuevoValor = (attr.value || 10) + item.incremento;
+                    const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+                    console.log(`📈 Aplicando +${item.incremento} a ${item.name}: ${attr.value} -> ${valorLimitado}`);
+                    this.attributeManager.update(item.id, { value: valorLimitado });
+                }
+            }
+            
+            this.attributeUI?.render(this.attributeManager.getAll());
+            this.savingThrowsManager?.updateFromAttributes();
+            this.calcularPercepcionPasiva();
+            
+            closeModal();
+            Helpers.showMessage('✅ Atributos actualizados correctamente', 'success');
+            
+            if (this.hasValidCharacterName()) {
+                this.saveCharacter();
+            }
+        });
+    }
+
+    // ===== APLICAR ATRIBUTOS DE ESPECIE =====
+    aplicarAtributosDeEspecie(atributos) {
+        if (!atributos || typeof atributos !== 'object') return;
+        
+        if (!this.atributosBaseGuardados) {
+            this.guardarAtributosBase();
+        }
+        
+        console.log('📊 Aplicando atributos de especie (reemplazando):', atributos);
+        
+        const nombreMap = {
+            'fuerza': 'Fuerza',
+            'str': 'Fuerza',
+            'strength': 'Fuerza',
+            'destreza': 'DESTREZA',
+            'dex': 'DESTREZA',
+            'dexterity': 'DESTREZA',
+            'constitución': 'CONSTITUCIÓN',
+            'con': 'CONSTITUCIÓN',
+            'constitution': 'CONSTITUCIÓN',
+            'inteligencia': 'INTELIGENCIA',
+            'int': 'INTELIGENCIA',
+            'intelligence': 'INTELIGENCIA',
+            'sabiduría': 'SABIDURÍA',
+            'wis': 'SABIDURÍA',
+            'wisdom': 'SABIDURÍA',
+            'carisma': 'CARISMA',
+            'cha': 'CARISMA',
+            'charisma': 'CARISMA'
+        };
+        
+        const atributosFijos = {};
+        const atributosPersonalizables = [];
+        
+        for (const [nombreAttr, incremento] of Object.entries(atributos)) {
+            if (typeof incremento !== 'number') continue;
+            
+            const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
+            const nombreLower = nombreAttr.toLowerCase();
+            
+            const esAtributoEstandar = Object.keys(nombreMap).some(key => 
+                key === nombreLower || nombreMap[key]?.toLowerCase() === nombreLower
+            );
+            
+            if (!esAtributoEstandar && (incremento === 1 || incremento === 2)) {
+                atributosPersonalizables.push({ originalName: nombreAttr, incremento });
+            } else {
+                atributosFijos[nombreNormalizado] = incremento;
+            }
+        }
+        
+        this.restaurarAtributosBase();
+        
+        const atributosActuales = this.attributeManager.getAll();
+        
+        for (const [nombreAttr, incremento] of Object.entries(atributosFijos)) {
+            const attrExistente = atributosActuales.find(attr => 
+                attr.name === nombreAttr || 
+                attr.name.toUpperCase() === nombreAttr.toUpperCase()
+            );
+            
+            if (attrExistente) {
+                let valorBase = 10;
+                if (this.atributosBaseGuardados) {
+                    const baseGuardado = this.atributosBaseGuardados.find(a => a.id === attrExistente.id);
+                    if (baseGuardado) {
+                        valorBase = baseGuardado.value;
+                    }
+                }
+                
+                const nuevoValor = valorBase + incremento;
+                const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+                
+                console.log(`📈 Aplicando ${nombreAttr}: base ${valorBase} +${incremento} = ${valorLimitado}`);
+                this.attributeManager.update(attrExistente.id, { value: valorLimitado });
+            } else {
+                const nuevoValor = 10 + incremento;
+                const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+                console.log(`➕ Creando nuevo atributo: ${nombreAttr} con valor ${valorLimitado}`);
+                this.attributeManager.add(nombreAttr, valorLimitado);
+            }
+        }
+        
+        if (atributosPersonalizables.length > 0) {
+            this.atributosPersonalizablesPendientes = atributosPersonalizables;
+            this.mostrarModalSeleccionAtributos(atributosPersonalizables);
+        }
+        
         this.attributeUI?.render(this.attributeManager.getAll());
         this.savingThrowsManager?.updateFromAttributes();
         this.calcularPercepcionPasiva();
         
-        closeModal();
-        Helpers.showMessage('✅ Atributos actualizados correctamente', 'success');
-        
         if (this.hasValidCharacterName()) {
             this.saveCharacter();
         }
-    });
-}
+    }
 
-// MODIFICAR el método aplicarAtributosDeEspecie para manejar correctamente los valores
-aplicarAtributosDeEspecie(atributos) {
-    if (!atributos || typeof atributos !== 'object') return;
-    
-    // Si no hay atributos base guardados, guardar los actuales primero
-    if (!this.atributosBaseGuardados) {
-        this.guardarAtributosBase();
+    // ===== GUARDAR ATRIBUTOS BASE =====
+    guardarAtributosBase() {
+        const atributosActuales = this.attributeManager.getAll();
+        this.atributosBaseGuardados = atributosActuales.map(attr => ({
+            id: attr.id,
+            name: attr.name,
+            value: attr.value,
+            modifier: attr.modifier
+        }));
+        console.log('💾 Atributos base guardados:', this.atributosBaseGuardados);
     }
-    
-    console.log('📊 Aplicando atributos de especie (reemplazando):', atributos);
-    
-    // Mapeo de nombres de atributos a sus formas estándar
-    const nombreMap = {
-        'fuerza': 'Fuerza',
-        'str': 'Fuerza',
-        'strength': 'Fuerza',
-        'destreza': 'DESTREZA',
-        'dex': 'DESTREZA',
-        'dexterity': 'DESTREZA',
-        'constitución': 'CONSTITUCIÓN',
-        'con': 'CONSTITUCIÓN',
-        'constitution': 'CONSTITUCIÓN',
-        'inteligencia': 'INTELIGENCIA',
-        'int': 'INTELIGENCIA',
-        'intelligence': 'INTELIGENCIA',
-        'sabiduría': 'SABIDURÍA',
-        'wis': 'SABIDURÍA',
-        'wisdom': 'SABIDURÍA',
-        'carisma': 'CARISMA',
-        'cha': 'CARISMA',
-        'charisma': 'CARISMA'
-    };
-    
-    // Separar atributos fijos de los personalizables
-    const atributosFijos = {};
-    const atributosPersonalizables = [];
-    
-    for (const [nombreAttr, incremento] of Object.entries(atributos)) {
-        if (typeof incremento !== 'number') continue;
+
+    // ===== RESTAURAR ATRIBUTOS BASE =====
+    restaurarAtributosBase() {
+        if (!this.atributosBaseGuardados) return;
         
-        const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
-        const nombreLower = nombreAttr.toLowerCase();
+        console.log('🔄 Restaurando atributos base...');
         
-        // Detectar si es un atributo personalizable (no es un nombre de atributo estándar)
-        const esAtributoEstandar = Object.keys(nombreMap).some(key => 
-            key === nombreLower || nombreMap[key]?.toLowerCase() === nombreLower
-        );
+        const idsBase = new Set(this.atributosBaseGuardados.map(a => a.id));
+        const atributosActuales = this.attributeManager.getAll();
         
-        if (!esAtributoEstandar && (incremento === 1 || incremento === 2)) {
-            // Es un incremento personalizable
-            atributosPersonalizables.push({ originalName: nombreAttr, incremento });
-        } else {
-            // Es un atributo fijo
-            atributosFijos[nombreNormalizado] = incremento;
+        for (const attr of atributosActuales) {
+            if (!idsBase.has(attr.id)) {
+                console.log(`🗑️ Eliminando atributo extra: ${attr.name}`);
+                this.attributeManager.remove(attr.id);
+            }
         }
-    }
-    
-    // Primero, restaurar valores base
-    this.restaurarAtributosBase();
-    
-    // Luego aplicar los incrementos fijos
-    const atributosActuales = this.attributeManager.getAll();
-    
-    for (const [nombreAttr, incremento] of Object.entries(atributosFijos)) {
-        const attrExistente = atributosActuales.find(attr => 
-            attr.name === nombreAttr || 
-            attr.name.toUpperCase() === nombreAttr.toUpperCase()
-        );
         
-        if (attrExistente) {
-            let valorBase = 10;
-            if (this.atributosBaseGuardados) {
-                const baseGuardado = this.atributosBaseGuardados.find(a => a.id === attrExistente.id);
-                if (baseGuardado) {
-                    valorBase = baseGuardado.value;
+        for (const attrBase of this.atributosBaseGuardados) {
+            const attrActual = this.attributeManager.getById(attrBase.id);
+            if (attrActual) {
+                if (attrActual.value !== attrBase.value) {
+                    console.log(`📊 Restaurando ${attrBase.name}: ${attrActual.value} -> ${attrBase.value}`);
+                    this.attributeManager.update(attrBase.id, { value: attrBase.value });
                 }
+            } else {
+                console.log(`➕ Recreando atributo base: ${attrBase.name}`);
+                this.attributeManager.add(attrBase.name, attrBase.value);
             }
-            
-            const nuevoValor = valorBase + incremento;
-            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-            
-            console.log(`📈 Aplicando ${nombreAttr}: base ${valorBase} +${incremento} = ${valorLimitado}`);
-            this.attributeManager.update(attrExistente.id, { value: valorLimitado });
-        } else {
-            const nuevoValor = 10 + incremento;
-            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-            console.log(`➕ Creando nuevo atributo: ${nombreAttr} con valor ${valorLimitado}`);
-            this.attributeManager.add(nombreAttr, valorLimitado);
         }
-    }
-    
-    // Si hay atributos personalizables, mostrar modal
-    if (atributosPersonalizables.length > 0) {
-        // Guardar temporalmente los atributos personalizables para el modal
-        this.atributosPersonalizablesPendientes = atributosPersonalizables;
-        this.mostrarModalSeleccionAtributos(atributosPersonalizables);
-    }
-    
-    // Forzar actualización de UI
-    this.attributeUI?.render(this.attributeManager.getAll());
-    this.savingThrowsManager?.updateFromAttributes();
-    this.calcularPercepcionPasiva();
-    
-    // Guardar automáticamente
-    if (this.hasValidCharacterName()) {
-        this.saveCharacter();
-    }
-}
-
-/**
- * Guarda los valores actuales de los atributos como base
- * para poder restaurarlos después
- */
-guardarAtributosBase() {
-    const atributosActuales = this.attributeManager.getAll();
-    this.atributosBaseGuardados = atributosActuales.map(attr => ({
-        id: attr.id,
-        name: attr.name,
-        value: attr.value,
-        modifier: attr.modifier
-    }));
-    console.log('💾 Atributos base guardados:', this.atributosBaseGuardados);
-}
-
-/**
- * Restaura los atributos a sus valores base originales
- */
-restaurarAtributosBase() {
-    if (!this.atributosBaseGuardados) return;
-    
-    console.log('🔄 Restaurando atributos base...');
-    
-    // Primero, eliminar atributos que no están en la base
-    const idsBase = new Set(this.atributosBaseGuardados.map(a => a.id));
-    const atributosActuales = this.attributeManager.getAll();
-    
-    // Eliminar atributos extra que se hayan añadido
-    for (const attr of atributosActuales) {
-        if (!idsBase.has(attr.id)) {
-            console.log(`🗑️ Eliminando atributo extra: ${attr.name}`);
-            this.attributeManager.remove(attr.id);
-        }
-    }
-    
-    // Restaurar valores de atributos existentes
-    for (const attrBase of this.atributosBaseGuardados) {
-        const attrActual = this.attributeManager.getById(attrBase.id);
-        if (attrActual) {
-            if (attrActual.value !== attrBase.value) {
-                console.log(`📊 Restaurando ${attrBase.name}: ${attrActual.value} -> ${attrBase.value}`);
-                this.attributeManager.update(attrBase.id, { value: attrBase.value });
-            }
-        } else {
-            // Si el atributo base no existe, crearlo
-            console.log(`➕ Recreando atributo base: ${attrBase.name}`);
-            this.attributeManager.add(attrBase.name, attrBase.value);
-        }
-    }
-    
-    // Forzar actualización de UI
-    this.attributeUI?.render(this.attributeManager.getAll());
-}
-
-/**
- * Aplica los aumentos de atributo de una especie (reemplazando valores base)
- * @param {Object} atributos - Objeto con los atributos a modificar ej: { "Fuerza": 2, "Destreza": 1 }
- */
-aplicarAtributosDeEspecie(atributos) {
-    if (!atributos || typeof atributos !== 'object') return;
-    
-    // Si no hay atributos base guardados, guardar los actuales primero
-    if (!this.atributosBaseGuardados) {
-        this.guardarAtributosBase();
-    }
-    
-    console.log('📊 Aplicando atributos de especie (reemplazando):', atributos);
-    
-    // Mapeo de nombres de atributos a sus formas estándar
-    const nombreMap = {
-        'fuerza': 'Fuerza',
-        'str': 'Fuerza',
-        'strength': 'Fuerza',
-        'destreza': 'DESTREZA',
-        'dex': 'DESTREZA',
-        'dexterity': 'DESTREZA',
-        'constitución': 'CONSTITUCIÓN',
-        'con': 'CONSTITUCIÓN',
-        'constitution': 'CONSTITUCIÓN',
-        'inteligencia': 'INTELIGENCIA',
-        'int': 'INTELIGENCIA',
-        'intelligence': 'INTELIGENCIA',
-        'sabiduría': 'SABIDURÍA',
-        'wis': 'SABIDURÍA',
-        'wisdom': 'SABIDURÍA',
-        'carisma': 'CARISMA',
-        'cha': 'CARISMA',
-        'charisma': 'CARISMA'
-    };
-    
-    // Primero, restaurar valores base
-    this.restaurarAtributosBase();
-    
-    // Luego aplicar los nuevos incrementos
-    const atributosActuales = this.attributeManager.getAll();
-    
-    for (const [nombreAttr, incremento] of Object.entries(atributos)) {
-        if (typeof incremento !== 'number') continue;
         
-        // Normalizar el nombre del atributo
-        const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
-        
-        // Buscar el atributo en la lista actual
-        const attrExistente = atributosActuales.find(attr => 
-            attr.name === nombreNormalizado || 
-            attr.name.toUpperCase() === nombreNormalizado.toUpperCase()
-        );
-        
-        if (attrExistente) {
-            // Usar el valor base (10) como punto de partida
-            // El valor base puede ser el original del atributo
-            let valorBase = 10;
-            
-            // Si tenemos el valor base guardado, usarlo
-            if (this.atributosBaseGuardados) {
-                const baseGuardado = this.atributosBaseGuardados.find(a => a.id === attrExistente.id);
-                if (baseGuardado) {
-                    valorBase = baseGuardado.value;
-                }
-            }
-            
-            const nuevoValor = valorBase + incremento;
-            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-            
-            console.log(`📈 Aplicando ${nombreNormalizado}: base ${valorBase} +${incremento} = ${valorLimitado}`);
-            
-            // Actualizar el atributo
-            this.attributeManager.update(attrExistente.id, { value: valorLimitado });
-        } else {
-            // Atributo no existe, crearlo con valor base 10 + incremento
-            const nuevoValor = 10 + incremento;
-            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-            
-            console.log(`➕ Creando nuevo atributo: ${nombreNormalizado} con valor ${valorLimitado}`);
-            
-            this.attributeManager.add(nombreNormalizado, valorLimitado);
-        }
+        this.attributeUI?.render(this.attributeManager.getAll());
     }
-    
-    // Forzar actualización de UI de atributos
-    this.attributeUI?.render(this.attributeManager.getAll());
-    
-    // Recalcular tiradas de salvación y percepción pasiva
-    this.savingThrowsManager?.updateFromAttributes();
-    this.calcularPercepcionPasiva();
-    
-    // Mostrar mensaje de confirmación
-    const cambios = Object.entries(atributos)
-        .map(([attr, val]) => `${attr} +${val}`)
-        .join(', ');
-    
-    // Guardar automáticamente
-    if (this.hasValidCharacterName()) {
-        this.saveCharacter();
-    }
-}
 
-    setupRaceClearHandler() {
-    const raceInput = document.getElementById('char-race');
-    if (!raceInput) return;
-    
-    raceInput.addEventListener('input', (e) => {
-        const value = e.target.value.trim();
-        if (value === '') {
-            // Si el usuario borra la raza, no hacemos nada con la descripción
-            // (dejamos que la mantenga o se pueda limpiar manualmente)
-        }
-    });
-}
-
+    // ===== CONFIGURAR EVENTOS DE STATS DE CONJUROS =====
     setupSpellStatsEvents() {
-    const spellcastingAbilitySelect = document.getElementById('spellcastingAbility');
-    const preparedSpellsInput = document.getElementById('preparedSpells');
-    const cantripsKnownInput = document.getElementById('cantripsKnown');
-    
-    // Poblar el select de Característica Mágica con los atributos actuales
-    this.populateSpellcastingAbilitySelect();
-    
-    // Escuchar cambios en atributos para actualizar el select
-    this.eventBus.on('attributeChanged', () => {
+        const spellcastingAbilitySelect = this.$('#spellcastingAbility');
+        const preparedSpellsInput = this.$('#preparedSpells');
+        const cantripsKnownInput = this.$('#cantripsKnown');
+        
         this.populateSpellcastingAbilitySelect();
-        this.spellStatsManager.calculateStats();
-        this.updateSpellStatsDisplay();
-    });
-    
-    this.eventBus.on('attributeNameChanged', () => {
-        this.populateSpellcastingAbilitySelect();
-        this.spellStatsManager.calculateStats();
-        this.updateSpellStatsDisplay();
-    });
-    
-    this.eventBus.on('attributeRemoved', () => {
-        this.populateSpellcastingAbilitySelect();
-        this.spellStatsManager.calculateStats();
-        this.updateSpellStatsDisplay();
-    });
-    
-    if (spellcastingAbilitySelect) {
-        spellcastingAbilitySelect.addEventListener('change', (e) => {
-            this.spellStatsManager.setSpellcastingAbility(e.target.value);
+        
+        this.eventBus.on('attributeChanged', () => {
+            this.populateSpellcastingAbilitySelect();
+            this.spellStatsManager.calculateStats();
             this.updateSpellStatsDisplay();
-            if (this.hasValidCharacterName()) this.saveCharacter();
         });
-    }
-    
-    if (preparedSpellsInput) {
-        preparedSpellsInput.addEventListener('change', (e) => {
-            const value = parseInt(e.target.value) || 0;
-            this.spellStatsManager.setPreparedSpells(value);
+        
+        this.eventBus.on('attributeNameChanged', () => {
+            this.populateSpellcastingAbilitySelect();
+            this.spellStatsManager.calculateStats();
             this.updateSpellStatsDisplay();
-            if (this.hasValidCharacterName()) this.saveCharacter();
         });
-    }
-    
-    if (cantripsKnownInput) {
-        cantripsKnownInput.addEventListener('change', (e) => {
-            const value = parseInt(e.target.value) || 0;
-            this.spellStatsManager.setCantripsKnown(value);
-            if (this.hasValidCharacterName()) this.saveCharacter();
+        
+        this.eventBus.on('attributeRemoved', () => {
+            this.populateSpellcastingAbilitySelect();
+            this.spellStatsManager.calculateStats();
+            this.updateSpellStatsDisplay();
         });
+        
+        if (spellcastingAbilitySelect) {
+            spellcastingAbilitySelect.addEventListener('change', (e) => {
+                this.spellStatsManager.setSpellcastingAbility(e.target.value);
+                this.updateSpellStatsDisplay();
+                if (this.hasValidCharacterName()) this.saveCharacter();
+            });
+        }
+        
+        if (preparedSpellsInput) {
+            preparedSpellsInput.addEventListener('change', (e) => {
+                const value = parseInt(e.target.value) || 0;
+                this.spellStatsManager.setPreparedSpells(value);
+                this.updateSpellStatsDisplay();
+                if (this.hasValidCharacterName()) this.saveCharacter();
+            });
+        }
+        
+        if (cantripsKnownInput) {
+            cantripsKnownInput.addEventListener('change', (e) => {
+                const value = parseInt(e.target.value) || 0;
+                this.spellStatsManager.setCantripsKnown(value);
+                if (this.hasValidCharacterName()) this.saveCharacter();
+            });
+        }
+        
+        this.spellStatsManager.subscribe(() => {
+            this.updateSpellStatsDisplay();
+        });
+        
+        this.eventBus.on('attributeChanged', () => {
+            this.spellStatsManager.calculateStats();
+            this.updateSpellStatsDisplay();
+        });
+        
+        this.eventBus.on('expChanged', () => {
+            this.spellStatsManager.calculateStats();
+            this.updateSpellStatsDisplay();
+        });
+        
+        this.updateSpellStatsDisplay();
     }
-    
-    // Suscribirse a cambios para actualizar UI
-    this.spellStatsManager.subscribe(() => {
-        this.updateSpellStatsDisplay();
-    });
-    
-    // Recalcular cuando cambien atributos o nivel
-    this.eventBus.on('attributeChanged', () => {
-        this.spellStatsManager.calculateStats();
-        this.updateSpellStatsDisplay();
-    });
-    
-    this.eventBus.on('expChanged', () => {
-        this.spellStatsManager.calculateStats();
-        this.updateSpellStatsDisplay();
-    });
-    
-    // Actualizar display inicial
-    this.updateSpellStatsDisplay();
-}
 
-populateSpellcastingAbilitySelect() {
-    const select = document.getElementById('spellcastingAbility');
-    if (!select) return;
-    
-    const attributes = this.attributeManager.getAll();
-    const currentValue = this.spellStatsManager.getData().spellcastingAbility;
-    
-    // Guardar el valor seleccionado actualmente
-    let selectedValue = currentValue;
-    
-    // Verificar si el valor seleccionado aún existe
-    const attributeExists = attributes.some(attr => attr.name === currentValue);
-    if (!attributeExists && attributes.length > 0) {
-        // Si no existe, seleccionar el primer atributo
-        selectedValue = attributes[0].name;
-        if (selectedValue !== currentValue) {
-            this.spellStatsManager.setSpellcastingAbility(selectedValue);
+    populateSpellcastingAbilitySelect() {
+        const select = this.$('#spellcastingAbility');
+        if (!select) return;
+        
+        const attributes = this.attributeManager.getAll();
+        const currentValue = this.spellStatsManager.getData().spellcastingAbility;
+        
+        let selectedValue = currentValue;
+        const attributeExists = attributes.some(attr => attr.name === currentValue);
+        if (!attributeExists && attributes.length > 0) {
+            selectedValue = attributes[0].name;
+            if (selectedValue !== currentValue) {
+                this.spellStatsManager.setSpellcastingAbility(selectedValue);
+            }
         }
-    }
-    
-    // Limpiar y repoblar el select
-    select.innerHTML = '';
-    
-    if (attributes.length === 0) {
-        select.innerHTML = '<option value="">No hay atributos</option>';
-        return;
-    }
-    
-    attributes.forEach(attr => {
-        const option = document.createElement('option');
-        option.value = attr.name;
-        option.textContent = attr.name;
-        if (attr.name === selectedValue) {
-            option.selected = true;
+        
+        select.innerHTML = '';
+        
+        if (attributes.length === 0) {
+            select.innerHTML = '<option value="">No hay atributos</option>';
+            return;
         }
-        select.appendChild(option);
-    });
-}
+        
+        attributes.forEach(attr => {
+            const option = document.createElement('option');
+            option.value = attr.name;
+            option.textContent = attr.name;
+            if (attr.name === selectedValue) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
 
     updateSpellStatsDisplay() {
-    const stats = this.spellStatsManager.getData();
-    
-    const saveDC = document.getElementById('spellSaveDC');
-    const attackBonus = document.getElementById('spellAttackBonus');
-    const preparedSpellsInput = document.getElementById('preparedSpells');
-    const maxPreparedSpan = document.getElementById('maxPreparedSpells');
-    const cantripsKnownInput = document.getElementById('cantripsKnown');
-    const spellcastingAbilitySelect = document.getElementById('spellcastingAbility');
-    
-    if (saveDC) saveDC.textContent = stats.spellSaveDC;
-    if (attackBonus) attackBonus.textContent = stats.spellAttackBonus > 0 ? `+${stats.spellAttackBonus}` : stats.spellAttackBonus;
-    if (maxPreparedSpan) maxPreparedSpan.textContent = stats.maxPreparedSpells;
-    
-    if (preparedSpellsInput && preparedSpellsInput.value != stats.preparedSpells) {
-        preparedSpellsInput.value = stats.preparedSpells;
-        preparedSpellsInput.max = stats.maxPreparedSpells;
-    }
-    
-    if (cantripsKnownInput && cantripsKnownInput.value != stats.cantripsKnown) {
-        cantripsKnownInput.value = stats.cantripsKnown;
-    }
-    
-    // Actualizar el select sin disparar evento change
-    if (spellcastingAbilitySelect && spellcastingAbilitySelect.value != stats.spellcastingAbility) {
-        // Verificar si la opción existe en el select
-        let optionExists = false;
-        for (let i = 0; i < spellcastingAbilitySelect.options.length; i++) {
-            if (spellcastingAbilitySelect.options[i].value === stats.spellcastingAbility) {
-                optionExists = true;
-                break;
-            }
+        const stats = this.spellStatsManager.getData();
+        
+        const saveDC = this.$('#spellSaveDC');
+        const attackBonus = this.$('#spellAttackBonus');
+        const preparedSpellsInput = this.$('#preparedSpells');
+        const maxPreparedSpan = this.$('#maxPreparedSpells');
+        const cantripsKnownInput = this.$('#cantripsKnown');
+        const spellcastingAbilitySelect = this.$('#spellcastingAbility');
+        
+        if (saveDC) saveDC.textContent = stats.spellSaveDC;
+        if (attackBonus) attackBonus.textContent = stats.spellAttackBonus > 0 ? `+${stats.spellAttackBonus}` : stats.spellAttackBonus;
+        if (maxPreparedSpan) maxPreparedSpan.textContent = stats.maxPreparedSpells;
+        
+        if (preparedSpellsInput && preparedSpellsInput.value != stats.preparedSpells) {
+            preparedSpellsInput.value = stats.preparedSpells;
+            preparedSpellsInput.max = stats.maxPreparedSpells;
         }
         
-        if (optionExists) {
-            spellcastingAbilitySelect.value = stats.spellcastingAbility;
+        if (cantripsKnownInput && cantripsKnownInput.value != stats.cantripsKnown) {
+            cantripsKnownInput.value = stats.cantripsKnown;
+        }
+        
+        if (spellcastingAbilitySelect && spellcastingAbilitySelect.value != stats.spellcastingAbility) {
+            let optionExists = false;
+            for (let i = 0; i < spellcastingAbilitySelect.options.length; i++) {
+                if (spellcastingAbilitySelect.options[i].value === stats.spellcastingAbility) {
+                    optionExists = true;
+                    break;
+                }
+            }
+            
+            if (optionExists) {
+                spellcastingAbilitySelect.value = stats.spellcastingAbility;
+            }
         }
     }
-}
 
+    // ===== CONFIGURAR EVENTOS DE SALVACIONES DE MUERTE =====
     setupDeathSavesEvents() {
-        const successCheckboxes = document.querySelectorAll('.death-save-success');
-        const failCheckboxes = document.querySelectorAll('.death-save-fail');
+        const successCheckboxes = this.$$('.death-save-success');
+        const failCheckboxes = this.$$('.death-save-fail');
         
         successCheckboxes.forEach((checkbox, index) => {
             const newCheckbox = checkbox.cloneNode(true);
@@ -1694,10 +1604,11 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== CONFIGURAR EVENTOS DE MONEDAS =====
     setupCurrencyEvents() {
-        const goldInput = document.getElementById('goldAmount');
-        const silverInput = document.getElementById('silverAmount');
-        const copperInput = document.getElementById('copperAmount');
+        const goldInput = this.$('#goldAmount');
+        const silverInput = this.$('#silverAmount');
+        const copperInput = this.$('#copperAmount');
         
         if (goldInput) {
             const newGold = goldInput.cloneNode(true);
@@ -1733,6 +1644,7 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== CONFIGURAR EVENTOS DE ATRIBUTOS =====
     setupAttributeEvents() {
         this.eventBus.on('attributeChanged', () => {
             if (this.hasValidCharacterName()) this.saveCharacter();
@@ -1743,8 +1655,9 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== CONFIGURAR EVENTOS DE ATAQUES =====
     setupAttackEvents() {
-        const attacksList = document.querySelector('.attacks-list');
+        const attacksList = this.$('.attacks-list');
         if (attacksList) {
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
@@ -1761,7 +1674,7 @@ populateSpellcastingAbilitySelect() {
             observer.observe(attacksList, { childList: true, subtree: true });
         }
         
-        document.querySelectorAll('.attack-item').forEach(item => {
+        this.$$('.attack-item').forEach(item => {
             this.setupAttackItemEvents(item);
         });
     }
@@ -1786,8 +1699,9 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== CONFIGURAR EVENTOS DE CONJUROS =====
     setupSpellEvents() {
-        const spellsList = document.getElementById('spellsList');
+        const spellsList = this.$('#spellsList');
         if (spellsList) {
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
@@ -1804,7 +1718,7 @@ populateSpellcastingAbilitySelect() {
             observer.observe(spellsList, { childList: true, subtree: true });
         }
         
-        document.querySelectorAll('#spellsList .spell-item').forEach(item => {
+        this.$$('#spellsList .spell-item').forEach(item => {
             this.setupSpellItemEvents(item);
         });
         
@@ -1831,6 +1745,7 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== CONFIGURAR AUTO-GUARDADO =====
     setupAutoSave() {
         let saveTimeout;
         const debouncedSave = () => {
@@ -1896,10 +1811,11 @@ populateSpellcastingAbilitySelect() {
     }
 
     hasValidCharacterName() {
-        const charName = document.getElementById('char-name')?.value.trim();
+        const charName = this.$('#char-name')?.value?.trim();
         return charName && charName !== '' && charName !== 'Sin nombre';
     }
 
+    // ===== MOSTRAR MODAL PARA AÑADIR COMPETENCIA =====
     showAddProficiencyModal() {
         const existingModal = document.getElementById('addProficiencyModal');
         if (existingModal) existingModal.remove();
@@ -1971,126 +1887,167 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
-    setupSubscriptions() {
-        this.healthManager.subscribe((data) => {
-            this.updateHealthDisplay(data);
-        });
+    // ===== CONFIGURAR SUSCRIPCIONES =====
+setupSubscriptions() {
+    this.healthManager.subscribe((data) => {
+        this.updateHealthDisplay(data);
+    });
+    
+    this.manaManager.subscribe((data) => {
+        this.updateManaDisplay(data);
+    });
+    
+    this.deathSavesManager.subscribe((data) => {
+        this.updateDeathSavesDisplay(data);
+    });
+    
+    this.skillsManager.subscribe((skills) => {
+        this.renderSkills(skills);
+    });
+    
+    this.proficiencyManager.subscribe((allProficiencies) => {
+        const activeTab = this.container.querySelector('.proficiency-tab.active');
+        const filterType = activeTab ? activeTab.dataset.type : 'all';
         
-        this.manaManager.subscribe((data) => {
-            this.updateManaDisplay(data);
-        });
-        
-        this.deathSavesManager.subscribe((data) => {
-            this.updateDeathSavesDisplay(data);
-        });
-        
-        this.skillsManager.subscribe((skills) => {
-            this.renderSkills(skills);
-        });
-        
-        this.proficiencyManager.subscribe((allProficiencies) => {
-            const activeTab = document.querySelector('.proficiency-tab.active');
-            const filterType = activeTab ? activeTab.dataset.type : 'all';
-            
-            if (filterType === 'all') {
-                this.renderProficiencies(allProficiencies);
-            } else {
-                const filtered = this.proficiencyManager.getByType(filterType);
-                this.renderProficiencies(filtered);
-            }
-        });
-        
-        this.savingThrowsManager.subscribe((savingThrows) => {
-            this.renderSavingThrows(savingThrows);
-        });
-        
-        this.expManager.subscribe((data) => {
-            this.updateExpDisplay(data);
-            this.calcularPercepcionPasiva();
-            if (this.hasValidCharacterName()) this.saveCharacter();
-        });
-        
-        this.currencyManager.subscribe((data) => {
-            this.updateCurrencyDisplay(data);
-        });
-        
-        this.treasureManager.subscribe((treasures) => {
-            this.renderTreasures(treasures);
-        });
-        
-        this.potionManager.subscribe((potions) => {
-            this.renderPotions(potions);
-        });
-        
-        this.equipmentManager.subscribe((equipment) => {
-            this.renderEquipment(equipment);
-        });
-        
-        this.spellSlotsManager.subscribe((slots) => {});
-        
-        this.eventBus.on('levelChanged', (level) => {
-            this.updateSavingThrows();
-            document.getElementById('level-display').textContent = level;
-            document.getElementById('character-level').value = level;
-        });
-        
-        this.eventBus.on('deathSavesSuccess', (message) => {
-            Helpers.showMessage(message, 'info');
-        });
-        
-        this.eventBus.on('deathSavesFail', (message) => {
-            Helpers.showMessage(message, 'error');
-        });
-        
-        this.eventBus.on('requestProficiencyBonus', () => {
-            const bonus = this.expManager.getProficiencyBonus();
-            this.eventBus.emit('proficiencyBonusResponse', bonus);
-        });
+        if (filterType === 'all') {
+            this.renderProficiencies(allProficiencies);
+        } else {
+            const filtered = this.proficiencyManager.getByType(filterType);
+            this.renderProficiencies(filtered);
+        }
+    });
+    
+    this.savingThrowsManager.subscribe((savingThrows) => {
+        this.renderSavingThrows(savingThrows);
+    });
+    
+    this.expManager.subscribe((data) => {
+        this.updateExpDisplay(data);
+        this.calcularPercepcionPasiva();
+        if (this.hasValidCharacterName()) this.saveCharacter();
+    });
+    
+    this.currencyManager.subscribe((data) => {
+        this.updateCurrencyDisplay(data);
+    });
+    
+    this.treasureManager.subscribe((treasures) => {
+        this.renderTreasures(treasures);
+    });
+    
+    this.potionManager.subscribe((potions) => {
+        this.renderPotions(potions);
+    });
+    
+    this.equipmentManager.subscribe((equipment) => {
+        this.renderEquipment(equipment);
+    });
+    
+    this.spellSlotsManager.subscribe((slots) => {});
+    
+    this.eventBus.on('levelChanged', (level) => {
+        this.updateSavingThrows();
+        const levelDisplay = this.$('#level-display');
+        const characterLevel = this.$('#character-level');
+        if (levelDisplay) levelDisplay.textContent = level;
+        if (characterLevel) characterLevel.value = level;
+    });
+    
+    this.eventBus.on('deathSavesSuccess', (message) => {
+        Helpers.showMessage(message, 'info');
+    });
+    
+    this.eventBus.on('deathSavesFail', (message) => {
+        Helpers.showMessage(message, 'error');
+    });
+    
+    this.eventBus.on('requestProficiencyBonus', () => {
+        const bonus = this.expManager.getProficiencyBonus();
+        this.eventBus.emit('proficiencyBonusResponse', bonus);
+    });
 
-        this.eventBus.on('attributeChanged', () => {
-            this.calcularPercepcionPasiva();
-            if (this.hasValidCharacterName()) this.saveCharacter();
-        });
-    }
+    this.eventBus.on('attributeChanged', () => {
+        this.calcularPercepcionPasiva();
+        if (this.hasValidCharacterName()) this.saveCharacter();
+    });
+    
+    // Escuchar cambios de imagen
+    this.eventBus.on('imageChanged', (imageUrl) => {
+        if (this.hasValidCharacterName()) {
+            this.saveCharacter();
+        }
+    });
+}
 
+    // ===== CONFIGURAR BOTONES DE AÑADIR =====
     setupAddButtons() {
-        document.getElementById('addSkillBtn')?.addEventListener('click', () => {
-            const name = prompt('Nombre de la habilidad:');
-            if (name) {
-                const attribute = prompt('Atributo asociado (FUERZA, DESTREZA, etc.) opcional:');
-                this.skillsManager.add(name, attribute || '');
-            }
-        });
+        const addSkillBtn = this.$('#addSkillBtn');
+        if (addSkillBtn) {
+            addSkillBtn.addEventListener('click', () => {
+                const name = prompt('Nombre de la habilidad:');
+                if (name) {
+                    const attribute = prompt('Atributo asociado (FUERZA, DESTREZA, etc.) opcional:');
+                    this.skillsManager.add(name, attribute || '');
+                }
+            });
+        }
         
-        document.getElementById('addProficiencyBtn')?.addEventListener('click', () => {
-            this.showAddProficiencyModal();
-        });
+        const addProficiencyBtn = this.$('#addProficiencyBtn');
+        if (addProficiencyBtn) {
+            addProficiencyBtn.addEventListener('click', () => {
+                this.showAddProficiencyModal();
+            });
+        }
 
-        document.getElementById('addTreasureBtn')?.addEventListener('click', () => {
-            this.showAddTreasureModal();
-        });
+        const addTreasureBtn = this.$('#addTreasureBtn');
+        if (addTreasureBtn) {
+            addTreasureBtn.addEventListener('click', () => {
+                this.showAddTreasureModal();
+            });
+        }
 
-        document.getElementById('addPotionBtn')?.addEventListener('click', () => {
-            this.showAddPotionModal();
-        });
+        const addPotionBtn = this.$('#addPotionBtn');
+        if (addPotionBtn) {
+            addPotionBtn.addEventListener('click', () => {
+                this.showAddPotionModal();
+            });
+        }
 
-        document.getElementById('addEquipmentBtn')?.addEventListener('click', () => {
-            this.showAddEquipmentModal();
-        });
+        const addEquipmentBtn = this.$('#addEquipmentBtn');
+        if (addEquipmentBtn) {
+            addEquipmentBtn.addEventListener('click', () => {
+                this.showAddEquipmentModal();
+            });
+        }
 
-        document.getElementById('addAttackBtn')?.addEventListener('click', () => {
-            this.addAttack();
-        });
+        const addAttackBtn = this.$('#addAttackBtn');
+        if (addAttackBtn) {
+            addAttackBtn.addEventListener('click', () => {
+                this.addAttack();
+            });
+        }
 
-        document.getElementById('addSpellBtn')?.addEventListener('click', () => {
-            this.spellManager.add();
-        });
+        const addSpellBtn = this.$('#addSpellBtn');
+        if (addSpellBtn) {
+            addSpellBtn.addEventListener('click', () => {
+                this.spellManager.add();
+            });
+        }
+        
+        const addAttributeBtn = this.$('#addAttributeBtn');
+        if (addAttributeBtn) {
+            addAttributeBtn.addEventListener('click', () => {
+                this.attributeManager.add();
+                Helpers.showMessage('Atributo añadido', 'info');
+            });
+        }
     }
 
+    // ===== CONFIGURAR EVENTOS GLOBALES =====
     setupGlobalEvents() {
-        document.querySelectorAll('.proficiency-tab').forEach(tab => {
+        this.$$('.proficiency-tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                document.querySelectorAll('.proficiency-tab').forEach(t => t.classList.remove('active'));
+                this.$$('.proficiency-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 
                 const type = tab.dataset.type;
@@ -2099,61 +2056,97 @@ populateSpellcastingAbilitySelect() {
             });
         });
         
-        document.getElementById('exportBtn')?.addEventListener('click', () => {
-            this.exportCharacter();
-        });
+        const exportBtn = this.$('#exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.exportCharacter();
+            });
+        }
         
-        document.getElementById('importBtn')?.addEventListener('click', () => {
-            this.importCharacter();
-        });
+        const importBtn = this.$('#importBtn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => {
+                this.importCharacter();
+            });
+        }
 
-        document.getElementById('saveBtn')?.addEventListener('click', () => {
-            this.saveCharacter();
-        });
+        const saveBtn = this.$('#saveBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.saveCharacter();
+            });
+        }
         
-        document.getElementById('resetBtn')?.addEventListener('click', () => {
-            if (confirm('¿Restablecer toda la hoja? Se perderán los cambios no guardados.')) {
-                this.resetAll();
-            }
-        });
+        const resetBtn = this.$('#resetBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                if (confirm('¿Restablecer toda la hoja? Se perderán los cambios no guardados.')) {
+                    this.resetAll();
+                }
+            });
+        }
         
-        document.getElementById('colorCustomizerBtn')?.addEventListener('click', () => {
-            this.showColorCustomizer();
-        });
+        const colorCustomizerBtn = this.$('#colorCustomizerBtn');
+        if (colorCustomizerBtn) {
+            colorCustomizerBtn.addEventListener('click', () => {
+                this.showColorCustomizer();
+            });
+        }
         
-        document.getElementById('textCustomizerBtn')?.addEventListener('click', () => {
-            this.showTextColorCustomizer();
-        });
+        const textCustomizerBtn = this.$('#textCustomizerBtn');
+        if (textCustomizerBtn) {
+            textCustomizerBtn.addEventListener('click', () => {
+                this.showTextColorCustomizer();
+            });
+        }
         
-        document.getElementById('configManaBtn')?.addEventListener('click', () => {
-            this.showManaConfig();
-        });
+        const configManaBtn = this.$('#configManaBtn');
+        if (configManaBtn) {
+            configManaBtn.addEventListener('click', () => {
+                this.showManaConfig();
+            });
+        }
         
-        document.getElementById('configExpBtn')?.addEventListener('click', () => {
-            this.showExpConfig();
-        });
+        const configExpBtn = this.$('#configExpBtn');
+        if (configExpBtn) {
+            configExpBtn.addEventListener('click', () => {
+                this.showExpConfig();
+            });
+        }
         
-        document.getElementById('configSlotsBtn')?.addEventListener('click', () => {
-            this.showSpellSlotsConfig();
-        });
+        const configSlotsBtn = this.$('#configSlotsBtn');
+        if (configSlotsBtn) {
+            configSlotsBtn.addEventListener('click', () => {
+                this.showSpellSlotsConfig();
+            });
+        }
         
-        document.getElementById('configCurrencyBtn')?.addEventListener('click', () => {
-            this.showCurrencyConfig();
-        });
+        const configCurrencyBtn = this.$('#configCurrencyBtn');
+        if (configCurrencyBtn) {
+            configCurrencyBtn.addEventListener('click', () => {
+                this.showCurrencyConfig();
+            });
+        }
         
-        document.getElementById('level-up-btn')?.addEventListener('click', () => {
-            this.expManager.changeLevel(1);
-        });
+        const levelUpBtn = this.$('#level-up-btn');
+        if (levelUpBtn) {
+            levelUpBtn.addEventListener('click', () => {
+                this.expManager.changeLevel(1);
+            });
+        }
         
-        document.getElementById('level-down-btn')?.addEventListener('click', () => {
-            this.expManager.changeLevel(-1);
-        });
+        const levelDownBtn = this.$('#level-down-btn');
+        if (levelDownBtn) {
+            levelDownBtn.addEventListener('click', () => {
+                this.expManager.changeLevel(-1);
+            });
+        }
 
-        const currentExpInput = document.getElementById('current-exp');
-        const maxExpInput = document.getElementById('max-exp');
+        const currentExpInput = this.$('#current-exp');
+        const maxExpInput = this.$('#max-exp');
         if (currentExpInput) {
-            currentExpInput.replaceWith(currentExpInput.cloneNode(true));
-            const newCurrentExp = document.getElementById('current-exp');
+            const newCurrentExp = currentExpInput.cloneNode(true);
+            currentExpInput.parentNode.replaceChild(newCurrentExp, currentExpInput);
             
             newCurrentExp.addEventListener('change', (e) => {
                 const value = parseInt(e.target.value) || 0;
@@ -2162,8 +2155,8 @@ populateSpellcastingAbilitySelect() {
         }
 
         if (maxExpInput) {
-            maxExpInput.replaceWith(maxExpInput.cloneNode(true));
-            const newMaxExp = document.getElementById('max-exp');
+            const newMaxExp = maxExpInput.cloneNode(true);
+            maxExpInput.parentNode.replaceChild(newMaxExp, maxExpInput);
             
             newMaxExp.addEventListener('change', (e) => {
                 const value = parseInt(e.target.value) || 1;
@@ -2171,65 +2164,100 @@ populateSpellcastingAbilitySelect() {
             });
         }
         
-        document.getElementById('manaPlusBtn')?.addEventListener('click', () => {
-            this.manaManager.modify(1);
-        });
+        const manaPlusBtn = this.$('#manaPlusBtn');
+        if (manaPlusBtn) {
+            manaPlusBtn.addEventListener('click', () => {
+                this.manaManager.modify(1);
+            });
+        }
         
-        document.getElementById('manaMinusBtn')?.addEventListener('click', () => {
-            this.manaManager.modify(-1);
-        });
+        const manaMinusBtn = this.$('#manaMinusBtn');
+        if (manaMinusBtn) {
+            manaMinusBtn.addEventListener('click', () => {
+                this.manaManager.modify(-1);
+            });
+        }
         
-        document.getElementById('manaInput')?.addEventListener('change', (e) => {
-            this.manaManager.setCurrent(parseInt(e.target.value) || 0);
-        });
+        const manaInput = this.$('#manaInput');
+        if (manaInput) {
+            manaInput.addEventListener('change', (e) => {
+                this.manaManager.setCurrent(parseInt(e.target.value) || 0);
+            });
+        }
         
-        document.getElementById('current-hp')?.addEventListener('change', (e) => {
-            this.healthManager.setCurrent(parseInt(e.target.value) || 0);
-        });
+        const currentHp = this.$('#current-hp');
+        if (currentHp) {
+            currentHp.addEventListener('change', (e) => {
+                this.healthManager.setCurrent(parseInt(e.target.value) || 0);
+            });
+        }
         
-        document.getElementById('max-hp')?.addEventListener('change', (e) => {
-            this.healthManager.setMax(parseInt(e.target.value) || 1);
-        });
+        const maxHp = this.$('#max-hp');
+        if (maxHp) {
+            maxHp.addEventListener('change', (e) => {
+                this.healthManager.setMax(parseInt(e.target.value) || 1);
+            });
+        }
         
-        document.getElementById('temp-hp')?.addEventListener('change', (e) => {
-            this.healthManager.setTemp(parseInt(e.target.value) || 0);
-        });
+        const tempHp = this.$('#temp-hp');
+        if (tempHp) {
+            tempHp.addEventListener('change', (e) => {
+                this.healthManager.setTemp(parseInt(e.target.value) || 0);
+            });
+        }
         
-        document.getElementById('closeModalBtn')?.addEventListener('click', () => {
-            document.getElementById('configModal').style.display = 'none';
-        });
+        const closeModalBtn = this.$('#closeModalBtn');
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', () => {
+                const configModal = document.getElementById('configModal');
+                if (configModal) configModal.style.display = 'none';
+            });
+        }
         
-        document.getElementById('closeTextColorModalBtn')?.addEventListener('click', () => {
-            document.getElementById('textColorModal').style.display = 'none';
-        });
+        const closeTextColorModalBtn = this.$('#closeTextColorModalBtn');
+        if (closeTextColorModalBtn) {
+            closeTextColorModalBtn.addEventListener('click', () => {
+                const textColorModal = document.getElementById('textColorModal');
+                if (textColorModal) textColorModal.style.display = 'none';
+            });
+        }
         
-        document.getElementById('configModal')?.addEventListener('click', (e) => {
-            if (e.target === document.getElementById('configModal')) {
-                e.target.style.display = 'none';
-            }
-        });
+        const configModal = document.getElementById('configModal');
+        if (configModal) {
+            configModal.addEventListener('click', (e) => {
+                if (e.target === configModal) {
+                    configModal.style.display = 'none';
+                }
+            });
+        }
         
-        document.getElementById('textColorModal')?.addEventListener('click', (e) => {
-            if (e.target === document.getElementById('textColorModal')) {
-                e.target.style.display = 'none';
-            }
-        });
+        const textColorModal = document.getElementById('textColorModal');
+        if (textColorModal) {
+            textColorModal.addEventListener('click', (e) => {
+                if (e.target === textColorModal) {
+                    textColorModal.style.display = 'none';
+                }
+            });
+        }
         
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                document.getElementById('configModal').style.display = 'none';
-                document.getElementById('textColorModal').style.display = 'none';
+                const configModal = document.getElementById('configModal');
+                const textColorModal = document.getElementById('textColorModal');
+                if (configModal) configModal.style.display = 'none';
+                if (textColorModal) textColorModal.style.display = 'none';
             }
         });
     }
 
+    // ===== ACTUALIZAR DISPLAY DE VIDA =====
     updateHealthDisplay(data) {
-        const currentHP = document.getElementById('current-hp');
-        const maxHP = document.getElementById('max-hp');
-        const hpBarFill = document.getElementById('hpBarFill');
-        const hpCurrentLabel = document.getElementById('hpCurrentLabel');
-        const hpMaxLabel = document.getElementById('hpMaxLabel');
-        const tempHP = document.getElementById('temp-hp');
+        const currentHP = this.$('#current-hp');
+        const maxHP = this.$('#max-hp');
+        const hpBarFill = this.$('#hpBarFill');
+        const hpCurrentLabel = this.$('#hpCurrentLabel');
+        const hpMaxLabel = this.$('#hpMaxLabel');
+        const tempHP = this.$('#temp-hp');
         
         if (currentHP) currentHP.value = data.current;
         if (maxHP) maxHP.value = data.max;
@@ -2250,11 +2278,12 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== ACTUALIZAR DISPLAY DE MANÁ =====
     updateManaDisplay(data) {
-        const manaInput = document.getElementById('manaInput');
-        const currentManaSpan = document.getElementById('currentMana');
-        const maxManaSpan = document.getElementById('maxMana');
-        const manaBarFill = document.getElementById('manaBarFill');
+        const manaInput = this.$('#manaInput');
+        const currentManaSpan = this.$('#currentMana');
+        const maxManaSpan = this.$('#maxMana');
+        const manaBarFill = this.$('#manaBarFill');
         
         if (manaInput) {
             manaInput.value = data.current;
@@ -2276,9 +2305,10 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== ACTUALIZAR DISPLAY DE SALVACIONES DE MUERTE =====
     updateDeathSavesDisplay(data) {
-        const successCheckboxes = document.querySelectorAll('.death-save-success');
-        const failCheckboxes = document.querySelectorAll('.death-save-fail');
+        const successCheckboxes = this.$$('.death-save-success');
+        const failCheckboxes = this.$$('.death-save-fail');
         
         data.successes.forEach((checked, index) => {
             if (successCheckboxes[index]) successCheckboxes[index].checked = checked;
@@ -2289,17 +2319,25 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== CARGAR RASGOS DESDE STORAGE =====
     loadTraitsFromStorage() {
         const savedData = this.storage.load('traits');
         if (savedData) {
-            document.getElementById('personality').value = savedData.personality || '';
-            document.getElementById('ideals').value = savedData.ideals || '';
-            document.getElementById('bonds').value = savedData.bonds || '';
-            document.getElementById('flaws').value = savedData.flaws || '';
-            document.getElementById('features').value = savedData.features || '';
+            const personality = this.$('#personality');
+            const ideals = this.$('#ideals');
+            const bonds = this.$('#bonds');
+            const flaws = this.$('#flaws');
+            const features = this.$('#features');
+            
+            if (personality) personality.value = savedData.personality || '';
+            if (ideals) ideals.value = savedData.ideals || '';
+            if (bonds) bonds.value = savedData.bonds || '';
+            if (flaws) flaws.value = savedData.flaws || '';
+            if (features) features.value = savedData.features || '';
         }
     }
 
+    // ===== CARGAR SALVACIONES DE MUERTE DESDE STORAGE =====
     loadDeathSavesFromStorage() {
         const saved = this.storage.load('deathSaves');
         if (saved) {
@@ -2309,11 +2347,12 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== CARGAR PERCEPCIÓN PASIVA DESDE STORAGE =====
     loadPassivePerceptionFromStorage() {
         const saved = this.storage.load('passivePerception');
         if (saved) {
             this.passivePerception = saved;
-            const perceptionInput = document.getElementById('passivePerception');
+            const perceptionInput = this.$('#passivePerception');
             if (perceptionInput) perceptionInput.value = saved;
         }
         setTimeout(() => {
@@ -2321,15 +2360,16 @@ populateSpellcastingAbilitySelect() {
         }, 500);
     }
 
+    // ===== ACTUALIZAR DISPLAY DE EXPERIENCIA =====
     updateExpDisplay(data) {
-        const currentExp = document.getElementById('current-exp');
-        const maxExp = document.getElementById('max-exp');
-        const expBarFill = document.getElementById('expBarFill');
-        const expCurrentLabel = document.getElementById('expCurrentLabel');
-        const expMaxLabel = document.getElementById('expMaxLabel');
-        const expPercentage = document.getElementById('expPercentage');
-        const levelDisplay = document.getElementById('level-display');
-        const characterLevel = document.getElementById('character-level');
+        const currentExp = this.$('#current-exp');
+        const maxExp = this.$('#max-exp');
+        const expBarFill = this.$('#expBarFill');
+        const expCurrentLabel = this.$('#expCurrentLabel');
+        const expMaxLabel = this.$('#expMaxLabel');
+        const expPercentage = this.$('#expPercentage');
+        const levelDisplay = this.$('#level-display');
+        const characterLevel = this.$('#character-level');
         
         if (currentExp) currentExp.value = data.current;
         if (maxExp) maxExp.value = data.max;
@@ -2352,12 +2392,14 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== ACTUALIZAR DISPLAY DE MONEDAS =====
     updateCurrencyDisplay(data) {
-        document.getElementById('currencyName').textContent = data.name;
+        const currencyName = this.$('#currencyName');
+        if (currencyName) currencyName.textContent = data.name;
         
-        const goldLabel = document.querySelector('.currency-item:first-child label');
-        const silverLabel = document.querySelector('.currency-item:nth-child(2) label');
-        const copperLabel = document.querySelector('.currency-item:last-child label');
+        const goldLabel = this.$('.currency-item:first-child label');
+        const silverLabel = this.$('.currency-item:nth-child(2) label');
+        const copperLabel = this.$('.currency-item:last-child label');
         
         if (goldLabel) {
             goldLabel.innerHTML = `<i class="fas fa-circle" style="color: #ffd700;"></i> ${data.goldName}`;
@@ -2369,86 +2411,85 @@ populateSpellcastingAbilitySelect() {
             copperLabel.innerHTML = `<i class="fas fa-circle" style="color: #b87333;"></i> ${data.copperName}`;
         }
         
-        const goldInput = document.getElementById('goldAmount');
-        const silverInput = document.getElementById('silverAmount');
-        const copperInput = document.getElementById('copperAmount');
+        const goldInput = this.$('#goldAmount');
+        const silverInput = this.$('#silverAmount');
+        const copperInput = this.$('#copperAmount');
         
         if (goldInput && goldInput.value != data.gold) goldInput.value = data.gold;
         if (silverInput && silverInput.value != data.silver) silverInput.value = data.silver;
         if (copperInput && copperInput.value != data.copper) copperInput.value = data.copper;
     }
 
+    // ===== RENDERIZAR HABILIDADES =====
     renderSkills(skills) {
-    const container = document.getElementById('skillsContainer');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    if (skills.length === 0) {
-        container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay habilidades</p>';
-        return;
+        const container = this.$('#skillsContainer');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (skills.length === 0) {
+            container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center;">No hay habilidades</p>';
+            return;
+        }
+        
+        skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
+            const item = document.createElement('div');
+            item.className = 'skill-item';
+            item.dataset.id = skill.id;
+            
+            const bonusClass = skill.bonus > 0 ? 'positive' : (skill.bonus < 0 ? 'negative' : '');
+            
+            const profIcon = skill.proficient ? (skill.expertise ? 'fa-star' : 'fa-check-circle') : 'fa-circle';
+            const profTitle = skill.expertise ? 'Experto' : (skill.proficient ? 'Competente' : 'Sin competencia');
+            
+            const attributeText = skill.attribute && skill.attribute !== '' ? skill.attribute : 'Sin atributo';
+            
+            item.innerHTML = `
+                <div class="skill-header">
+                    <span class="skill-prof" title="${profTitle}" style="color: var(--accent-gold); cursor: pointer;">
+                        <i class="fas ${profIcon}"></i>
+                    </span>
+                    <span class="skill-name">${skill.name}</span>
+                    <span class="skill-bonus ${bonusClass}">${Helpers.formatModifier(skill.bonus)}</span>
+                    <button class="skill-edit-btn" data-id="${skill.id}" title="Editar habilidad" style="background: none; border: none; cursor: pointer; color: var(--accent-gold); margin: 0 5px;">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-remove-skill" title="Eliminar"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="skill-attribute-info" style="font-size: 0.7rem; color: var(--ink-light); margin-top: 4px; padding-left: 28px;">
+                    <i class="fas fa-dice-d20"></i> ${attributeText}
+                </div>
+            `;
+            
+            container.appendChild(item);
+            
+            const profSpan = item.querySelector('.skill-prof');
+            profSpan.addEventListener('click', () => {
+                if (!skill.proficient) {
+                    this.skillsManager.toggleProficient(skill.id);
+                } else if (!skill.expertise) {
+                    this.skillsManager.toggleExpertise(skill.id);
+                } else {
+                    this.skillsManager.toggleProficient(skill.id);
+                }
+            });
+            
+            const editBtn = item.querySelector('.skill-edit-btn');
+            editBtn.addEventListener('click', () => {
+                this.showEditSkillModal(skill);
+            });
+            
+            item.querySelector('.btn-remove-skill').addEventListener('click', () => {
+                if (confirm('¿Eliminar esta habilidad?')) {
+                    this.skillsManager.remove(skill.id);
+                }
+            });
+        });
     }
-    
-    skills.sort((a, b) => a.name.localeCompare(b.name)).forEach(skill => {
-        const item = document.createElement('div');
-        item.className = 'skill-item';
-        item.dataset.id = skill.id;
-        
-        const bonusClass = skill.bonus > 0 ? 'positive' : (skill.bonus < 0 ? 'negative' : '');
-        
-        const profIcon = skill.proficient ? (skill.expertise ? 'fa-star' : 'fa-check-circle') : 'fa-circle';
-        const profTitle = skill.expertise ? 'Experto' : (skill.proficient ? 'Competente' : 'Sin competencia');
-        
-        const attributeText = skill.attribute && skill.attribute !== '' ? skill.attribute : 'Sin atributo';
-        
-        item.innerHTML = `
-            <div class="skill-header">
-                <span class="skill-prof" title="${profTitle}" style="color: var(--accent-gold); cursor: pointer;">
-                    <i class="fas ${profIcon}"></i>
-                </span>
-                <span class="skill-name">${skill.name}</span>
-                <span class="skill-bonus ${bonusClass}">${Helpers.formatModifier(skill.bonus)}</span>
-                <button class="skill-edit-btn" data-id="${skill.id}" title="Editar habilidad" style="background: none; border: none; cursor: pointer; color: var(--accent-gold); margin: 0 5px;">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-remove-skill" title="Eliminar"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="skill-attribute-info" style="font-size: 0.7rem; color: var(--ink-light); margin-top: 4px; padding-left: 28px;">
-                <i class="fas fa-dice-d20"></i> ${attributeText}
-            </div>
-        `;
-        
-        container.appendChild(item);
-        
-        // Evento para competencia
-        const profSpan = item.querySelector('.skill-prof');
-        profSpan.addEventListener('click', () => {
-            if (!skill.proficient) {
-                this.skillsManager.toggleProficient(skill.id);
-            } else if (!skill.expertise) {
-                this.skillsManager.toggleExpertise(skill.id);
-            } else {
-                this.skillsManager.toggleProficient(skill.id);
-            }
-        });
-        
-        // Evento para editar
-        const editBtn = item.querySelector('.skill-edit-btn');
-        editBtn.addEventListener('click', () => {
-            this.showEditSkillModal(skill);
-        });
-        
-        // Evento para eliminar
-        item.querySelector('.btn-remove-skill').addEventListener('click', () => {
-            if (confirm('¿Eliminar esta habilidad?')) {
-                this.skillsManager.remove(skill.id);
-            }
-        });
-    });
-}
 
+    // ===== RENDERIZAR TIRADAS DE SALVACIÓN =====
     renderSavingThrows(savingThrows) {
-        const container = document.getElementById('savingThrowsContainer');
+        const container = this.$('#savingThrowsContainer');
         if (!container) return;
         
         container.innerHTML = '';
@@ -2488,8 +2529,9 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== RENDERIZAR COMPETENCIAS =====
     renderProficiencies(proficiencies) {
-        const container = document.getElementById('proficienciesContainer');
+        const container = this.$('#proficienciesContainer');
         if (!container) return;
         
         container.innerHTML = '';
@@ -2544,6 +2586,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== ABRIR MODAL DE EDICIÓN DE COMPETENCIA =====
     openProficiencyEditModal(proficiency) {
         const existingModal = document.getElementById('proficiencyEditModal');
         if (existingModal) existingModal.remove();
@@ -2631,8 +2674,9 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== RENDERIZAR TESOROS =====
     renderTreasures(treasures) {
-        const container = document.getElementById('treasureList');
+        const container = this.$('#treasureList');
         if (!container) return;
         
         container.innerHTML = '';
@@ -2667,8 +2711,9 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== RENDERIZAR POCIONES =====
     renderPotions(potions) {
-        const container = document.getElementById('potionsList');
+        const container = this.$('#potionsList');
         if (!container) return;
         
         container.innerHTML = '';
@@ -2720,8 +2765,9 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== RENDERIZAR EQUIPO =====
     renderEquipment(equipment) {
-        const container = document.getElementById('equipmentList');
+        const container = this.$('#equipmentList');
         if (!container) return;
         
         container.innerHTML = '';
@@ -2779,6 +2825,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== OBTENER ICONO DE TESORO =====
     getTreasureIcon(type) {
         const icons = {
             'gem': 'fa-gem',
@@ -2789,38 +2836,57 @@ populateSpellcastingAbilitySelect() {
         return icons[type] || 'fa-box';
     }
 
-    setupBasicInfo() {
-        const basicInfo = this.storage.load('basicInfo');
-        if (basicInfo) {
-            document.getElementById('char-name').value = basicInfo.name || '';
-            document.getElementById('char-class').value = basicInfo.class || '';
-            document.getElementById('char-race').value = basicInfo.race || '';
-            document.getElementById('char-bg').value = basicInfo.background || '';
-            document.getElementById('char-align').value = basicInfo.alignment || '';
-        }
-        
-        const charNameInput = document.getElementById('char-name');
-        if (charNameInput) {
-            charNameInput.addEventListener('change', () => {
-                this.saveBasicInfo();
-                this.saveCharacter(); 
-            });
-        }
-        
-        ['char-class', 'char-race', 'char-bg', 'char-align'].forEach(id => {
-            const input = document.getElementById(id);
-            if (input) {
-                input.addEventListener('change', () => {
-                    this.saveBasicInfo();
-                    const currentName = document.getElementById('char-name')?.value.trim();
-                    if (currentName && currentName !== '') {
-                        this.saveCharacter();
-                    }
-                });
+    // ===== CONFIGURAR INFORMACIÓN BÁSICA =====
+setupBasicInfo() {
+    const basicInfo = this.storage.load('basicInfo');
+    
+    const charName = this.$('#char-name');
+    const charClass = this.$('#char-class');
+    const charRace = this.$('#char-race');
+    const charBg = this.$('#char-bg');
+    const charAlign = this.$('#char-align');
+    
+    if (basicInfo) {
+        if (charName) charName.value = basicInfo.name || '';
+        if (charClass) charClass.value = basicInfo.class || '';
+        if (charRace) charRace.value = basicInfo.race || '';
+        if (charBg) charBg.value = basicInfo.background || '';
+        if (charAlign) charAlign.value = basicInfo.alignment || '';
+    }
+    
+    // Cargar imagen del storage aislado
+    const savedImage = this.storage.load('imagenUrl');
+    if (savedImage && this.imageManager) {
+        this.imageManager.currentImageUrl = savedImage;
+        this.imageManager.displayImage(savedImage);
+    }
+    
+    if (charName) {
+        charName.addEventListener('change', () => {
+            this.saveBasicInfo();
+            this.saveCharacter();
+            const newName = charName.value.trim();
+            if (newName && window.tabManager) {
+                window.tabManager.renameTab(this.tabId, newName);
             }
         });
     }
+    
+    ['#char-class', '#char-race', '#char-bg', '#char-align'].forEach(selector => {
+        const input = this.$(selector);
+        if (input) {
+            input.addEventListener('change', () => {
+                this.saveBasicInfo();
+                const currentName = this.$('#char-name')?.value?.trim();
+                if (currentName && currentName !== '') {
+                    this.saveCharacter();
+                }
+            });
+        }
+    });
+}
 
+    // ===== CALCULAR PERCEPCIÓN PASIVA =====
     calcularPercepcionPasiva() {
         let sabiduriaMod = 0;
         const atributos = this.attributeManager.getAll();
@@ -2837,35 +2903,41 @@ populateSpellcastingAbilitySelect() {
         }
         
         const proficiencyBonus = this.expManager?.getProficiencyBonus() || 2;
-        
         const passivePerception = 10 + sabiduriaMod + proficiencyBonus;
         
-        const perceptionInput = document.getElementById('passivePerception');
+        const perceptionInput = this.$('#passivePerception');
         if (perceptionInput && perceptionInput.value != passivePerception) {
             perceptionInput.value = passivePerception;
         }
         
         this.passivePerception = passivePerception;
-        
         return passivePerception;
     }
 
+    // ===== GUARDAR INFORMACIÓN BÁSICA =====
     saveBasicInfo() {
+        const charName = this.$('#char-name');
+        const charClass = this.$('#char-class');
+        const charRace = this.$('#char-race');
+        const charBg = this.$('#char-bg');
+        const charAlign = this.$('#char-align');
+        
         const basicInfo = {
-            name: document.getElementById('char-name')?.value || '',
-            class: document.getElementById('char-class')?.value || '',
-            race: document.getElementById('char-race')?.value || '',
-            background: document.getElementById('char-bg')?.value || '',
-            trasfondo: document.getElementById('char-bg')?.value || '',
-            alignment: document.getElementById('char-align')?.value || '',
-            alineamiento: document.getElementById('char-align')?.value || ''
+            name: charName?.value || '',
+            class: charClass?.value || '',
+            race: charRace?.value || '',
+            background: charBg?.value || '',
+            trasfondo: charBg?.value || '',
+            alignment: charAlign?.value || '',
+            alineamiento: charAlign?.value || ''
         };
         this.storage.save('basicInfo', basicInfo);
     }
 
+    // ===== CONFIGURAR CONTROLES RÁPIDOS DE HP =====
     setupQuickHPControls() {
-        const hpContainer = document.querySelector('.hp-container');
-        if (!hpContainer || document.querySelector('.hp-quick-controls')) return;
+        const hpContainer = this.$('.hp-container');
+        if (!hpContainer || hpContainer.querySelector('.hp-quick-controls')) return;
         
         const controls = document.createElement('div');
         controls.className = 'hp-quick-controls';
@@ -2886,9 +2958,10 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== CONFIGURAR AUTO-GUARDADO DE ESTADÍSTICAS DE COMBATE =====
     setupCombatStatsAutoSave() {
-        ['armor-class', 'speed', 'initiative'].forEach(id => {
-            const input = document.getElementById(id);
+        ['#armor-class', '#speed', '#initiative'].forEach(selector => {
+            const input = this.$(selector);
             if (input) {
                 input.addEventListener('change', () => {
                     if (this.hasValidCharacterName()) {
@@ -2899,32 +2972,37 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== CONFIGURAR COLLAPSE DE INVENTARIO =====
     setupInventoryCollapse() {
-        const toggleBtn = document.getElementById('toggleInventoryBtn');
-        const inventoryCard = document.getElementById('card-inventory');
+        const toggleBtn = this.$('#toggleInventoryBtn');
+        const inventoryCard = this.$('#card-inventory');
         
         if (!toggleBtn || !inventoryCard) return;
         
         const savedState = this.storage.load('inventoryCollapsed');
         if (savedState) {
             inventoryCard.classList.add('collapsed');
-            toggleBtn.querySelector('i').className = 'fas fa-chevron-down';
+            const icon = toggleBtn.querySelector('i');
+            if (icon) icon.className = 'fas fa-chevron-down';
         }
         
         toggleBtn.addEventListener('click', () => {
             inventoryCard.classList.toggle('collapsed');
             const icon = toggleBtn.querySelector('i');
-            icon.className = inventoryCard.classList.contains('collapsed') 
-                ? 'fas fa-chevron-down' 
-                : 'fas fa-chevron-up';
+            if (icon) {
+                icon.className = inventoryCard.classList.contains('collapsed') 
+                    ? 'fas fa-chevron-down' 
+                    : 'fas fa-chevron-up';
+            }
             
             this.storage.save('inventoryCollapsed', inventoryCard.classList.contains('collapsed'));
         });
     }
 
+    // ===== AÑADIR ATAQUE =====
     addAttack(name = '', bonus = '', damage = '', saveToStorage = true) {
-        const attacksList = document.querySelector('.attacks-list');
-        const addBtn = document.getElementById('addAttackBtn');
+        const attacksList = this.$('.attacks-list');
+        const addBtn = this.$('#addAttackBtn');
         if (!attacksList || !addBtn) return;
         
         const item = document.createElement('div');
@@ -2946,9 +3024,10 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== CONFIGURAR AUTO-GUARDADO DE RASGOS =====
     setupTraitsAutoSave() {
-        ['personality', 'ideals', 'bonds', 'flaws', 'features'].forEach(id => {
-            const textarea = document.getElementById(id);
+        ['#personality', '#ideals', '#bonds', '#flaws', '#features'].forEach(selector => {
+            const textarea = this.$(selector);
             if (textarea) {
                 textarea.addEventListener('change', () => {
                     if (this.hasValidCharacterName()) {
@@ -2959,15 +3038,17 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== GUARDAR ATAQUES EN STORAGE =====
     saveAttacksToStorage() {
         const attacks = this.getAttacks();
         this.storage.save('attacks', attacks);
         this.eventBus.emit('attacksChanged', attacks);
     }
 
+    // ===== OBTENER ATAQUES =====
     getAttacks() {
         const attacks = [];
-        const attackItems = document.querySelectorAll('.attack-item');
+        const attackItems = this.$$('.attack-item');
         
         attackItems.forEach(item => {
             const name = item.querySelector('.attack-name')?.value || '';
@@ -2980,9 +3061,10 @@ populateSpellcastingAbilitySelect() {
         return attacks;
     }
 
+    // ===== OBTENER CONJUROS =====
     getSpells() {
         const spells = [];
-        const spellItems = document.querySelectorAll('#spellsList .spell-item');
+        const spellItems = this.$$('#spellsList .spell-item');
         
         spellItems.forEach(item => {
             const name = item.querySelector('.spell-name')?.value || '';
@@ -2995,173 +3077,170 @@ populateSpellcastingAbilitySelect() {
         return spells;
     }
 
+    // ===== MOSTRAR MODAL DE EDICIÓN DE HABILIDAD =====
     showEditSkillModal(skill) {
-    const existingModal = document.getElementById('editSkillModal');
-    if (existingModal) existingModal.remove();
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.id = 'editSkillModal';
-    modal.style.display = 'flex';
-    
-    // Obtener lista de atributos para el select
-    const attributes = this.attributeManager.getAll();
-    let attributeOptions = '<option value="">Sin atributo</option>';
-    attributes.forEach(attr => {
-        const selected = skill.attribute === attr.name ? 'selected' : '';
-        attributeOptions += `<option value="${attr.name}" ${selected}>${attr.name}</option>`;
-    });
-    
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width: 450px;">
-            <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> Editar Habilidad</h3>
-                <button class="modal-close" id="closeSkillModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label><i class="fas fa-tag"></i> Nombre de la habilidad</label>
-                    <input type="text" id="editSkillName" value="${skill.name.replace(/"/g, '&quot;')}" placeholder="Ej: Atletismo">
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-dice-d20"></i> Atributo asociado</label>
-                    <select id="editSkillAttribute">
-                        ${attributeOptions}
-                    </select>
-                    <small style="color: var(--ink-light); font-size: 0.7rem;">El modificador de este atributo se sumará al bonus</small>
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-star"></i> Competencia</label>
-                    <div style="display: flex; gap: 15px; margin-top: 5px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="radio" name="proficiency" value="none" ${!skill.proficient ? 'checked' : ''}>
-                            <span>Sin competencia</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="radio" name="proficiency" value="proficient" ${skill.proficient && !skill.expertise ? 'checked' : ''}>
-                            <span>Competente</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="radio" name="proficiency" value="expertise" ${skill.expertise ? 'checked' : ''}>
-                            <span>Experto</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-plus-circle"></i> Bonificador adicional</label>
-                    <input type="number" id="editSkillMisc" value="${skill.misc || 0}" step="1" min="-10" max="10">
-                    <small style="color: var(--ink-light); font-size: 0.7rem;">Bonificador extra (se suma al total)</small>
-                </div>
-                <div class="skill-preview" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; text-align: center;">
-                    <span style="font-size: 0.8rem; color: var(--ink-light);">Vista previa:</span>
-                    <span style="font-weight: bold; margin-left: 5px;" id="skillPreviewBonus">+0</span>
-                </div>
-            </div>
-            <div class="modal-actions" style="justify-content: flex-end; gap: 10px; padding: 15px;">
-                <button type="button" class="btn-secondary btn-cancel" id="cancelSkillBtn">
-                    Cancelar
-                </button>
-                <button type="button" class="btn-secondary" id="saveSkillBtn" style="background: #4CAF50;">
-                    <i class="fas fa-check"></i> Guardar cambios
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Función para actualizar vista previa
-    const updatePreview = () => {
-        const attributeName = document.getElementById('editSkillAttribute').value;
-        const proficiencyRadio = document.querySelector('input[name="proficiency"]:checked');
-        const misc = parseInt(document.getElementById('editSkillMisc').value) || 0;
+        const existingModal = document.getElementById('editSkillModal');
+        if (existingModal) existingModal.remove();
         
-        let proficiencyBonus = 0;
-        if (proficiencyRadio) {
-            const profValue = proficiencyRadio.value;
-            if (profValue === 'proficient') {
-                proficiencyBonus = this.expManager?.getProficiencyBonus() || 2;
-            } else if (profValue === 'expertise') {
-                proficiencyBonus = (this.expManager?.getProficiencyBonus() || 2) * 2;
-            }
-        }
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'editSkillModal';
+        modal.style.display = 'flex';
         
-        let attributeMod = 0;
-        if (attributeName) {
-            const attribute = this.attributeManager.getByName(attributeName);
-            if (attribute) {
-                attributeMod = attribute.modifier;
-            }
-        }
-        
-        const totalBonus = attributeMod + proficiencyBonus + misc;
-        const sign = totalBonus >= 0 ? '+' : '';
-        const previewSpan = document.getElementById('skillPreviewBonus');
-        if (previewSpan) {
-            previewSpan.textContent = `${sign}${totalBonus}`;
-            previewSpan.style.color = totalBonus >= 0 ? '#4CAF50' : '#ff4444';
-        }
-    };
-    
-    const nameInput = document.getElementById('editSkillName');
-    const attributeSelect = document.getElementById('editSkillAttribute');
-    const miscInput = document.getElementById('editSkillMisc');
-    const radioButtons = document.querySelectorAll('input[name="proficiency"]');
-    
-    nameInput?.addEventListener('input', updatePreview);
-    attributeSelect?.addEventListener('change', updatePreview);
-    miscInput?.addEventListener('input', updatePreview);
-    radioButtons.forEach(radio => radio.addEventListener('change', updatePreview));
-    
-    updatePreview();
-    
-    // Cerrar modal
-    const closeModal = () => modal.remove();
-    document.getElementById('closeSkillModal')?.addEventListener('click', closeModal);
-    document.getElementById('cancelSkillBtn')?.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
-    
-    // Guardar cambios
-    document.getElementById('saveSkillBtn')?.addEventListener('click', () => {
-        const newName = document.getElementById('editSkillName').value.trim();
-        const newAttribute = document.getElementById('editSkillAttribute').value;
-        const newMisc = parseInt(document.getElementById('editSkillMisc').value) || 0;
-        const proficiencyRadio = document.querySelector('input[name="proficiency"]:checked');
-        
-        if (!newName) {
-            Helpers.showMessage('El nombre de la habilidad no puede estar vacío', 'warning');
-            return;
-        }
-        
-        let newProficient = false;
-        let newExpertise = false;
-        
-        if (proficiencyRadio) {
-            if (proficiencyRadio.value === 'proficient') {
-                newProficient = true;
-                newExpertise = false;
-            } else if (proficiencyRadio.value === 'expertise') {
-                newProficient = true;
-                newExpertise = true;
-            }
-        }
-        
-        // Actualizar la habilidad
-        this.skillsManager.update(skill.id, {
-            name: newName,
-            attribute: newAttribute || '',
-            proficient: newProficient,
-            expertise: newExpertise,
-            misc: newMisc
+        const attributes = this.attributeManager.getAll();
+        let attributeOptions = '<option value="">Sin atributo</option>';
+        attributes.forEach(attr => {
+            const selected = skill.attribute === attr.name ? 'selected' : '';
+            attributeOptions += `<option value="${attr.name}" ${selected}>${attr.name}</option>`;
         });
         
-        closeModal();
-        Helpers.showMessage('Habilidad actualizada', 'info');
-    });
-}
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-edit"></i> Editar Habilidad</h3>
+                    <button class="modal-close" id="closeSkillModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Nombre de la habilidad</label>
+                        <input type="text" id="editSkillName" value="${skill.name.replace(/"/g, '&quot;')}" placeholder="Ej: Atletismo">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-dice-d20"></i> Atributo asociado</label>
+                        <select id="editSkillAttribute">
+                            ${attributeOptions}
+                        </select>
+                        <small style="color: var(--ink-light); font-size: 0.7rem;">El modificador de este atributo se sumará al bonus</small>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-star"></i> Competencia</label>
+                        <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="proficiency" value="none" ${!skill.proficient ? 'checked' : ''}>
+                                <span>Sin competencia</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="proficiency" value="proficient" ${skill.proficient && !skill.expertise ? 'checked' : ''}>
+                                <span>Competente</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="proficiency" value="expertise" ${skill.expertise ? 'checked' : ''}>
+                                <span>Experto</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-plus-circle"></i> Bonificador adicional</label>
+                        <input type="number" id="editSkillMisc" value="${skill.misc || 0}" step="1" min="-10" max="10">
+                        <small style="color: var(--ink-light); font-size: 0.7rem;">Bonificador extra (se suma al total)</small>
+                    </div>
+                    <div class="skill-preview" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; text-align: center;">
+                        <span style="font-size: 0.8rem; color: var(--ink-light);">Vista previa:</span>
+                        <span style="font-weight: bold; margin-left: 5px;" id="skillPreviewBonus">+0</span>
+                    </div>
+                </div>
+                <div class="modal-actions" style="justify-content: flex-end; gap: 10px; padding: 15px;">
+                    <button type="button" class="btn-secondary btn-cancel" id="cancelSkillBtn">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn-secondary" id="saveSkillBtn" style="background: #4CAF50;">
+                        <i class="fas fa-check"></i> Guardar cambios
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const updatePreview = () => {
+            const attributeName = document.getElementById('editSkillAttribute').value;
+            const proficiencyRadio = document.querySelector('input[name="proficiency"]:checked');
+            const misc = parseInt(document.getElementById('editSkillMisc').value) || 0;
+            
+            let proficiencyBonus = 0;
+            if (proficiencyRadio) {
+                const profValue = proficiencyRadio.value;
+                if (profValue === 'proficient') {
+                    proficiencyBonus = this.expManager?.getProficiencyBonus() || 2;
+                } else if (profValue === 'expertise') {
+                    proficiencyBonus = (this.expManager?.getProficiencyBonus() || 2) * 2;
+                }
+            }
+            
+            let attributeMod = 0;
+            if (attributeName) {
+                const attribute = this.attributeManager.getByName(attributeName);
+                if (attribute) {
+                    attributeMod = attribute.modifier;
+                }
+            }
+            
+            const totalBonus = attributeMod + proficiencyBonus + misc;
+            const sign = totalBonus >= 0 ? '+' : '';
+            const previewSpan = document.getElementById('skillPreviewBonus');
+            if (previewSpan) {
+                previewSpan.textContent = `${sign}${totalBonus}`;
+                previewSpan.style.color = totalBonus >= 0 ? '#4CAF50' : '#ff4444';
+            }
+        };
+        
+        const nameInput = document.getElementById('editSkillName');
+        const attributeSelect = document.getElementById('editSkillAttribute');
+        const miscInput = document.getElementById('editSkillMisc');
+        const radioButtons = document.querySelectorAll('input[name="proficiency"]');
+        
+        nameInput?.addEventListener('input', updatePreview);
+        attributeSelect?.addEventListener('change', updatePreview);
+        miscInput?.addEventListener('input', updatePreview);
+        radioButtons.forEach(radio => radio.addEventListener('change', updatePreview));
+        
+        updatePreview();
+        
+        const closeModal = () => modal.remove();
+        document.getElementById('closeSkillModal')?.addEventListener('click', closeModal);
+        document.getElementById('cancelSkillBtn')?.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        
+        document.getElementById('saveSkillBtn')?.addEventListener('click', () => {
+            const newName = document.getElementById('editSkillName').value.trim();
+            const newAttribute = document.getElementById('editSkillAttribute').value;
+            const newMisc = parseInt(document.getElementById('editSkillMisc').value) || 0;
+            const proficiencyRadio = document.querySelector('input[name="proficiency"]:checked');
+            
+            if (!newName) {
+                Helpers.showMessage('El nombre de la habilidad no puede estar vacío', 'warning');
+                return;
+            }
+            
+            let newProficient = false;
+            let newExpertise = false;
+            
+            if (proficiencyRadio) {
+                if (proficiencyRadio.value === 'proficient') {
+                    newProficient = true;
+                    newExpertise = false;
+                } else if (proficiencyRadio.value === 'expertise') {
+                    newProficient = true;
+                    newExpertise = true;
+                }
+            }
+            
+            this.skillsManager.update(skill.id, {
+                name: newName,
+                attribute: newAttribute || '',
+                proficient: newProficient,
+                expertise: newExpertise,
+                misc: newMisc
+            });
+            
+            closeModal();
+            Helpers.showMessage('Habilidad actualizada', 'info');
+        });
+    }
 
+    // ===== MOSTRAR CONFIGURACIÓN DE MANÁ =====
     showManaConfig() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3192,6 +3271,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR CONFIGURACIÓN DE EXPERIENCIA =====
     showExpConfig() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3235,6 +3315,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR CONFIGURACIÓN DE SLOTS DE CONJUROS =====
     showSpellSlotsConfig() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3273,8 +3354,10 @@ populateSpellcastingAbilitySelect() {
             this.spellSlotsManager.setTotal(total);
             this.spellSlotsManager.setUsed(Math.min(used, total));
             
-            document.getElementById('spellLevel').value = level;
-            document.getElementById('totalSlots').value = total;
+            const spellLevel = this.$('#spellLevel');
+            const totalSlots = this.$('#totalSlots');
+            if (spellLevel) spellLevel.value = level;
+            if (totalSlots) totalSlots.value = total;
             
             modal.style.display = 'none';
         });
@@ -3284,6 +3367,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR CONFIGURACIÓN DE MONEDAS =====
     showCurrencyConfig() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3332,6 +3416,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR MODAL PARA AÑADIR TESORO =====
     showAddTreasureModal() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3384,6 +3469,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR MODAL PARA AÑADIR POCIÓN =====
     showAddPotionModal() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3439,6 +3525,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR MODAL PARA AÑADIR EQUIPO =====
     showAddEquipmentModal() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3517,6 +3604,7 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR PERSONALIZADOR DE COLORES =====
     showColorCustomizer() {
         const modal = document.getElementById('configModal');
         const modalBody = document.getElementById('modalBody');
@@ -3573,11 +3661,7 @@ populateSpellcastingAbilitySelect() {
         
         modal.style.display = 'flex';
         
-        const saveBtn = document.getElementById('saveColorsBtn');
-        const resetBtn = document.getElementById('resetColorsBtn');
-        const cancelBtn = document.getElementById('cancelColorsBtn');
-        
-        saveBtn.addEventListener('click', () => {
+        document.getElementById('saveColorsBtn').addEventListener('click', () => {
             const colors = {
                 mana: document.getElementById('colorMana').value,
                 hp: document.getElementById('colorHP').value,
@@ -3605,7 +3689,7 @@ populateSpellcastingAbilitySelect() {
             Helpers.showMessage('Colores aplicados', 'info');
         });
         
-        resetBtn.addEventListener('click', () => {
+        document.getElementById('resetColorsBtn').addEventListener('click', () => {
             const defaultColors = {
                 mana: '#4169e1',
                 hp: '#dc143c',
@@ -3633,11 +3717,12 @@ populateSpellcastingAbilitySelect() {
             Helpers.showMessage('Colores restaurados', 'info');
         });
         
-        cancelBtn.addEventListener('click', () => {
+        document.getElementById('cancelColorsBtn').addEventListener('click', () => {
             modal.style.display = 'none';
         });
     }
 
+    // ===== MOSTRAR PERSONALIZADOR DE COLORES DE TEXTO =====
     showTextColorCustomizer() {
         const modal = document.getElementById('textColorModal');
         const modalBody = document.getElementById('textColorModalBody');
@@ -3705,8 +3790,9 @@ populateSpellcastingAbilitySelect() {
         });
     }
 
+    // ===== MOSTRAR CONFIRMACIÓN DE GUARDADO =====
     showSaveConfirmation() {
-        const saveBtn = document.getElementById('saveBtn');
+        const saveBtn = this.$('#saveBtn');
         if (!saveBtn) return;
         
         const originalHTML = saveBtn.innerHTML;
@@ -3719,20 +3805,21 @@ populateSpellcastingAbilitySelect() {
         }, 2000);
     }
 
+    // ===== EXPORTAR PERSONAJE =====
     exportCharacter() {
-        const personajeNombre = document.getElementById('char-name')?.value.trim() || 'Sin nombre';
-        const clase = document.getElementById('char-class')?.value || '';
-        const raza = document.getElementById('char-race')?.value || '';
-        const trasfondo = document.getElementById('char-bg')?.value || '';
-        const alineamiento = document.getElementById('char-align')?.value || '';
+        const personajeNombre = this.$('#char-name')?.value?.trim() || 'Sin nombre';
+        const clase = this.$('#char-class')?.value || '';
+        const raza = this.$('#char-race')?.value || '';
+        const trasfondo = this.$('#char-bg')?.value || '';
+        const alineamiento = this.$('#char-align')?.value || '';
         
-        const inventoryCard = document.getElementById('card-inventory');
+        const inventoryCard = this.$('#card-inventory');
         const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
         
         const imagenUrl = localStorage.getItem('imagenUrl') || null;
         
         const atributosDOM = [];
-        document.querySelectorAll('.attribute-item').forEach(item => {
+        this.$$('.attribute-item').forEach(item => {
             const nameInput = item.querySelector('.attribute-name');
             const valueInput = item.querySelector('.ability-value');
             const modifierElement = item.querySelector('.ability-modifier');
@@ -3758,18 +3845,18 @@ populateSpellcastingAbilitySelect() {
         });
         
         const notas = {
-            personalidad: document.getElementById('personality')?.value || '',
-            ideales: document.getElementById('ideals')?.value || '',
-            vinculos: document.getElementById('bonds')?.value || '',
-            defectos: document.getElementById('flaws')?.value || '',
-            rasgos: document.getElementById('features')?.value || ''
+            personalidad: this.$('#personality')?.value || '',
+            ideales: this.$('#ideals')?.value || '',
+            vinculos: this.$('#bonds')?.value || '',
+            defectos: this.$('#flaws')?.value || '',
+            rasgos: this.$('#features')?.value || ''
         };
         
         const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
         const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
         
         const layout = {};
-        document.querySelectorAll('.card').forEach((card, index) => {
+        this.$$('.card').forEach((card, index) => {
             const id = card.id || `card-${index}`;
             layout[id] = {
                 width: card.style.width || getComputedStyle(card).width,
@@ -3798,9 +3885,9 @@ populateSpellcastingAbilitySelect() {
             stats: {
                 hp: this.healthManager.getData(),
                 mana: this.manaManager.getData(),
-                ca: parseInt(document.getElementById('armor-class')?.value) || 12,
-                velocidad: parseInt(document.getElementById('speed')?.value) || 30,
-                iniciativa: parseInt(document.getElementById('initiative')?.value) || 1,
+                ca: parseInt(this.$('#armor-class')?.value) || 12,
+                velocidad: parseInt(this.$('#speed')?.value) || 30,
+                iniciativa: parseInt(this.$('#initiative')?.value) || 1,
                 atributos: atributosDOM
             },
             ataques: this.getAttacks(),
@@ -3836,6 +3923,7 @@ populateSpellcastingAbilitySelect() {
         Helpers.showMessage('Personaje exportado correctamente', 'info');
     }
 
+    // ===== IMPORTAR PERSONAJE =====
     importCharacter() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -3862,11 +3950,11 @@ populateSpellcastingAbilitySelect() {
         input.click();
     }
 
+    // ===== CARGAR ATAQUES DESDE STORAGE =====
     loadAttacksFromStorage() {
         const savedAttacks = this.storage.load('attacks');
         if (savedAttacks && savedAttacks.length > 0) {
-            const attacksList = document.querySelector('.attacks-list');
-            const addAttackBtn = document.getElementById('addAttackBtn');
+            const attacksList = this.$('.attacks-list');
             if (attacksList) {
                 const attackItems = attacksList.querySelectorAll('.attack-item');
                 attackItems.forEach(item => item.remove());
@@ -3878,21 +3966,41 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== CARGAR PERSONAJE DESDE DATOS =====
     loadCharacterFromData(data) {
-        this.clearAllData();
+    this.clearAllData();
+    
+    if (data.basicInfo) {
+        const charName = this.$('#char-name');
+        const charClass = this.$('#char-class');
+        const charRace = this.$('#char-race');
+        const charBg = this.$('#char-bg');
+        const charAlign = this.$('#char-align');
         
-        if (data.basicInfo) {
-            document.getElementById('char-name').value = data.basicInfo.name || '';
-            document.getElementById('char-class').value = data.basicInfo.class || '';
-            document.getElementById('char-race').value = data.basicInfo.race || '';
-            document.getElementById('char-bg').value = data.basicInfo.background || '';
-            document.getElementById('char-align').value = data.basicInfo.alignment || '';
-            this.saveBasicInfo();
-        } else if (data.nombre) {
-            document.getElementById('char-name').value = data.nombre || '';
-            document.getElementById('char-class').value = data.clase || '';
-            document.getElementById('char-race').value = data.raza || '';
+        if (charName) charName.value = data.basicInfo.name || '';
+        if (charClass) charClass.value = data.basicInfo.class || '';
+        if (charRace) charRace.value = data.basicInfo.race || '';
+        if (charBg) charBg.value = data.basicInfo.background || '';
+        if (charAlign) charAlign.value = data.basicInfo.alignment || '';
+        this.saveBasicInfo();
+    } else if (data.nombre) {
+        const charName = this.$('#char-name');
+        const charClass = this.$('#char-class');
+        const charRace = this.$('#char-race');
+        
+        if (charName) charName.value = data.nombre || '';
+        if (charClass) charClass.value = data.clase || '';
+        if (charRace) charRace.value = data.raza || '';
+    }
+    
+    // Cargar imagen en storage aislado
+    if (data.imagen) {
+        this.storage.save('imagenUrl', data.imagen);
+        if (this.imageManager) {
+            this.imageManager.currentImageUrl = data.imagen;
+            this.imageManager.displayImage(data.imagen);
         }
+    }
         
         if (data.attributes && data.attributes.length > 0) {
             this.attributeManager.attributes = [];
@@ -3941,13 +4049,16 @@ populateSpellcastingAbilitySelect() {
         }
         
         if (data.stats) {
-            document.getElementById('armor-class').value = data.stats.ca || 12;
-            document.getElementById('speed').value = data.stats.velocidad || 30;
-            document.getElementById('initiative').value = data.stats.iniciativa || 1;
+            const armorClass = this.$('#armor-class');
+            const speed = this.$('#speed');
+            const initiative = this.$('#initiative');
+            
+            if (armorClass) armorClass.value = data.stats.ca || 12;
+            if (speed) speed.value = data.stats.velocidad || 30;
+            if (initiative) initiative.value = data.stats.iniciativa || 1;
         }
         
-        const attacksList = document.querySelector('.attacks-list');
-        const addAttackBtn = document.getElementById('addAttackBtn');
+        const attacksList = this.$('.attacks-list');
         if (attacksList) {
             const attackItems = attacksList.querySelectorAll('.attack-item');
             attackItems.forEach(item => item.remove());
@@ -3959,8 +4070,7 @@ populateSpellcastingAbilitySelect() {
         }
 
         if (data.attacks && data.attacks.length > 0) {
-            const attacksList = document.querySelector('.attacks-list');
-            const addAttackBtn = document.getElementById('addAttackBtn');
+            const attacksList = this.$('.attacks-list');
             if (attacksList) {
                 const attackItems = attacksList.querySelectorAll('.attack-item');
                 attackItems.forEach(item => item.remove());
@@ -3972,8 +4082,7 @@ populateSpellcastingAbilitySelect() {
                 this.saveAttacksToStorage();
             }
         } else if (data.ataques && data.ataques.length > 0) {
-            const attacksList = document.querySelector('.attacks-list');
-            const addAttackBtn = document.getElementById('addAttackBtn');
+            const attacksList = this.$('.attacks-list');
             if (attacksList) {
                 const attackItems = attacksList.querySelectorAll('.attack-item');
                 attackItems.forEach(item => item.remove());
@@ -3986,7 +4095,7 @@ populateSpellcastingAbilitySelect() {
             }
         }
         
-        const spellsList = document.getElementById('spellsList');
+        const spellsList = this.$('#spellsList');
         if (spellsList) {
             spellsList.innerHTML = '';
             const spells = data.spells || data.conjuros || [];
@@ -4057,61 +4166,60 @@ populateSpellcastingAbilitySelect() {
             this.deathSavesManager.notify();
         }
         
-         if (data.skills && data.skills.length > 0) {
-        // Obtener mapa de atributos actuales
-        const currentAttributes = this.attributeManager.getAll();
-        const attributeMap = {};
-        currentAttributes.forEach(attr => {
-            attributeMap[attr.name] = attr;
-            attributeMap[attr.name.toUpperCase()] = attr;
-        });
-        
-        this.skillsManager.skills = [];
-        data.skills.forEach(skill => {
-            // Asegurar que el atributo esté asignado para habilidades estándar
-            let attribute = skill.attribute || '';
-            if (!attribute) {
-                const skillNameLower = skill.name.toLowerCase();
-                const SKILL_ATTRIBUTE_MAP = {
-                    'acrobacias': 'DESTREZA',
-                    'arcano': 'INTELIGENCIA',
-                    'atletismo': 'FUERZA',
-                    'engaño': 'CARISMA',
-                    'historia': 'INTELIGENCIA',
-                    'interpretación': 'CARISMA',
-                    'intimidación': 'CARISMA',
-                    'investigación': 'INTELIGENCIA',
-                    'juego de manos': 'DESTREZA',
-                    'medicina': 'SABIDURÍA',
-                    'naturaleza': 'INTELIGENCIA',
-                    'percepción': 'SABIDURÍA',
-                    'perspicacia': 'SABIDURÍA',
-                    'persuasión': 'CARISMA',
-                    'religión': 'INTELIGENCIA',
-                    'sigilo': 'DESTREZA',
-                    'supervivencia': 'SABIDURÍA',
-                    'trato con animales': 'SABIDURÍA'
-                };
-                attribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
-            }
+        if (data.skills && data.skills.length > 0) {
+            const currentAttributes = this.attributeManager.getAll();
+            const attributeMap = {};
+            currentAttributes.forEach(attr => {
+                attributeMap[attr.name] = attr;
+                attributeMap[attr.name.toUpperCase()] = attr;
+            });
             
-            this.skillsManager.add(skill.name, attribute);
-            
-            const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
-            if (lastSkill) {
-                lastSkill.bonus = skill.bonus || 0;
-                lastSkill.proficient = skill.proficient || false;
-                lastSkill.expertise = skill.expertise || false;
-                lastSkill.misc = skill.misc || 0;
-            }
-        });
-        this.skillsManager.updateAllBonuses();
-        this.skillsManager.notify();
-    }
+            this.skillsManager.skills = [];
+            data.skills.forEach(skill => {
+                let attribute = skill.attribute || '';
+                if (!attribute) {
+                    const skillNameLower = skill.name.toLowerCase();
+                    const SKILL_ATTRIBUTE_MAP = {
+                        'acrobacias': 'DESTREZA',
+                        'arcano': 'INTELIGENCIA',
+                        'atletismo': 'FUERZA',
+                        'engaño': 'CARISMA',
+                        'historia': 'INTELIGENCIA',
+                        'interpretación': 'CARISMA',
+                        'intimidación': 'CARISMA',
+                        'investigación': 'INTELIGENCIA',
+                        'juego de manos': 'DESTREZA',
+                        'medicina': 'SABIDURÍA',
+                        'naturaleza': 'INTELIGENCIA',
+                        'percepción': 'SABIDURÍA',
+                        'perspicacia': 'SABIDURÍA',
+                        'persuasión': 'CARISMA',
+                        'religión': 'INTELIGENCIA',
+                        'sigilo': 'DESTREZA',
+                        'supervivencia': 'SABIDURÍA',
+                        'trato con animales': 'SABIDURÍA'
+                    };
+                    attribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
+                }
+                
+                this.skillsManager.add(skill.name, attribute);
+                
+                const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
+                if (lastSkill) {
+                    lastSkill.bonus = skill.bonus || 0;
+                    lastSkill.proficient = skill.proficient || false;
+                    lastSkill.expertise = skill.expertise || false;
+                    lastSkill.misc = skill.misc || 0;
+                }
+            });
+            this.skillsManager.updateAllBonuses();
+            this.skillsManager.notify();
+        }
         
         if (data.passivePerception !== undefined) {
             this.passivePerception = data.passivePerception;
-            document.getElementById('passivePerception').value = data.passivePerception;
+            const perceptionInput = this.$('#passivePerception');
+            if (perceptionInput) perceptionInput.value = data.passivePerception;
         }
         
         if (data.proficiencies && data.proficiencies.length > 0) {
@@ -4135,18 +4243,24 @@ populateSpellcastingAbilitySelect() {
         
         const notas = data.notas || data;
         
+        const personality = this.$('#personality');
+        const ideals = this.$('#ideals');
+        const bonds = this.$('#bonds');
+        const flaws = this.$('#flaws');
+        const features = this.$('#features');
+        
         if (notas.personalidad !== undefined) {
-            document.getElementById('personality').value = notas.personalidad || '';
-            document.getElementById('ideals').value = notas.ideales || '';
-            document.getElementById('bonds').value = notas.vinculos || '';
-            document.getElementById('flaws').value = notas.defectos || '';
-            document.getElementById('features').value = notas.rasgos || '';
+            if (personality) personality.value = notas.personalidad || '';
+            if (ideals) ideals.value = notas.ideales || '';
+            if (bonds) bonds.value = notas.vinculos || '';
+            if (flaws) flaws.value = notas.defectos || '';
+            if (features) features.value = notas.rasgos || '';
         } else if (notas.personality) {
-            document.getElementById('personality').value = notas.personality || '';
-            document.getElementById('ideals').value = notas.ideals || '';
-            document.getElementById('bonds').value = notas.bonds || '';
-            document.getElementById('flaws').value = notas.flaws || '';
-            document.getElementById('features').value = notas.features || '';
+            if (personality) personality.value = notas.personality || '';
+            if (ideals) ideals.value = notas.ideals || '';
+            if (bonds) bonds.value = notas.bonds || '';
+            if (flaws) flaws.value = notas.flaws || '';
+            if (features) features.value = notas.features || '';
         }
         
         if (data.layout) {
@@ -4170,6 +4284,7 @@ populateSpellcastingAbilitySelect() {
         this.saveCharacter();
     }
 
+    // ===== LIMPIAR TODOS LOS DATOS =====
     clearAllData() {
         if (this.attributeManager) {
             this.attributeManager.attributes = [];
@@ -4199,13 +4314,14 @@ populateSpellcastingAbilitySelect() {
             this.spellManager.spells = [];
         }
         
-        const attacksList = document.querySelector('.attacks-list');
+        const attacksList = this.$('.attacks-list');
         if (attacksList) {
             const attackItems = attacksList.querySelectorAll('.attack-item');
             attackItems.forEach(item => item.remove());
         }
     }
 
+    // ===== REINICIAR TODO =====
     resetAll() {
         if (confirm('¿Estás seguro? Esta acción no se puede deshacer.')) {
             this.storage.clear();
@@ -4214,14 +4330,17 @@ populateSpellcastingAbilitySelect() {
         }
     }
 
+    // ===== ACTUALIZAR TIRADAS DE SALVACIÓN =====
     updateSavingThrows() {
         this.savingThrowsManager.updateFromAttributes();
     }
 
+    // ===== OBTENER NOMBRE DEL PERSONAJE =====
     getCharacterName() {
-        return document.getElementById('char-name')?.value || 'Sin nombre';
+        return this.$('#char-name')?.value || 'Sin nombre';
     }
 
+    // ===== OBTENER NOMBRE DEL JUGADOR =====
     getPlayerName() {
         if (this.userManager && this.userManager.isUserSet()) {
             return this.userManager.getUserName();
@@ -4229,19 +4348,34 @@ populateSpellcastingAbilitySelect() {
         return localStorage.getItem('jugadorNombre') || 'Anónimo';
     }
 
+    // ===== SINCRONIZAR CON WEBSOCKET =====
     syncCharacterWithWebSocket() {
         if (!this.ws || !this.ws.isConectado()) return;
         
         const personaje = {
             nombre: this.getCharacterName(),
-            clase: document.getElementById('char-class')?.value || '',
+            clase: this.$('#char-class')?.value || '',
             nivel: this.expManager?.getData().level || 1,
-            raza: document.getElementById('char-race')?.value || '',
-            jugador: this.getPlayerName()
+            raza: this.$('#char-race')?.value || '',
+            jugador: this.getPlayerName(),
+            tabId: this.tabId
         };
         
         if (personaje.nombre && personaje.nombre !== 'Sin nombre') {
             this.ws.actualizarPersonaje(personaje);
         }
+    }
+
+    // ===== CONFIGURAR RACE CLEAR HANDLER =====
+    setupRaceClearHandler() {
+        const raceInput = this.$('#char-race');
+        if (!raceInput) return;
+        
+        raceInput.addEventListener('input', (e) => {
+            const value = e.target.value.trim();
+            if (value === '') {
+                // Si el usuario borra la raza, no hacemos nada con la descripción
+            }
+        });
     }
 }

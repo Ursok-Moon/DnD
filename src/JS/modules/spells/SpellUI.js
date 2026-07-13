@@ -1,30 +1,37 @@
+// js/modules/spells/SpellUI.js
 export class SpellUI {
-    constructor(spellManager, spellSlotsManager, eventBus) {
+    constructor(spellManager, spellSlotsManager, eventBus, container = null) {
         this.spellManager = spellManager;
         this.spellSlotsManager = spellSlotsManager;
         this.eventBus = eventBus;
         
-        // Buscar contenedores
-        this.container = document.getElementById('spellsList');
-        this.slotsGrid = document.getElementById('slotsGrid');
+        // Usar el contenedor proporcionado
+        this.container = container || document;
+        this.containerElement = this.container.querySelector ? this.container : document;
         
-        console.log('🔍 SpellUI - slotsGrid:', this.slotsGrid);
+        // Buscar contenedores dentro del contexto
+        this.container = this.containerElement.querySelector('#spellsList');
+        this.slotsGrid = this.containerElement.querySelector('#slotsGrid');
+        
+        console.log('🔍 SpellUI - slotsGrid:', this.slotsGrid, 'container:', this.container);
         
         if (!this.slotsGrid) {
-            console.error('❌ CRÍTICO: No se encontró el elemento #slotsGrid');
-            return;
+            console.error('❌ CRÍTICO: No se encontró el elemento #slotsGrid en el contexto');
+            // Intentar buscar en todo el documento como fallback
+            this.slotsGrid = document.getElementById('slotsGrid');
+            if (this.slotsGrid) {
+                console.log('✅ slotsGrid encontrado en documento global');
+            }
         }
         
         // Crear la estructura de slots
         this.createSlotsStructure();
         
-        // Suscribirse a eventos específicos
+        // Suscribirse a eventos
         this.spellManager.subscribe((spells) => {
-            // Solo para carga inicial o cambios masivos
             this.renderSpells(spells);
         });
         
-        // Eventos específicos para actualizaciones parciales
         this.eventBus.on('spellUpdated', (data) => {
             this.updateSpellField(data.id, data.updates);
         });
@@ -51,42 +58,45 @@ export class SpellUI {
         
         // Render inicial
         const initialSlots = this.spellSlotsManager.getData();
-        console.log(' Render inicial con slots:', initialSlots);
+        console.log('Render inicial con slots:', initialSlots);
         this.renderSpellSlots(initialSlots);
     }
 
-    // Crear la estructura de slots
     createSlotsStructure() {
         if (!this.slotsGrid) return;
         
         this.slotsGrid.innerHTML = `
             <div class="slots-gems-container">
-                <div class="slots-config" style="display: none;">
-                    <!-- Esto se mantiene oculto porque usamos modal -->
-                </div>
+                <div class="slots-config" style="display: none;"></div>
                 <div class="slots-gems" id="slotsGems">
                     <!-- Las gemas se generarán aquí -->
                 </div>
             </div>
         `;
         
-        this.slotsContainer = document.getElementById('slotsGems');
+        this.slotsContainer = this.slotsGrid.querySelector('#slotsGems');
         console.log('✨ slotsContainer creado:', this.slotsContainer);
     }
 
     setupAddButton() {
-        const addBtn = document.getElementById('addSpellBtn');
+        const addBtn = this.containerElement.querySelector('#addSpellBtn');
         if (addBtn) {
-            addBtn.addEventListener('click', () => {
+            const newBtn = addBtn.cloneNode(true);
+            addBtn.parentNode.replaceChild(newBtn, addBtn);
+            
+            newBtn.addEventListener('click', () => {
                 this.spellManager.add();
             });
         }
     }
 
     setupConfigButton() {
-        const configBtn = document.getElementById('configSlotsBtn');
+        const configBtn = this.containerElement.querySelector('#configSlotsBtn');
         if (configBtn) {
-            configBtn.addEventListener('click', () => {
+            const newBtn = configBtn.cloneNode(true);
+            configBtn.parentNode.replaceChild(newBtn, configBtn);
+            
+            newBtn.addEventListener('click', () => {
                 this.showSlotsConfigModal();
             });
         }
@@ -138,15 +148,10 @@ export class SpellUI {
             this.spellSlotsManager.setUsed(Math.min(used, total));
             
             modal.style.display = 'none';
-            
-            saveBtn.removeEventListener('click', handleSave);
-            cancelBtn.removeEventListener('click', handleCancel);
         };
         
         const handleCancel = () => {
             modal.style.display = 'none';
-            saveBtn.removeEventListener('click', handleSave);
-            cancelBtn.removeEventListener('click', handleCancel);
         };
         
         saveBtn.addEventListener('click', handleSave);
@@ -163,33 +168,31 @@ export class SpellUI {
     }
 
     updateSpellField(spellId, updates) {
-    const spellItem = this.container?.querySelector(`[data-id="${spellId}"]`);
-    if (!spellItem) return;
-    
-    if (updates.name !== undefined && updates.name !== '') {
-        const nameInput = spellItem.querySelector('.spell-name');
-        if (nameInput && nameInput.value !== updates.name) {
-            nameInput.value = updates.name;
+        const spellItem = this.container?.querySelector(`[data-id="${spellId}"]`);
+        if (!spellItem) return;
+        
+        if (updates.name !== undefined && updates.name !== '') {
+            const nameInput = spellItem.querySelector('.spell-name');
+            if (nameInput && nameInput.value !== updates.name) {
+                nameInput.value = updates.name;
+            }
+        }
+        
+        if (updates.level !== undefined && updates.level !== '' && updates.level !== null) {
+            const levelInput = spellItem.querySelector('.spell-level-input');
+            if (levelInput && levelInput.value != updates.level) {
+                levelInput.value = updates.level;
+            }
+        }
+        
+        if (updates.description !== undefined) {
+            const descTextarea = spellItem.querySelector('.spell-desc');
+            if (descTextarea && descTextarea.value !== updates.description) {
+                descTextarea.value = updates.description;
+            }
         }
     }
-    
-    // IMPORTANTE: Validar que el nivel no sea undefined o null
-    if (updates.level !== undefined && updates.level !== '' && updates.level !== null) {
-        const levelInput = spellItem.querySelector('.spell-level-input');
-        if (levelInput && levelInput.value != updates.level) {  // Usar != para comparar número vs string
-            levelInput.value = updates.level;
-        }
-    }
-    
-    if (updates.description !== undefined) {
-        const descTextarea = spellItem.querySelector('.spell-desc');
-        if (descTextarea && descTextarea.value !== updates.description) {
-            descTextarea.value = updates.description;
-        }
-    }
-}
 
-    // NUEVO: Actualizar solo el estado de preparado
     updateSpellPrepared(spellId, prepared) {
         const spellItem = this.container?.querySelector(`[data-id="${spellId}"]`);
         if (!spellItem) return;
@@ -205,11 +208,9 @@ export class SpellUI {
         }
     }
 
-    // NUEVO: Añadir un conjuro al DOM sin reconstruir todo
     addSpellToDOM(spell) {
         if (!this.container) return;
         
-        // Si no hay conjuros, eliminar el mensaje de "no hay conjuros"
         if (this.container.children.length === 1 && this.container.children[0].tagName === 'P') {
             this.container.innerHTML = '';
         }
@@ -218,20 +219,17 @@ export class SpellUI {
         this.container.appendChild(item);
     }
 
-    // NUEVO: Eliminar un conjuro del DOM sin reconstruir todo
     removeSpellFromDOM(spellId) {
         const spellItem = this.container?.querySelector(`[data-id="${spellId}"]`);
         if (spellItem) {
             spellItem.remove();
         }
         
-        // Si no quedan conjuros, mostrar mensaje
         if (this.container && this.container.children.length === 0) {
             this.container.innerHTML = '<p style="color: var(--ink-light); font-style: italic; text-align: center; padding: 20px;">No hay conjuros. Haz clic en "Añadir conjuro" para crear uno.</p>';
         }
     }
 
-    // NUEVO: Crear elemento sin añadirlo al DOM (para reutilizar)
     createSpellElement(spell) {
         const item = document.createElement('div');
         item.className = 'spell-item';
@@ -257,7 +255,6 @@ export class SpellUI {
         return item;
     }
 
-    // NUEVO: Escapar HTML para evitar inyección
     escapeHtml(text) {
         if (!text) return '';
         return String(text)
@@ -269,56 +266,51 @@ export class SpellUI {
     }
 
     attachSpellEvents(item, spell) {
-    const preparedIcon = item.querySelector('.spell-prepared');
-    const nameInput = item.querySelector('.spell-name');
-    const levelInput = item.querySelector('.spell-level-input');
-    const descTextarea = item.querySelector('.spell-desc');
-    const removeBtn = item.querySelector('.btn-remove-spell');
-    
-    const spellId = spell.id;
-    const self = this;
-    
-    preparedIcon.addEventListener('click', function(e) {
-        e.stopPropagation();
-        self.spellManager.togglePrepared(spellId);
-    });
-    
-    // Para nombre - guardado inmediato en lugar de timeout
-    nameInput.addEventListener('change', function() {
-        if (this.value !== spell.name) {
-            self.spellManager.update(spellId, { name: this.value });
-        }
-    });
-    
-    // Para nivel - guardado inmediato y validación
-    levelInput.addEventListener('change', function() {
-        let levelValue = this.value.trim();
-        // Si está vacío, mantener el valor anterior
-        if (levelValue === '') {
-            this.value = spell.level;
-            return;
-        }
-        if (this.value !== spell.level) {
-            self.spellManager.update(spellId, { level: this.value });
-        }
-    });
-    
-    // Para descripción - guardado inmediato
-    descTextarea.addEventListener('change', function() {
-        if (this.value !== spell.description) {
-            self.spellManager.update(spellId, { description: this.value });
-        }
-    });
-    
-    removeBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        if (confirm('¿Eliminar este conjuro?')) {
-            self.spellManager.remove(spellId);
-        }
-    });
-}
+        const preparedIcon = item.querySelector('.spell-prepared');
+        const nameInput = item.querySelector('.spell-name');
+        const levelInput = item.querySelector('.spell-level-input');
+        const descTextarea = item.querySelector('.spell-desc');
+        const removeBtn = item.querySelector('.btn-remove-spell');
+        
+        const spellId = spell.id;
+        const self = this;
+        
+        preparedIcon.addEventListener('click', function(e) {
+            e.stopPropagation();
+            self.spellManager.togglePrepared(spellId);
+        });
+        
+        nameInput.addEventListener('change', function() {
+            if (this.value !== spell.name) {
+                self.spellManager.update(spellId, { name: this.value });
+            }
+        });
+        
+        levelInput.addEventListener('change', function() {
+            let levelValue = this.value.trim();
+            if (levelValue === '') {
+                this.value = spell.level;
+                return;
+            }
+            if (this.value !== spell.level) {
+                self.spellManager.update(spellId, { level: this.value });
+            }
+        });
+        
+        descTextarea.addEventListener('change', function() {
+            if (this.value !== spell.description) {
+                self.spellManager.update(spellId, { description: this.value });
+            }
+        });
+        
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (confirm('¿Eliminar este conjuro?')) {
+                self.spellManager.remove(spellId);
+            }
+        });
+    }
 
-    // MODIFICADO: Renderizar todos los conjuros (solo para carga inicial)
     renderSpells(spells) {
         if (!this.container) return;
         

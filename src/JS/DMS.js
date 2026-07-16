@@ -44,6 +44,12 @@ class DMScreen {
         
         this.timerInterval = null;
         this.timerSeconds = 0;
+        this.autoSaveEnabled = true;
+        this.lastSaveTime = null;
+        this.saveCooldown = 2000; // 2 segundos entre guardados automáticos
+        this.pendingSave = false;
+        this.saveTimeout = null;
+        this._lastNotificationTime = null;
 
         this.enemyCustomSheets = {};
         
@@ -1886,9 +1892,12 @@ class DMScreen {
             html += `<div class="stat-grid">`;
             if (stats.FUE) html += `<div class="stat-item"><strong>FUE:</strong> ${stats.FUE}</div>`;
             if (stats.DES) html += `<div class="stat-item"><strong>DES:</strong> ${stats.DES}</div>`;
+            if (stats.AGI) html += `<div class="stat-item"><strong>AGI:</strong> ${stats.AGI}</div>`;
             if (stats.CON) html += `<div class="stat-item"><strong>CON:</strong> ${stats.CON}</div>`;
+            if (stats.AGU) html += `<div class="stat-item"><strong>AGU:</strong> ${stats.AGU}</div>`;
             if (stats.INT) html += `<div class="stat-item"><strong>INT:</strong> ${stats.INT}</div>`;
             if (stats.SAB) html += `<div class="stat-item"><strong>SAB:</strong> ${stats.SAB}</div>`;
+            if (stats.ESP) html += `<div class="stat-item"><strong>ESP:</strong> ${stats.ESP}</div>`;
             if (stats.CAR) html += `<div class="stat-item"><strong>CAR:</strong> ${stats.CAR}</div>`;
             html += `</div>`;
             
@@ -2654,54 +2663,68 @@ rollAllEnemiesHp() {
     }
     
     loadSessionFromFile() {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.json';
-        fileInput.style.display = 'none';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
         
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const sessionData = JSON.parse(event.target.result);
-                    this.loadSessionData(sessionData);
-                    this.showNotification('Sesión cargada desde archivo', 'success');
-                } catch (error) {
-                    console.error('Error al cargar archivo:', error);
-                    this.showNotification('Error al cargar el archivo de sesión', 'error');
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const sessionData = JSON.parse(event.target.result);
+                
+                if (!sessionData.players && !sessionData.enemies) {
+                    this.showNotification('❌ Archivo no válido', 'error');
+                    return;
                 }
-            };
-            reader.readAsText(file);
-            
-            document.body.removeChild(fileInput);
-        });
-        
-        document.body.appendChild(fileInput);
-        fileInput.click();
-    }
+                
+                this.loadSessionData(sessionData);
+                localStorage.setItem('dmSessionData', JSON.stringify(sessionData));
+                localStorage.setItem('dmSessionLastSave', new Date().toISOString());
+                this.guardarSesionEnServidor(sessionData);
+                this.updateAutoSaveIndicator('saved');
+                this.cargarPersonajesHoy();
+                
+                this.showNotification(`✅ Sesión cargada desde: ${file.name}`, 'success');
+            } catch (error) {
+                console.error('Error al cargar archivo:', error);
+                this.showNotification('❌ Error al cargar el archivo de sesión', 'error');
+            }
+        };
+        reader.readAsText(file);
+        document.body.removeChild(fileInput);
+    });
+    
+    document.body.appendChild(fileInput);
+    fileInput.click();
+}
     
     setupPDFJS() {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
     
     switchSection(sectionId) {
-        document.querySelectorAll('.dm-section').forEach(section => {
-            section.classList.remove('active');
-        });
-        
-        const targetSection = document.getElementById(`${sectionId}Section`);
-        if (targetSection) targetSection.classList.add('active');
-        
-        document.querySelectorAll('.static-menu-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        const activeBtn = document.querySelector(`.static-menu-btn[data-section="${sectionId}"]`);
-        if (activeBtn) activeBtn.classList.add('active');
-    }
+    document.querySelectorAll('.dm-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    const targetSection = document.getElementById(`${sectionId}Section`);
+    if (targetSection) targetSection.classList.add('active');
+    
+    document.querySelectorAll('.static-menu-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const activeBtn = document.querySelector(`.static-menu-btn[data-section="${sectionId}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+    
+    // Auto-guardar al cambiar de sección
+    this.autoSaveSession();
+}
     
     addPlayer() {
         const name = document.getElementById('playerNameInput')?.value.trim();
@@ -2740,6 +2763,7 @@ rollAllEnemiesHp() {
         this.updateInitiativeOrder();
         
         this.showNotification(`Jugador "${name}" añadido`, 'success');
+        this.autoSaveSession();
     }
     
     addEnemy() {
@@ -2892,6 +2916,7 @@ rollAllEnemiesHp() {
         } else {
             this.showNotification(`Enemigo "${baseName}" añadido (Iniciativa: ${this.enemies[this.enemies.length - 1].initiative})`, 'success');
         }
+        this.autoSaveSession();
     }
 
     showCustomSheetModal(entity) {
@@ -4083,6 +4108,7 @@ confirmSummon() {
         : `✨ ${invocador.name} invoca a ${name} (Iniciativa: ${iniciativa})`;
     
     this.showNotification(mensaje, 'success');
+    this.autoSaveSession();
 }
 
 /**
@@ -4418,6 +4444,7 @@ confirmSummon() {
     }
     
     this.updateInitiativeOrderAfterRemoval(id, currentEntityId);
+    this.autoSaveSession();
 }
 
 editarIniciativaInvocacion(entity) {
@@ -4523,6 +4550,7 @@ removeSummon(summonId) {
     
     this.showNotification(`Invocación "${summon.name}" eliminada`, 'warning');
     this.updateSummonInvocadoresList();
+    this.autoSaveSession();
 }
 
 addSummon() {
@@ -4716,6 +4744,7 @@ getInvocadorForSummon(summonId) {
             this.updateInitiativeOrder();
             this.showNotification(`${entity.name} tira iniciativa: ${entity.initiative} (bonificador DEX: ${dexBonus >= 0 ? '+' : ''}${dexBonus})`, 'info');
         }
+        this.autoSaveSession();
     }
     
     editHPForEntity(entity) {
@@ -4948,6 +4977,7 @@ getInvocadorForSummon(summonId) {
         if (changes.length > 0) {
             this.showNotification(`${entity.name}: ${changes.join(', ')}`, 'info');
         }
+        this.autoSaveSession();
     });
     
     // Enter en inputs
@@ -5020,6 +5050,7 @@ getInvocadorForSummon(summonId) {
         
         this.updateInitiativeOrder();
         this.showNotification(`${type === 'player' ? 'Jugador' : 'Enemigo'} actualizado`, 'success');
+        this.autoSaveSession();
     }
 }
     
@@ -5131,6 +5162,7 @@ getInvocadorForSummon(summonId) {
     sortInitiative() {
         this.updateInitiativeOrder();
         this.showNotification('Orden de iniciativa actualizado', 'info');
+        this.autoSaveSession();
     }
     
     clearInitiativeOrder() {
@@ -5147,6 +5179,7 @@ getInvocadorForSummon(summonId) {
         this.updateInitiativeOrder();
         
         this.showNotification('Orden de iniciativa limpiado', 'warning');
+        this.autoSaveSession();
     }
     
     nextTurn() {
@@ -5168,6 +5201,7 @@ getInvocadorForSummon(summonId) {
         if (currentEntity) {
             this.showNotification(`Turno de: ${currentEntity.name}`, 'info');
         }
+        this.autoSaveSession();
     }
     
     handleInitiativeClick(event) {
@@ -5210,6 +5244,7 @@ getInvocadorForSummon(summonId) {
         }
         
         this.showNotification(`Modo ${this.combatMode ? 'Combate' : 'Exploración'} activado`, 'info');
+        this.autoSaveSession();
     }
     
     async loadPDF(file, type) {
@@ -5487,6 +5522,7 @@ getInvocadorForSummon(summonId) {
         
         const tab = activeTab.dataset.tab;
         this.notes[tab] = content;
+        this.autoSaveSession();
     }
     
     updateNotesStats() {
@@ -5524,6 +5560,7 @@ getInvocadorForSummon(summonId) {
         if (notesLastSaved) notesLastSaved.textContent = `Guardado: ${timeString}`;
         
         this.showNotification('Notas guardadas', 'success');
+        this.autoSaveSession();
     }
     
     exportNotes() {
@@ -5639,107 +5676,295 @@ getInvocadorForSummon(summonId) {
         const timerDisplay = document.getElementById('timerDisplay');
         if (timerDisplay) timerDisplay.textContent = display;
     }
+
+autoSaveSession() {
+    if (!this.autoSaveEnabled) return;
+    
+    // Evitar guardados múltiples muy seguidos
+    const now = Date.now();
+    if (this.lastSaveTime && (now - this.lastSaveTime) < this.saveCooldown) {
+        this.pendingSave = true;
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => {
+            this.pendingSave = false;
+            this.performAutoSave();
+        }, this.saveCooldown);
+        return;
+    }
+    
+    this.performAutoSave();
+}
+
+performAutoSave() {
+    const sessionData = {
+        players: this.players,
+        enemies: this.enemies,
+        initiativeOrder: this.initiativeOrder,
+        currentTurn: this.currentTurn,
+        currentRound: this.currentRound,
+        combatMode: this.combatMode,
+        notes: this.notes,
+        bestiaryCustomLoaded: !!this.bestiarioPersonalizado,
+        timestamp: new Date().toISOString(),
+        version: '2.1'
+    };
+    
+    const jsonData = JSON.stringify(sessionData, null, 2);
+    localStorage.setItem('dmSessionData', jsonData);
+    localStorage.setItem('dmSessionLastSave', new Date().toISOString());
+    
+    this.lastSaveTime = Date.now();
+    
+    // Actualizar indicador visual de guardado
+    this.updateAutoSaveIndicator('auto-saved');
+}
     
     newSession() {
-        if (!confirm('¿Crear una nueva sesión? Se perderán los datos no guardados.')) return;
-        
-        this.players = [];
-        this.enemies = [];
-        this.initiativeOrder = [];
-        this.currentTurn = 0;
-        this.currentRound = 1;
-        this.combatMode = false;
-        this.notes = {
-            session: '',
-            plot: '',
-            npcs: '',
-            locations: ''
-        };
-        
-        this.pdfData = {
-            manual: null,
-            bestiary: null,
-            campaign: null
-        };
-        
-        this.pdfPages = {
-            manual: { current: 1, total: 1 },
-            bestiary: { current: 1, total: 1 },
-            campaign: { current: 1, total: 1 }
-        };
-        
-        this.zoomLevels = {
-            manual: 100,
-            bestiary: 100,
-            campaign: 100
-        };
-        
-        // Restaurar bestiario original si existe
-        if (this.bestiarioOriginal) {
-            this.bestiarioActual = JSON.parse(JSON.stringify(this.bestiarioOriginal));
-            this.bestiarioPersonalizado = null;
-            this.fuenteBestiarioActual = 'original';
-            this.generateBestiaryDenominaciones();
-            this.setupBestiaryAutocomplete();
-            this.updateBestiaryStatus('original');
-        }
-        
-        localStorage.removeItem('customBestiary');
-        localStorage.removeItem('customBestiaryName');
-        
-        this.updateUI();
-        
-        this.clearPDF('manual');
-        this.clearPDF('bestiary');
-        this.clearPDF('campaign');
-        
-        this.showNotification('Nueva sesión creada', 'success');
+    if (!confirm('¿Crear una nueva sesión? Se perderán los datos no guardados.')) return;
+    
+    const hadCustomBestiary = !!this.bestiarioPersonalizado;
+    const customBestiaryData = this.bestiarioPersonalizado;
+    const customBestiarySource = this.fuenteBestiarioActual;
+    
+    this.players = [];
+    this.enemies = [];
+    this.initiativeOrder = [];
+    this.currentTurn = 0;
+    this.currentRound = 1;
+    this.combatMode = false;
+    this.notes = {
+        session: '',
+        plot: '',
+        npcs: '',
+        locations: ''
+    };
+    this.personajesHoy = [];
+    this.jugadoresDenominaciones = [];
+    
+    // Mantener bestiario personalizado si existía
+    if (hadCustomBestiary && customBestiaryData) {
+        this.bestiarioPersonalizado = customBestiaryData;
+        this.bestiarioActual = JSON.parse(JSON.stringify(customBestiaryData));
+        this.fuenteBestiarioActual = customBestiarySource;
+        this.generateBestiaryDenominaciones();
+        this.setupBestiaryAutocomplete();
+        this.updateBestiaryStatus('custom', 'Bestiario personalizado');
+    } else if (this.bestiarioOriginal) {
+        this.bestiarioActual = JSON.parse(JSON.stringify(this.bestiarioOriginal));
+        this.bestiarioPersonalizado = null;
+        this.fuenteBestiarioActual = 'original';
+        this.generateBestiaryDenominaciones();
+        this.setupBestiaryAutocomplete();
+        this.updateBestiaryStatus('original');
     }
+    
+    this.clearPDF('manual');
+    this.clearPDF('bestiary');
+    this.clearPDF('campaign');
+    
+    this.saveSession();
+    this.updateUI();
+    this.showNotification('Nueva sesión creada', 'success');
+}
     
     saveSession() {
-        const sessionData = {
-            players: this.players,
-            enemies: this.enemies,
-            initiativeOrder: this.initiativeOrder,
-            currentTurn: this.currentTurn,
-            currentRound: this.currentRound,
-            combatMode: this.combatMode,
-            notes: this.notes,
-            bestiaryCustomLoaded: !!this.bestiarioPersonalizado,
-            timestamp: new Date().toISOString(),
-            version: '2.1'
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const timeString = now.toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    
+    const sessionData = {
+        players: this.players,
+        enemies: this.enemies,
+        initiativeOrder: this.initiativeOrder,
+        currentTurn: this.currentTurn,
+        currentRound: this.currentRound,
+        combatMode: this.combatMode,
+        notes: this.notes,
+        bestiaryCustomLoaded: !!this.bestiarioPersonalizado,
+        timestamp: now.toISOString(),
+        fecha: today,
+        version: '2.1'
+    };
+    
+    const jsonData = JSON.stringify(sessionData, null, 2);
+    
+    // 1. Guardar en localStorage (siempre)
+    localStorage.setItem('dmSessionData', jsonData);
+    localStorage.setItem('dmSessionLastSave', now.toISOString());
+    
+    // 2. Guardar en el servidor
+    this.guardarSesionEnServidor(sessionData);
+    
+    // 3. DESCARGAR archivo (nombre fijo por fecha, SOBRESCRIBE automáticamente)
+    const fileName = `dm-session-${today}.json`;
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Liberar memoria después de un pequeño retraso
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    
+    this.lastSaveTime = Date.now();
+    this.updateAutoSaveIndicator('saved');
+    
+    this.showNotification(`✅ Sesión guardada (${timeString}) - ${fileName}`, 'success');
+}
+
+// Guarda la sesión en el servidor
+async guardarSesionEnServidor(sessionData) {
+    try {
+        const hoy = sessionData.fecha || new Date().toISOString().split('T')[0];
+        const personajesData = {
+            fecha: hoy,
+            personajes: this.personajesHoy
         };
         
-        const jsonData = JSON.stringify(sessionData, null, 2);
-        localStorage.setItem('dmSessionData', jsonData);
+        const response = await fetch(`${this.baseUrl}/api/personajes/guardar-multiples`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                personajes: personajesData.personajes,
+                fecha: personajesData.fecha
+            })
+        });
         
-        const blob = new Blob([jsonData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `dm-session-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        
-        URL.revokeObjectURL(url);
-        this.showNotification('Sesión guardada y descargada', 'success');
+        if (!response.ok) {
+            console.warn('⚠️ No se pudo guardar en servidor');
+        } else {
+            console.log('✅ Sesión guardada en servidor');
+        }
+    } catch (error) {
+        console.warn('⚠️ Error guardando en servidor:', error);
+    }
+}
+// Auto-guardado (se llama automáticamente)
+autoSaveSession() {
+    if (!this.autoSaveEnabled) return;
+    
+    const now = Date.now();
+    if (this.lastSaveTime && (now - this.lastSaveTime) < this.saveCooldown) {
+        this.pendingSave = true;
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => {
+            this.pendingSave = false;
+            this.performAutoSave();
+        }, this.saveCooldown);
+        return;
     }
     
+    this.performAutoSave();
+}
+
+performAutoSave() {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    const sessionData = {
+        players: this.players,
+        enemies: this.enemies,
+        initiativeOrder: this.initiativeOrder,
+        currentTurn: this.currentTurn,
+        currentRound: this.currentRound,
+        combatMode: this.combatMode,
+        notes: this.notes,
+        bestiaryCustomLoaded: !!this.bestiarioPersonalizado,
+        timestamp: now.toISOString(),
+        fecha: today,
+        version: '2.1'
+    };
+    
+    // Guardar en localStorage (sobrescribe)
+    localStorage.setItem('dmSessionData', JSON.stringify(sessionData));
+    localStorage.setItem('dmSessionLastSave', now.toISOString());
+    
+    this.lastSaveTime = Date.now();
+    this.updateAutoSaveIndicator('auto-saved');
+    
+    // Guardar en servidor silenciosamente
+    this.guardarSesionEnServidor(sessionData);
+}
+
+    
     loadSession() {
-        const savedData = localStorage.getItem('dmSessionData');
-        
-        if (savedData) {
-            try {
-                const sessionData = JSON.parse(savedData);
-                this.loadSessionData(sessionData);
+    const savedData = localStorage.getItem('dmSessionData');
+    
+    if (savedData) {
+        try {
+            const sessionData = JSON.parse(savedData);
+            this.loadSessionData(sessionData);
+            
+            const lastSave = localStorage.getItem('dmSessionLastSave');
+            if (lastSave) {
+                const date = new Date(lastSave);
+                const timeString = date.toLocaleTimeString('es-ES', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                this.showNotification(`Sesión cargada (último guardado: ${timeString})`, 'success');
+            } else {
                 this.showNotification('Sesión cargada desde almacenamiento local', 'success');
-                return;
-            } catch (error) {
-                console.error('Error al cargar sesión:', error);
             }
+            
+            this.cargarPersonajesHoy();
+            this.updateAutoSaveIndicator('saved');
+            return;
+        } catch (error) {
+            console.error('Error al cargar sesión:', error);
+            this.showNotification('Error al cargar la sesión guardada', 'error');
         }
-        
-        this.generateDefaultSession();
     }
+    
+    this.generateDefaultSession();
+}
+
+    updateAutoSaveIndicator(status) {
+    let indicator = document.getElementById('autoSaveIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'autoSaveIndicator';
+        indicator.style.cssText = `
+            position: fixed;
+            bottom: 60px;
+            right: 20px;
+            font-size: 0.8rem;
+            color: var(--ink-light);
+            background: rgba(0,0,0,0.7);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-family: 'Cinzel', serif;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--accent-gold);
+        `;
+        indicator.innerHTML = `<i class="fas fa-save"></i> Auto-guardado activo`;
+        document.body.appendChild(indicator);
+    }
+    
+    switch(status) {
+        case 'saved':
+            indicator.innerHTML = `<i class="fas fa-check-circle" style="color: #4CAF50;"></i> Guardado`;
+            indicator.style.borderColor = '#4CAF50';
+            break;
+        case 'auto-saved':
+            indicator.innerHTML = `<i class="fas fa-sync-alt fa-spin" style="color: var(--accent-gold);"></i> Auto-guardado`;
+            indicator.style.borderColor = 'var(--accent-gold)';
+            break;
+        default:
+            indicator.innerHTML = `<i class="fas fa-save"></i> Auto-guardado activo`;
+            indicator.style.borderColor = 'var(--accent-gold)';
+    }
+}
     
     loadSessionData(sessionData) {
         this.players = sessionData.players || [];
@@ -5756,6 +5981,7 @@ getInvocadorForSummon(summonId) {
         };
         
         this.updateUI();
+        this.autoSaveSession();
     }
     
     generateDefaultSession() {

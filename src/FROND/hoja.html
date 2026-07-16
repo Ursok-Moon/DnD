@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&family=Uncial+Antiqua&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="shortcut icon" href="/src/favicon.ico" type="image/x-icon">
 </head>
 <body>
 
@@ -156,6 +157,15 @@
                                                 </button>
                                             </div>
                                         </div>
+                                        
+                                        <!-- BONIFICADOR POR COMPETENCIA -->
+                                        <div class="resource-header" style="margin:0;margin-left:auto;gap:8px;">
+                                            <h4 style="font-size:0.8rem;margin:0;display:flex;align-items:center;gap:4px;">
+                                                <i class="fas fa-medal"></i> BONIF.
+                                            </h4>
+                                            <span class="level-badge" id="proficiencyBonusDisplay" style="font-size:1rem;padding:4px 12px;min-width:40px;text-align:center;">+2</span>
+                                        </div>
+                                        
                                         <button type="button" class="exp-config-btn" id="configExpBtn" title="Configurar experiencia">
                                             <i class="fas fa-cog"></i>
                                         </button>
@@ -185,27 +195,39 @@
                                         </div>
                                     </div>
                                     
-                                    <!-- Input oculto para nivel (se sincroniza con el badge) -->
+                                    <!-- Input oculto para nivel -->
                                     <input type="hidden" id="character-level" value="1">
                                 </div>
-                            </section>
+                                </section>
 
                             <!-- Percepción Pasiva -->
-                            <section class="card passive-perception" id="card-passive-perception">
-                                <h3 class="card-title">
-                                    <i class="fas fa-eye"></i>
-                                    PERCEPCIÓN PASIVA
-                                </h3>
-                                <div class="passive-perception-container">
-                                    <div class="passive-perception-display">
-                                        <input type="number" id="passivePerception" value="10" min="1" max="30" class="passive-perception-input" readonly>
-                                        <span class="passive-perception-label">Total</span>
-                                    </div>
-                                    <div class="passive-perception-formula">
-                                        <i class="fas fa-calculator"></i> 10 + Mod. Sabiduría + Bonif. Competencia
-                                    </div>
+                        <section class="card passive-perception" id="card-passive-perception">
+                            <h3 class="card-title">
+                                <i class="fas fa-eye"></i>
+                                PERCEPCIÓN PASIVA
+                            </h3>
+                            <div class="passive-perception-container">
+                                <div class="passive-perception-display">
+                                    <input type="number" id="passivePerception" value="10" min="1" max="30" class="passive-perception-input" readonly>
+                                    <span class="passive-perception-label">Total</span>
                                 </div>
-                            </section>
+                                <div class="passive-perception-formula">
+                                    <i class="fas fa-calculator"></i> 
+                                    <span id="passivePerceptionFormula">10 + Mod. Sabiduría + Bonif. Competencia</span>
+                                </div>
+                                <div class="passive-perception-config" style="display:flex;gap:10px;align-items:center;margin-top:5px;width:100%;flex-wrap:wrap;">
+                                    <label style="font-size:0.8rem;color:var(--ink-light);display:flex;align-items:center;gap:4px;">
+                                        <i class="fas fa-dice-d20"></i> Atributo:
+                                    </label>
+                                    <select id="passivePerceptionAttribute" style="flex:1;min-width:120px;padding:6px 10px;border-radius:6px;border:2px solid var(--accent-gold);background:white;font-family:'Cinzel',serif;font-size:0.85rem;">
+                                        <!-- Se llenará dinámicamente -->
+                                    </select>
+                                    <button type="button" class="btn-secondary btn-small" id="refreshPassivePerception" style="margin:0;padding:4px 12px;font-size:0.8rem;">
+                                        <i class="fas fa-sync-alt"></i> Actualizar
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
 
                             <!-- Atributos dinámicos -->
                             <section class="card attributes-section" id="card-attributes">
@@ -334,7 +356,7 @@
                                                 <div class="mana-bar-fill" id="manaBarFill"></div>
                                             </div>
                                             <div class="mana-numbers">
-                                                <span id="currentMana">2</span>
+                                                <span id="currentMana">0</span>
                                                 <span class="mana-separator">/</span>
                                                 <span id="maxMana">15</span>
                                             </div>
@@ -344,7 +366,7 @@
                                             <button type="button" class="mana-btn mana-minus" id="manaMinusBtn">
                                                 <i class="fas fa-minus"></i>
                                             </button>
-                                            <input type="number" class="mana-input" id="manaInput" value="2" min="0" max="15">
+                                            <input type="number" class="mana-input" id="manaInput" value="0" min="0" max="15">
                                             <button type="button" class="mana-btn mana-plus" id="manaPlusBtn">
                                                 <i class="fas fa-plus"></i>
                                             </button>
@@ -480,12 +502,20 @@
                                     ESTADÍSTICAS DE COMBATE
                                 </h3>
                                 <div class="combat-grid">
-                                    <div class="combat-stat">
-                                        <label>CLASE DE ARMADURA</label>
-                                        <div class="stat-display">
-                                            <input type="number" id="armor-class" value="12" min="0">
-                                        </div>
+                                    <div class="combat-stat" style="position: relative;">
+                                    <label>CLASE DE ARMADURA</label>
+                                    <div class="stat-display" style="position: relative;">
+                                        <input type="number" id="armor-class" value="10" min="0" readonly 
+                                            style="background: var(--parchment-light, #f5e6d3); cursor: default; pointer-events: none; border-color: var(--accent-gold, #d4af37); padding-right: 35px;">
+                                        <span style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; color: var(--ink-light, #5c4033);">
+                                            <i class="fas fa-shield-alt" title="CA calculada automáticamente"></i>
+                                        </span>
+                                        <!-- El botón de configuración se añadirá desde JS -->
                                     </div>
+                                    <small style="display: block; font-size: 0.6rem; color: var(--ink-light, #5c4033); margin-top: 2px; text-align: center;">
+                                        <i class="fas fa-calculator"></i> <span id="acFormulaDisplay">10 + Destreza</span>
+                                    </small>
+                                </div>
                                     <div class="combat-stat">
                                         <label>VELOCIDAD</label>
                                         <div class="stat-display">

@@ -60,6 +60,22 @@ export class ApiService {
         }
     }
 
+    async getLastCharacter() {
+    try {
+        const response = await fetch(`${this.baseUrl}/personajes/ultimo`);
+        const data = await response.json();
+        
+        // El servidor devuelve { success, personaje }
+        if (data.success && data.personaje) {
+            return { success: true, personaje: data.personaje };
+        }
+        return { success: false, error: data.error || 'No hay personaje' };
+    } catch (error) {
+        console.error('Error obteniendo último personaje:', error);
+        return { success: false, error: error.message };
+    }
+}
+
     async uploadImage(file) {
         const formData = new FormData();
         formData.append('imagen', file);

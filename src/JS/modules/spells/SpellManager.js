@@ -11,10 +11,36 @@ export class SpellManager {
         this.load();
     }
 
+    /**
+     * Carga los conjuros desde storage con deduplicación
+     */
     load() {
         const saved = this.storage.load('spells');
         if (saved && saved.length > 0) {
-            this.spells = saved;
+            // DEDUPLICAR POR ID - Mantener solo el último de cada ID
+            const uniqueSpells = new Map();
+            saved.forEach(spell => {
+                if (spell.id) {
+                    // Si ya existe un conjuro con este ID, el último sobrescribe
+                    uniqueSpells.set(spell.id, spell);
+                } else {
+                    // Si no tiene ID, asignar uno
+                    spell.id = Helpers.generateId();
+                    uniqueSpells.set(spell.id, spell);
+                }
+            });
+            
+            this.spells = Array.from(uniqueSpells.values());
+            
+            // Si había duplicados, guardar la versión limpia
+            if (this.spells.length !== saved.length) {
+                this.save();
+                console.log(`🧹 Conjuros deduplicados: ${saved.length} -> ${this.spells.length}`);
+            }
+            
+            console.log(`📚 ${this.spells.length} conjuros cargados desde storage`);
+        } else {
+            console.log('📚 No hay conjuros guardados');
         }
     }
 
@@ -22,12 +48,30 @@ export class SpellManager {
         return [...this.spells];
     }
 
+    /**
+     * Añade un nuevo conjuro con verificación de duplicados
+     */
     add(name = '', level = '', description = '') {
+        // Si el nombre está vacío, asignar nombre por defecto
+        const finalName = name && name.trim() !== '' ? name.trim() : `Conjuro ${this.spells.length + 1}`;
+        const finalLevel = level || '0';
+        
+        // Verificar si ya existe un conjuro con el mismo nombre y nivel
+        const existing = this.spells.find(s => 
+            s.name.toLowerCase() === finalName.toLowerCase() && 
+            String(s.level) === String(finalLevel)
+        );
+        
+        if (existing) {
+            console.log(`⚠️ Conjuro "${finalName}" (nivel ${finalLevel}) ya existe, omitiendo duplicado`);
+            return existing;
+        }
+        
         const spell = {
             id: Helpers.generateId(),
-            name: name,
-            level: level,
-            description: description,
+            name: finalName,
+            level: finalLevel,
+            description: description || '',
             prepared: false,
             date: new Date().toISOString()
         };
@@ -37,10 +81,12 @@ export class SpellManager {
         this.notify();
         this.eventBus.emit('spellAdded', spell);
         
+        // Configurar autocompletado para el nuevo conjuro
         setTimeout(() => {
             this.setupAutocompleteForNewSpell(spell.id);
         }, 100);
         
+        console.log(`✅ Conjuro añadido: "${finalName}" (nivel ${finalLevel})`);
         return spell;
     }
 
@@ -52,6 +98,7 @@ export class SpellManager {
             this.save();
             this.notify();
             this.eventBus.emit('spellRemoved', removed);
+            console.log(`🗑️ Conjuro eliminado: "${removed.name}"`);
             return true;
         }
         return false;
@@ -60,10 +107,12 @@ export class SpellManager {
     update(id, updates) {
         const index = this.spells.findIndex(s => s.id === id);
         if (index !== -1) {
+            const oldName = this.spells[index].name;
             this.spells[index] = { ...this.spells[index], ...updates };
             this.save();
             this.notify();
             this.eventBus.emit('spellUpdated', { id, updates, spell: this.spells[index] });
+            console.log(`📝 Conjuro actualizado: "${oldName}" -> "${this.spells[index].name}"`);
             return true;
         }
         return false;
@@ -76,6 +125,7 @@ export class SpellManager {
             this.save();
             this.notify();
             this.eventBus.emit('spellPreparedChanged', spell);
+            console.log(`📌 Conjuro "${spell.name}" ${spell.prepared ? 'preparado' : 'no preparado'}`);
         }
     }
 
@@ -85,6 +135,17 @@ export class SpellManager {
 
     getPrepared() {
         return this.spells.filter(s => s.prepared);
+    }
+
+    /**
+     * Busca conjuros por nombre (case insensitive)
+     */
+    searchByName(searchTerm) {
+        if (!searchTerm || searchTerm.trim() === '') return [];
+        const term = searchTerm.toLowerCase().trim();
+        return this.spells.filter(s => 
+            s.name.toLowerCase().includes(term)
+        );
     }
 
     subscribe(listener) {
@@ -99,6 +160,37 @@ export class SpellManager {
 
     save() {
         this.storage.save('spells', this.spells);
+    }
+
+    /**
+     * Limpia conjuros duplicados existentes
+     */
+    cleanupDuplicates() {
+        const uniqueSpells = new Map();
+        const duplicates = [];
+        
+        this.spells.forEach(spell => {
+            const key = `${spell.name.toLowerCase()}|${spell.level}`;
+            if (!uniqueSpells.has(key)) {
+                uniqueSpells.set(key, spell);
+            } else {
+                duplicates.push(spell.id);
+            }
+        });
+        
+        if (duplicates.length > 0) {
+            console.log(`🧹 Eliminando ${duplicates.length} conjuros duplicados...`);
+            duplicates.forEach(id => {
+                const index = this.spells.findIndex(s => s.id === id);
+                if (index !== -1) {
+                    this.spells.splice(index, 1);
+                }
+            });
+            this.save();
+            this.notify();
+            console.log(`✅ Limpieza completada. ${this.spells.length} conjuros restantes.`);
+        }
+        return duplicates.length;
     }
 
     // ===== METODOS DE AUTOCOMPLETADO =====
@@ -292,72 +384,85 @@ export class SpellManager {
         document.addEventListener('click', this._boundSpellDocumentClickHandler);
     }
 
-fillSpellData(input, spellData) {
-    const spellItem = input.closest('.spell-item');
-    if (!spellItem) return;
-    
-    const spellId = spellItem.getAttribute('data-id');
-    
-    // Asegurar que el nivel es un número o string válido
-    const levelValue = spellData.level !== undefined && spellData.level !== null ? String(spellData.level) : '0';
-    
-    // ACTUALIZAR EL MODELO DE DATOS PRIMERO
-    if (spellId) {
-        this.update(spellId, {
-            name: spellData.name,
-            level: levelValue,
-            description: spellData.description
-        });
-    }
-    
-    // DESPUÉS actualizar la UI
-    input.value = spellData.name;
-    
-    const levelInput = spellItem.querySelector('.spell-level-input');
-    if (levelInput) {
-        levelInput.value = levelValue;
-        // Disparar evento change para que el UI se actualice
-        levelInput.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    
-    const descTextarea = spellItem.querySelector('.spell-desc');
-    if (descTextarea) {
-        let metadata = '';
+    fillSpellData(input, spellData) {
+        const spellItem = input.closest('.spell-item');
+        if (!spellItem) return;
         
-        if (spellData.castingTime && spellData.castingTime !== '—') {
-            metadata += `Tiempo de lanzamiento: ${spellData.castingTime}\n`;
-        }
-        if (spellData.range && spellData.range !== '—') {
-            metadata += `Alcance: ${spellData.range}\n`;
-        }
-        if (spellData.components && spellData.components !== '—') {
-            metadata += `Componentes: ${spellData.components}\n`;
-        }
-        if (spellData.duration && spellData.duration !== '—') {
-            metadata += `Duracion: ${spellData.duration}\n`;
-        }
-        if (spellData.damageType && spellData.damageType !== '—') {
-            metadata += `Tipo de dano: ${spellData.damageType}\n`;
-        }
-        if (spellData.school) {
-            const schoolSpanish = this.dictionary.getSchoolSpanish(spellData.school);
-            if (schoolSpanish) {
-                metadata += `Escuela: ${schoolSpanish}\n`;
+        const spellId = spellItem.getAttribute('data-id');
+        
+        // Asegurar que el nivel es un número o string válido
+        const levelValue = spellData.level !== undefined && spellData.level !== null ? String(spellData.level) : '0';
+        
+        // ACTUALIZAR EL MODELO DE DATOS PRIMERO
+        if (spellId) {
+            // Verificar si ya existe un conjuro con este nombre y nivel
+            const exists = this.spells.some(s => 
+                s.id !== spellId &&
+                s.name.toLowerCase() === spellData.name.toLowerCase() &&
+                String(s.level) === levelValue
+            );
+            
+            if (exists) {
+                console.log(`⚠️ El conjuro "${spellData.name}" (nivel ${levelValue}) ya existe en la lista`);
+                // No actualizar para evitar duplicados
+                return;
             }
+            
+            this.update(spellId, {
+                name: spellData.name,
+                level: levelValue,
+                description: spellData.description
+            });
         }
-        if (spellData.ritual) metadata += `Ritual: Si\n`;
-        if (spellData.concentration) metadata += `Concentracion: Si\n`;
         
-        if (metadata) {
-            metadata = metadata.trim() + '\n\n---\n\n';
+        // DESPUÉS actualizar la UI
+        input.value = spellData.name;
+        
+        const levelInput = spellItem.querySelector('.spell-level-input');
+        if (levelInput) {
+            levelInput.value = levelValue;
+            // Disparar evento change para que el UI se actualice
+            levelInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
         
-        descTextarea.value = metadata + spellData.description;
-        descTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+        const descTextarea = spellItem.querySelector('.spell-desc');
+        if (descTextarea) {
+            let metadata = '';
+            
+            if (spellData.castingTime && spellData.castingTime !== '—') {
+                metadata += `Tiempo de lanzamiento: ${spellData.castingTime}\n`;
+            }
+            if (spellData.range && spellData.range !== '—') {
+                metadata += `Alcance: ${spellData.range}\n`;
+            }
+            if (spellData.components && spellData.components !== '—') {
+                metadata += `Componentes: ${spellData.components}\n`;
+            }
+            if (spellData.duration && spellData.duration !== '—') {
+                metadata += `Duracion: ${spellData.duration}\n`;
+            }
+            if (spellData.damageType && spellData.damageType !== '—') {
+                metadata += `Tipo de dano: ${spellData.damageType}\n`;
+            }
+            if (spellData.school) {
+                const schoolSpanish = this.dictionary.getSchoolSpanish(spellData.school);
+                if (schoolSpanish) {
+                    metadata += `Escuela: ${schoolSpanish}\n`;
+                }
+            }
+            if (spellData.ritual) metadata += `Ritual: Si\n`;
+            if (spellData.concentration) metadata += `Concentracion: Si\n`;
+            
+            if (metadata) {
+                metadata = metadata.trim() + '\n\n---\n\n';
+            }
+            
+            descTextarea.value = metadata + spellData.description;
+            descTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        console.log(`📖 Conjuro cargado: ${spellData.name} (nivel ${levelValue})`);
     }
-    
-    console.log(`Conjuro cargado: ${spellData.name} (nivel ${levelValue})`);
-}
 
     escapeHtml(text) {
         if (!text) return '';

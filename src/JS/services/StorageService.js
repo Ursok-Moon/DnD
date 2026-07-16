@@ -46,13 +46,13 @@ export class StorageService {
     }
 
     clear() {
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.startsWith(this.prefix)) {
-                keysToRemove.push(key);
-            }
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(this.prefix)) {
+            keysToRemove.push(key);
         }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
     }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+}
 }

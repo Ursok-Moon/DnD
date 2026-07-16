@@ -1,4 +1,3 @@
-// js/core/CharacterSheet.js
 import { StorageService } from '../services/StorageService.js';
 import { ApiService } from '../services/ApiService.js';
 import { EventBus } from './EventBus.js';
@@ -36,14 +35,10 @@ import { SpellStatsManager } from '../modules/spells/SpellStatsManager.js';
 
 export class CharacterSheet {
     constructor(containerId = null, tabId = null) {
-        // Si no se proporciona containerId, usar el contenedor por defecto
         this.containerId = containerId || 'hojaPrincipal';
         this.tabId = tabId || `tab-${Date.now()}`;
         
-        // Buscar el contenedor
         this.container = document.getElementById(this.containerId);
-        
-        // Si no se encuentra el contenedor por ID, buscar por clase
         if (!this.container) {
             this.container = document.querySelector('.character-sheet');
             if (this.container) {
@@ -51,7 +46,6 @@ export class CharacterSheet {
             }
         }
         
-        // Si aún no hay contenedor, crear uno
         if (!this.container) {
             console.warn('⚠️ No se encontró contenedor, creando uno...');
             this.container = document.createElement('main');
@@ -67,9 +61,12 @@ export class CharacterSheet {
         
         console.log(`📄 Inicializando CharacterSheet para contenedor: ${this.containerId} (tab: ${this.tabId})`);
 
-        // Core services - usar storage aislado por tab
+        // ============================================================
+        // ⚠️ IMPORTANTE: Usar un storage COMPARTIDO para todos los tabs
+        // Esto permite que los datos persistan entre recargas
+        // ============================================================
+        this.storage = new StorageService('dnd_'); // SIN prefijo de tab
         this.eventBus = new EventBus();
-        this.storage = new StorageService(`dnd_${this.tabId}_`);
         this.api = new ApiService();
         this.userManager = new UserManager(this.storage); 
 
@@ -78,32 +75,39 @@ export class CharacterSheet {
         this.razaActual = null;
         this.atributosPersonalizablesPendientes = [];
         this.richTextEditor = null;
+        this._isLoadingData = false;
+        this._isInitialLoad = true;
+        this._dataLoaded = false;
+        this._isSaving = false;
+        this._saveQueue = [];
+        this._lastSaveTime = 0;
+        this._saveDebounceTimer = null;
         
-        // Usar WebSocket global
         this.ws = null;
         this.waitForWebSocket();
         
-        // Initialize all managers
         this.initManagers();
-        
-        // Setup UI bindings
         this.initUI();
+
+        // CARGAR DATOS GUARDADOS
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                this.loadSavedCharacterData();
+            }, 100);
+        });
+
+        this.setupPeriodicAutoSave();
 
         setTimeout(() => {
             this.createAIImportButton();
         }, 500);
         
-        // Setup global events
         this.setupGlobalEvents();
-
         this.setupAutoSave();
-
         this.setupCombatStatsAutoSave();
-
         this.setupTraitsAutoSave();
 
         this.passivePerception = 10;
-
         this.ensureUserIsSet();
 
         const savedName = localStorage.getItem('jugadorNombre');
@@ -114,7 +118,7 @@ export class CharacterSheet {
         console.log(`✅ CharacterSheet inicializado para ${this.containerId}`);
     }
 
-    // ===== MÉTODO DE UTILIDAD PARA BUSCAR DENTRO DEL CONTENEDOR =====
+    // ===== MÉTODO DE UTILIDAD =====
     $(selector) {
         return this.container.querySelector(selector);
     }
@@ -124,141 +128,159 @@ export class CharacterSheet {
     }
 
     // ===== INICIALIZACIÓN DE MANAGERS =====
-initManagers() {
-    this.colorManager = new ColorManager(this.storage);
-    this.attributeManager = new AttributeManager(this.storage);
-    this.healthManager = new HealthManager(this.storage, this.eventBus);
-    this.manaManager = new ManaManager(this.storage, this.eventBus);
-    this.deathSavesManager = new DeathSavesManager(this.storage, this.eventBus);
-    this.loadDeathSavesFromStorage();
-    this.loadPassivePerceptionFromStorage();
-    this.expManager = new ExpManager(this.storage, this.eventBus);
-    this.skillsManager = new SkillsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
-    this.proficiencyManager = new ProficiencyManager(this.storage, this.eventBus);
-    this.savingThrowsManager = new SavingThrowsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
-    
-    this.currencyManager = new CurrencyManager(this.storage, this.eventBus);
-    this.treasureManager = new TreasureManager(this.storage, this.eventBus);
-    this.potionManager = new PotionManager(this.storage, this.eventBus);
-    this.equipmentManager = new EquipmentManager(this.storage, this.eventBus, this.attributeManager);
-    
-    this.spellSlotsManager = new SpellSlotsManager(this.storage, this.eventBus);
-    this.spellManager = new SpellManager(this.storage, this.eventBus);
-    this.spellStatsManager = new SpellStatsManager(this.storage, this.eventBus, this.attributeManager, this.expManager);
-    
-    // PASAR EL CONTENEDOR A ImageManager
-    this.imageManager = new ImageManager(this.api, this.eventBus, this.storage, this.container);
-    this.dragDropManager = new DragDropManager(this.storage);
-    this.resizeManager = new ResizeManager(this.storage);
-    this.loadAttacksFromStorage();
-}
-    // ===== INICIALIZACIÓN DE UI =====
-initUI() {
-    // Pasar el contenedor a AttributeUI
-    this.attributeUI = new AttributeUI(
-        this.attributeManager, 
-        this.colorManager, 
-        this.eventBus,
-        this.container  
-    );
-    
-    // Pasar el contenedor a SpellUI
-    this.spellUI = new SpellUI(
-        this.spellManager, 
-        this.spellSlotsManager, 
-        this.eventBus,
-        this.container  
-    );
-
-    if (this.spellManager) {
-        setTimeout(() => {
-            this.spellManager.setupAutocomplete();
-        }, 500);
+    initManagers() {
+        this.colorManager = new ColorManager(this.storage);
+        this.attributeManager = new AttributeManager(this.storage);
+        this.healthManager = new HealthManager(this.storage, this.eventBus);
+        this.manaManager = new ManaManager(this.storage, this.eventBus);
+        this.deathSavesManager = new DeathSavesManager(this.storage, this.eventBus);
+        this.loadDeathSavesFromStorage();
+        this.loadPassivePerceptionFromStorage();
+        this.expManager = new ExpManager(this.storage, this.eventBus);
+        this.skillsManager = new SkillsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
+        this.proficiencyManager = new ProficiencyManager(this.storage, this.eventBus);
+        this.savingThrowsManager = new SavingThrowsManager(this.storage, this.attributeManager, this.eventBus, this.expManager);
+        
+        this.currencyManager = new CurrencyManager(this.storage, this.eventBus);
+        this.treasureManager = new TreasureManager(this.storage, this.eventBus);
+        this.potionManager = new PotionManager(this.storage, this.eventBus);
+        this.equipmentManager = new EquipmentManager(this.storage, this.eventBus, this.attributeManager);
+        
+        this.spellSlotsManager = new SpellSlotsManager(this.storage, this.eventBus);
+        this.spellManager = new SpellManager(this.storage, this.eventBus);
+        this.spellStatsManager = new SpellStatsManager(this.storage, this.eventBus, this.attributeManager, this.expManager);
+        
+        this.imageManager = new ImageManager(this.api, this.eventBus, this.storage, this.container);
+        this.dragDropManager = new DragDropManager(this.storage);
+        this.resizeManager = new ResizeManager(this.storage);
+        this.loadAttacksFromStorage();
     }
-    
-    this.setupSubscriptions();
-    this.setupQuickHPControls();
-    this.setupInventoryCollapse();
-    this.setupBasicInfo();
-    this.setupAddButtons();
-    this.setupAttributeEvents();
-    this.setupAttackEvents();
-    this.setupSpellEvents();
-    this.setupCurrencyEvents();
-    this.setupDeathSavesEvents();
-    this.setupSpellStatsEvents();
-    this.loadTraitsFromStorage();
-    this.setupRaceAutocomplete();
-    this.setupRaceClearHandler();
-    this.initRichTextEditor();
-}
 
-    // ===== MÉTODO PARA RECARGAR TODA LA HOJA =====
+    // ===== INICIALIZACIÓN DE UI =====
+    initUI() {
+        this.attributeUI = new AttributeUI(
+            this.attributeManager, 
+            this.colorManager, 
+            this.eventBus,
+            this.container  
+        );
+        
+        this.spellUI = new SpellUI(
+            this.spellManager, 
+            this.spellSlotsManager, 
+            this.eventBus,
+            this.container  
+        );
+
+        if (this.spellManager) {
+            setTimeout(() => {
+                this.spellManager.setupAutocomplete();
+            }, 500);
+        }
+        
+        // Limpiar duplicados de conjuros al iniciar
+        setTimeout(() => {
+            this.cleanupDuplicateSpells();
+        }, 100);
+        
+        this.setupSubscriptions();
+        this.setupQuickHPControls();
+        this.setupInventoryCollapse();
+        this.setupBasicInfo();
+        this.setupAddButtons();
+        this.setupAttributeEvents();
+        this.setupAttackEvents();
+        this.setupSpellEvents();
+        this.setupCurrencyEvents();
+        this.setupDeathSavesEvents();
+        this.setupSpellStatsEvents();
+        this.loadTraitsFromStorage();
+        this.setupRaceAutocomplete();
+        this.setupRaceClearHandler();
+        this.initRichTextEditor();
+        this.setupProficiencyBonusDisplay();
+        this.setupPassivePerceptionConfig();
+        
+        this.setupColorCustomizer();
+        this.setupTextColorCustomizer();
+    }
+
+    setupColorCustomizer() {
+        const btn = document.querySelector('#colorCustomizerBtn');
+        if (btn) {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', () => {
+                this.showColorCustomizer();
+            });
+        }
+    }
+
+    setupTextColorCustomizer() {
+        const btn = document.querySelector('#textCustomizerBtn');
+        if (btn) {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', () => {
+                this.showTextColorCustomizer();
+            });
+        }
+    }
+
+    // ===== REFRESH =====
     refresh() {
         console.log(`🔄 Recargando hoja ${this.containerId}`);
-        // Recargar todos los managers
+        
         if (this.attributeManager) {
-            this.attributeManager.load();
             this.attributeManager.notify();
         }
         if (this.healthManager) {
-            this.healthManager.load();
             this.healthManager.notify();
         }
         if (this.manaManager) {
-            this.manaManager.load();
             this.manaManager.notify();
         }
         if (this.skillsManager) {
-            this.skillsManager.load();
             this.skillsManager.notify();
         }
         if (this.proficiencyManager) {
-            this.proficiencyManager.load();
             this.proficiencyManager.notify();
         }
         if (this.savingThrowsManager) {
-            this.savingThrowsManager.load();
             this.savingThrowsManager.notify();
         }
         if (this.expManager) {
-            this.expManager.load();
             this.expManager.notify();
         }
         if (this.currencyManager) {
-            this.currencyManager.load();
             this.currencyManager.notify();
         }
         if (this.spellSlotsManager) {
-            this.spellSlotsManager.load();
             this.spellSlotsManager.notify();
         }
         if (this.spellStatsManager) {
-            this.spellStatsManager.load();
             this.spellStatsManager.calculateStats();
+            this.spellStatsManager.notify();
         }
         if (this.spellManager) {
-            this.spellManager.load();
             this.spellManager.notify();
         }
         if (this.deathSavesManager) {
-            this.deathSavesManager.load();
             this.deathSavesManager.notify();
         }
         if (this.treasureManager) {
-            this.treasureManager.load();
             this.treasureManager.notify();
         }
         if (this.potionManager) {
-            this.potionManager.load();
             this.potionManager.notify();
         }
         if (this.equipmentManager) {
-            this.equipmentManager.load();
             this.equipmentManager.notify();
         }
+        
         this.loadAttacksFromStorage();
         this.calcularPercepcionPasiva();
+        this.updateSpellStatsDisplay();
     }
 
     waitForWebSocket() {
@@ -590,7 +612,6 @@ initUI() {
         return result;
     }
 
-    // ===== MOSTRAR INDICADOR DE CARGA =====
     showLoadingIndicator(message) {
         const overlay = document.createElement('div');
         overlay.className = 'loading-overlay';
@@ -611,7 +632,6 @@ initUI() {
         }
     }
 
-    // ===== CREAR BOTÓN DE IMPORTACIÓN CON IA =====
     createAIImportButton() {
         const container = document.querySelector('.footer-buttons');
         if (!container) {
@@ -662,7 +682,6 @@ initUI() {
         console.log('✅ Botón creado correctamente');
     }
 
-    // ===== ASEGURAR QUE EL USUARIO ESTÉ CONFIGURADO =====
     async ensureUserIsSet() {
         if (document.readyState === 'loading') {
             await new Promise(resolve => {
@@ -693,206 +712,777 @@ initUI() {
         }
     }
 
-    // ===== GUARDAR PERSONAJE =====
-        async saveCharacter() {
-    const personajeNombre = this.$('#char-name')?.value?.trim() || 'Sin nombre';
-    const clase = this.$('#char-class')?.value || '';
-    const raza = this.$('#char-race')?.value || '';
-    const trasfondo = this.$('#char-bg')?.value || '';
-    const alineamiento = this.$('#char-align')?.value || '';
-    const jugadorNombre = this.getPlayerName();
-    
-    if (jugadorNombre === 'Aventurero' || jugadorNombre === 'Anónimo') {
-        console.warn('⚠️ Jugador sin registrar, mostrando prompt');
-        await this.userManager.showUserPrompt();
-        const nuevoNombre = this.getPlayerName();
-        if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
-            Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
-            return;
-        }
-    }
+    // ============================================================
+    // ===== MÉTODOS DE CARGA Y GUARDADO - CORREGIDOS =====
+    // ============================================================
 
-    const inventoryCard = this.$('#card-inventory');
-    const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
-    
-    // Obtener imagen del storage aislado
-    const imagenUrl = this.storage.load('imagenUrl') || null;
-    
-    const atributosDOM = [];
-    this.$$('.attribute-item').forEach(item => {
-        const nameInput = item.querySelector('.attribute-name');
-        const valueInput = item.querySelector('.ability-value');
-        const modifierElement = item.querySelector('.ability-modifier');
-        
-        if (nameInput && valueInput) {
-            const nombre = nameInput.value.trim() || 'ATRIBUTO';
-            const valor = parseInt(valueInput.value) || 10;
-            let modifier = 0;
+    /**
+     * Carga los datos guardados del personaje
+     */
+    async loadSavedCharacterData() {
+        if (this._isLoadingData || this._dataLoaded) return;
+        this._isLoadingData = true;
+
+        try {
+            console.log(`📂 Cargando datos para ${this.tabId}...`);
             
-            if (modifierElement) {
-                const modifierText = modifierElement.textContent;
-                modifier = parseInt(modifierText) || 0;
-            } else {
-                modifier = Helpers.calculateModifier(valor);
+            // 1. INTENTAR CARGAR DESDE LOCALSTORAGE (compartido)
+            const localData = this.loadFromLocalStorage();
+            if (localData) {
+                console.log(`✅ Datos cargados desde localStorage`);
+                this._dataLoaded = true;
+                this._isLoadingData = false;
+                this._isInitialLoad = false;
+                return true;
             }
             
-            atributosDOM.push({
-                nombre: nombre,
-                valor: valor,
-                modificador: modifier
+            // 2. INTENTAR CARGAR DESDE EL SERVIDOR
+            const serverData = await this.loadFromServer();
+            if (serverData) {
+                console.log(`✅ Datos cargados desde servidor`);
+                this.storage.save('characterData', serverData);
+                this._dataLoaded = true;
+                this._isLoadingData = false;
+                this._isInitialLoad = false;
+                return true;
+            }
+            
+            // 3. Si no hay datos, cargar valores por defecto
+            console.log(`📂 No se encontraron datos, cargando defaults...`);
+            this.loadDefaults();
+            
+            this._dataLoaded = true;
+            this._isLoadingData = false;
+            this._isInitialLoad = false;
+            return false;
+            
+        } catch (error) {
+            console.error('❌ Error cargando datos:', error);
+            this._isLoadingData = false;
+            this._isInitialLoad = false;
+            return false;
+        }
+    }
+
+    /**
+     * Carga valores por defecto
+     */
+    loadDefaults() {
+        this.attributeManager.loadDefaults();
+        this.skillsManager.loadDefaults();
+        this.healthManager.setCurrent(26);
+        this.healthManager.setMax(26);
+        this.healthManager.setTemp(0);
+        this.manaManager.setCurrent(2);
+        this.manaManager.setMax(15);
+        this.expManager.setCurrent(0);
+        this.expManager.setMax(300);
+        this.expManager.setLevel(1);
+        this.currencyManager.reset();
+        this.deathSavesManager.reset();
+        
+        this.treasureManager.treasures = [];
+        this.potionManager.potions = [];
+        this.equipmentManager.equipment = [];
+        this.spellManager.spells = [];
+        this.proficiencyManager.proficiencies = [];
+        
+        this.refresh();
+    }
+
+    /**
+     * Carga datos desde localStorage (usando storage COMPARTIDO)
+     */
+    loadFromLocalStorage() {
+        try {
+            const savedData = this.storage.load('characterData');
+            if (savedData && savedData.nombre) {
+                console.log(`📂 Cargando datos locales: ${savedData.nombre}`);
+                this.loadCharacterFromData(savedData);
+                
+                const savedImage = this.storage.load('imagenUrl');
+                if (savedImage && this.imageManager) {
+                    this.imageManager.currentImageUrl = savedImage;
+                    this.imageManager.displayImage(savedImage);
+                }
+                
+                return savedData;
+            }
+            return null;
+        } catch (error) {
+            console.warn('⚠️ Error cargando desde localStorage:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Carga datos desde el servidor
+     */
+    async loadFromServer() {
+        try {
+            const response = await fetch('/api/personajes/ultimo');
+            if (!response.ok) {
+                console.warn('⚠️ No se pudo cargar desde el servidor:', response.status);
+                return null;
+            }
+            
+            const result = await response.json();
+            
+            if (result.success && result.personaje) {
+                console.log(`📂 Cargando personaje desde servidor: ${result.personaje.nombre}`);
+                this.loadCharacterFromData(result.personaje);
+                return result.personaje;
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('⚠️ No se pudo cargar desde servidor:', error);
+            return null;
+        }
+    }
+
+    /* CARGA DATOS EN LA HOJA - SIN GUARDAR AUTOMÁTICAMENTE */
+
+loadCharacterFromData(data) {
+    console.log('Cargando datos en la hoja...');
+    
+    // 1. INFORMACIÓN BÁSICA - CORREGIDO
+    const charName = this.$('#char-name');
+    const charClass = this.$('#char-class');
+    const charRace = this.$('#char-race');
+    const charBg = this.$('#char-bg');
+    const charAlign = this.$('#char-align');
+    
+    if (data.basicInfo) {
+        if (charName) charName.value = data.basicInfo.name || '';
+        if (charClass) charClass.value = data.basicInfo.class || '';
+        if (charRace) charRace.value = data.basicInfo.race || '';
+        if (charBg) charBg.value = data.basicInfo.background || data.basicInfo.trasfondo || '';
+        if (charAlign) charAlign.value = data.basicInfo.alignment || data.basicInfo.alineamiento || '';
+    } else {
+        if (charName) charName.value = data.nombre || '';
+        if (charClass) charClass.value = data.clase || '';
+        if (charRace) charRace.value = data.raza || '';
+        if (charBg) charBg.value = data.trasfondo || '';
+        if (charAlign) charAlign.value = data.alineamiento || '';
+    }
+    
+    // Asegurar que trasfondo y alineamiento se guarden en storage
+    if (charBg && charBg.value) {
+        this.storage.save('trasfondo', charBg.value);
+    }
+    if (charAlign && charAlign.value) {
+        this.storage.save('alineamiento', charAlign.value);
+    }
+    
+    if (charName && charName.value) {
+        this.eventBus.emit('characterNameChanged', charName.value);
+    }
+    
+    // 2. IMAGEN - CORREGIDO
+    if (data.imagen && this.imageManager) {
+        console.log('🖼️ Cargando imagen:', data.imagen);
+        this.storage.save('imagenUrl', data.imagen);
+        this.imageManager.currentImageUrl = data.imagen;
+        this.imageManager.displayImage(data.imagen);
+    } else if (data.imagen) {
+        // Si no hay imageManager pero hay imagen, guardarla
+        console.log('🖼️ Guardando URL de imagen en storage:', data.imagen);
+        this.storage.save('imagenUrl', data.imagen);
+    }
+    
+    // 3. ATRIBUTOS
+    if (data.attributes || data.stats?.atributos) {
+        const attributes = data.attributes || data.stats.atributos || [];
+        this.attributeManager.attributes = [];
+        
+        attributes.forEach(attr => {
+            const name = attr.name || attr.nombre || 'ATRIBUTO';
+            const value = attr.value || attr.valor || 10;
+            this.attributeManager.add(name, value);
+        });
+        
+        if (this.attributeManager.attributes.length === 0) {
+            this.attributeManager.loadDefaults();
+        }
+        
+        this.attributeManager.save();
+        this.attributeManager.notify();
+    }
+    
+    // 4. HP
+    if (data.hp || data.stats?.hp) {
+        const hp = data.hp || data.stats.hp;
+        this.healthManager.setCurrent(hp.current || 26);
+        this.healthManager.setMax(hp.max || 26);
+        this.healthManager.setTemp(hp.temp || 0);
+    }
+    
+    // 5. MANÁ
+    if (data.mana || data.stats?.mana) {
+        const mana = data.mana || data.stats.mana;
+        this.manaManager.setCurrent(mana.current || 0);
+        this.manaManager.setMax(mana.max || 15);
+    }
+    
+    // 6. EXPERIENCIA
+    if (data.exp) {
+        this.expManager.setCurrent(data.exp.current || 0);
+        this.expManager.setMax(data.exp.max || 300);
+        if (data.exp.level) this.expManager.setLevel(data.exp.level);
+    } else if (data.nivel) {
+        this.expManager.setLevel(data.nivel);
+    }
+    
+    // 7. STATS DE COMBATE
+    if (data.stats) {
+        const armorClass = this.$('#armor-class');
+        const speed = this.$('#speed');
+        const initiative = this.$('#initiative');
+        
+        if (armorClass) armorClass.value = data.stats.ca || 10;
+        if (speed) speed.value = data.stats.velocidad || 30;
+        if (initiative) initiative.value = data.stats.iniciativa || 1;
+    }
+    
+    // 8. ATAQUES
+    const attacks = data.attacks || data.ataques || [];
+    if (attacks.length > 0) {
+        const attacksList = this.$('.attacks-list');
+        if (attacksList) {
+            const existingItems = attacksList.querySelectorAll('.attack-item');
+            existingItems.forEach(item => item.remove());
+            
+            attacks.forEach(attack => {
+                this.addAttack(attack.name, attack.bonus, attack.damage, false);
+            });
+            
+            this.saveAttacksToStorage();
+        }
+    }
+    
+    // 9. CONJUROS - CON DEDUPLICACIÓN Y CONTROL DE DUPLICADOS
+    const spells = data.spells || data.conjuros || [];
+    if (spells.length > 0) {
+        const spellsList = this.$('#spellsList');
+        
+        // Solo limpiar si es la primera carga o si no hay conjuros
+        if (this._isInitialLoad || this.spellManager.spells.length === 0) {
+            if (spellsList) {
+                // No limpiar completamente, solo eliminar si está vacío
+                const existingItems = spellsList.querySelectorAll('.spell-item');
+                if (existingItems.length === 0) {
+                    spellsList.innerHTML = '';
+                }
+            }
+        }
+        
+        // Añadir conjuros sin duplicar
+        spells.forEach(spell => {
+            const spellName = spell.name || '';
+            const spellLevel = spell.level || '0';
+            
+            // Verificar si ya existe en el manager
+            const exists = this.spellManager.spells.some(s => 
+                s.name.toLowerCase() === spellName.toLowerCase() &&
+                String(s.level) === String(spellLevel)
+            );
+            
+            if (!exists && spellName.trim() !== '') {
+                this.spellManager.add(spellName, spellLevel, spell.description || '');
+            }
+        });
+    }
+    
+    // 10. INVENTARIO
+    const inventory = data.inventario || data;
+    
+    if (inventory.currency || inventory.monedas) {
+        const currency = inventory.currency || inventory.monedas || {};
+        this.currencyManager.setGold(currency.gold || 0);
+        this.currencyManager.setSilver(currency.silver || 0);
+        this.currencyManager.setCopper(currency.copper || 0);
+    }
+    
+    if (inventory.treasures || inventory.tesoros) {
+        const treasures = inventory.treasures || inventory.tesoros || [];
+        this.treasureManager.treasures = [];
+        treasures.forEach(t => {
+            this.treasureManager.add(t.name, t.value, t.type);
+        });
+    }
+    
+    if (inventory.potions || inventory.pociones) {
+        const potions = inventory.potions || inventory.pociones || [];
+        this.potionManager.potions = [];
+        potions.forEach(p => {
+            this.potionManager.add(p.name, p.type, p.value, p.amount);
+        });
+    }
+    
+    if (inventory.equipment || inventory.equipo) {
+        const equipment = inventory.equipment || inventory.equipo || [];
+        this.equipmentManager.equipment = [];
+        equipment.forEach(e => {
+            this.equipmentManager.add(
+                e.name, 
+                e.cost || 0, 
+                e.weight || 0, 
+                e.description || '', 
+                e.stealth || 'none', 
+                e.attribute || '', 
+                e.bonus || 0
+            );
+        });
+    }
+    
+    // 11. SALVACIONES DE MUERTE
+    if (data.deathSaves) {
+        this.deathSavesManager.successes = data.deathSaves.successes || [false, false, false];
+        this.deathSavesManager.fails = data.deathSaves.fails || [false, false, false];
+        this.deathSavesManager.notify();
+    }
+    
+    // 12. HABILIDADES
+    if (data.skills && data.skills.length > 0) {
+        this.skillsManager.skills = [];
+        data.skills.forEach(skill => {
+            const attr = skill.attribute || this.getSkillDefaultAttribute(skill.name) || '';
+            this.skillsManager.add(skill.name, attr);
+            const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
+            if (lastSkill) {
+                lastSkill.bonus = skill.bonus || 0;
+                lastSkill.proficient = skill.proficient || false;
+                lastSkill.expertise = skill.expertise || false;
+                lastSkill.misc = skill.misc || 0;
+            }
+        });
+        this.skillsManager.updateAllBonuses();
+        this.skillsManager.notify();
+    }
+    
+    // 13. COMPETENCIAS
+    if (data.proficiencies && data.proficiencies.length > 0) {
+        this.proficiencyManager.proficiencies = [];
+        data.proficiencies.forEach(prof => {
+            this.proficiencyManager.add(prof.name, prof.type || 'language');
+        });
+    }
+    
+    // 14. TIRADAS DE SALVACIÓN
+    if (data.savingThrows && data.savingThrows.length > 0) {
+        this.savingThrowsManager.savingThrows = data.savingThrows.map(st => ({
+            name: st.name,
+            value: st.value || 0,
+            proficient: st.proficient || false,
+            basedOn: st.basedOn || st.name,
+            modifier: st.modifier || 0
+        }));
+        this.savingThrowsManager.updateAllValues();
+        this.savingThrowsManager.notify();
+    }
+    
+    // 15. PERCEPCIÓN PASIVA
+    if (data.passivePerceptionAttribute) {
+    this.storage.save('passivePerceptionAttribute', data.passivePerceptionAttribute);
+    // Poblar el select después de que los atributos estén cargados
+    setTimeout(() => {
+        this.populatePassivePerceptionSelect();
+        this.calcularPercepcionPasiva();
+    }, 200);
+    }
+    
+    // 16. SLOTS DE CONJUROS
+    if (data.spellSlots) {
+        this.spellSlotsManager.setLevel(data.spellSlots.level || 1);
+        this.spellSlotsManager.setTotal(data.spellSlots.total || 4);
+        this.spellSlotsManager.setUsed(data.spellSlots.used || 0);
+    }
+    
+    // 17. STATS DE CONJUROS
+    if (data.spellStats) {
+        this.spellStatsManager.spellStats = { ...this.spellStatsManager.spellStats, ...data.spellStats };
+        this.spellStatsManager.calculateStats();
+    }
+    
+    // 18. NOTAS / RASGOS 
+    const notas = data.notas || data;
+    const personality = this.$('#personality');
+    const ideals = this.$('#ideals');
+    const bonds = this.$('#bonds');
+    const flaws = this.$('#flaws');
+    const features = this.$('#features');
+
+    // Usar tanto 'rasgos' como 'features' para compatibilidad
+    const rasgosValue = notas.rasgos || notas.features || '';
+
+    if (personality) personality.value = notas.personalidad || notas.personality || '';
+    if (ideals) ideals.value = notas.ideales || notas.ideals || '';
+    if (bonds) bonds.value = notas.vinculos || notas.bonds || '';
+    if (flaws) flaws.value = notas.defectos || notas.flaws || '';
+    if (features) features.value = rasgosValue;
+
+    // Guardar en storage para persistencia
+    if (personality?.value || ideals?.value || bonds?.value || flaws?.value || features?.value) {
+        this.storage.save('traits', {
+            personality: personality?.value || '',
+            ideals: ideals?.value || '',
+            bonds: bonds?.value || '',
+            flaws: flaws?.value || '',
+            features: features?.value || ''
+        });
+    }
+
+    // ===== NUEVO: Convertir a Rich Text después de cargar los datos =====
+    // Si hay datos y el editor no se ha inicializado, convertirlo ahora
+    const hasTraitData = rasgosValue || personality?.value || ideals?.value || bonds?.value || flaws?.value;
+    if (hasTraitData) {
+        setTimeout(() => {
+            this.convertRichTextAfterLoad();
+        }, 200);
+    }
+    
+    // 19. COLORES PERSONALIZADOS 
+    if (data.colores_personalizados) {
+        console.log('🎨 Cargando colores personalizados:', data.colores_personalizados);
+        
+        const colors = data.colores_personalizados;
+        const colorsToSave = {};
+        
+        // Colores del tema
+        const themeColorKeys = ['background', 'parchment', 'accent', 'mana', 'hp', 'exp', 'gems', 'tabBar'];
+        themeColorKeys.forEach(key => {
+            if (colors[key]) {
+                colorsToSave[key] = colors[key];
+                this.colorManager.setThemeColor(key, colors[key]);
+            }
+        });
+        
+        // Guardar todos los colores en storage
+        if (Object.keys(colorsToSave).length > 0) {
+            this.storage.save('characterColors', colorsToSave);
+        }
+        
+        // Colores de texto
+        if (colors.textColors && typeof colors.textColors === 'object') {
+            const textColorsToSave = {};
+            const textColorKeys = ['title', 'subtitle', 'label', 'input', 'number', 'modifier'];
+            textColorKeys.forEach(key => {
+                if (colors.textColors[key]) {
+                    textColorsToSave[key] = colors.textColors[key];
+                }
+            });
+            
+            if (Object.keys(textColorsToSave).length > 0) {
+                this.storage.save('characterTextColors', textColorsToSave);
+                this.colorManager.setAllTextColors(textColorsToSave);
+            }
+        }
+        
+        // TabBar - asegurar que se aplica
+        if (colors.tabBar) {
+            document.documentElement.style.setProperty('--tab-bar-bg', colors.tabBar);
+            this.storage.save('tabBarColor', colors.tabBar);
+        } else if (colors.parchment) {
+            document.documentElement.style.setProperty('--tab-bar-bg', colors.parchment);
+            this.storage.save('tabBarColor', colors.parchment);
+        }
+    }
+    
+    // 20. LAYOUT
+    if (data.layout) {
+        Object.entries(data.layout).forEach(([cardId, cardLayout]) => {
+            const card = document.getElementById(cardId);
+            if (card) {
+                if (cardLayout.width) card.style.width = cardLayout.width;
+                if (cardLayout.height) card.style.height = cardLayout.height;
+            }
+        });
+    }
+    
+    // 21. REFRESCAR UI - CON UN SOLO GUARDADO AL FINAL
+    setTimeout(() => {
+        this.skillsManager.updateAllBonuses();
+        this.savingThrowsManager.updateFromAttributes();
+        this.calcularPercepcionPasiva();
+        this.updateSpellStatsDisplay();
+        this.refresh();
+        
+        this._dataLoaded = true;
+        this._isInitialLoad = false;
+        
+        // Solo un guardado después de cargar
+        setTimeout(() => {
+            this.saveCharacter();
+        }, 500);
+    }, 300);
+    
+    console.log('✅ Datos cargados correctamente');
+}
+
+    getSkillDefaultAttribute(skillName) {
+        const map = {
+            'acrobacias': 'DESTREZA',
+            'arcano': 'INTELIGENCIA',
+            'atletismo': 'FUERZA',
+            'engaño': 'CARISMA',
+            'historia': 'INTELIGENCIA',
+            'interpretación': 'CARISMA',
+            'intimidación': 'CARISMA',
+            'investigación': 'INTELIGENCIA',
+            'juego de manos': 'DESTREZA',
+            'medicina': 'SABIDURÍA',
+            'naturaleza': 'INTELIGENCIA',
+            'percepción': 'SABIDURÍA',
+            'perspicacia': 'SABIDURÍA',
+            'persuasión': 'CARISMA',
+            'religión': 'INTELIGENCIA',
+            'sigilo': 'DESTREZA',
+            'supervivencia': 'SABIDURÍA',
+            'trato con animales': 'SABIDURÍA'
+        };
+        return map[skillName.toLowerCase()] || '';
+    }
+
+    /**
+     * GUARDAR PERSONAJE - CON DEBOUNCE
+     */
+    async saveCharacter() {
+        if (this._isLoadingData) {
+            console.log('⏳ Cargando datos, omitiendo guardado...');
+            return;
+        }
+
+        if (this._isSaving) {
+            console.log('⏳ Guardado en progreso...');
+            return new Promise((resolve) => {
+                this._saveQueue.push(resolve);
             });
         }
-    });
-    
-    const notas = {
-        personalidad: this.$('#personality')?.value || '',
-        ideales: this.$('#ideals')?.value || '',
-        vinculos: this.$('#bonds')?.value || '',
-        defectos: this.$('#flaws')?.value || '',
-        rasgos: this.$('#features')?.value || ''
-    };
-    
-    const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
-    const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
-    
-    const layout = {};
-    this.$$('.card').forEach((card, index) => {
-        const id = card.id || `card-${index}`;
-        layout[id] = {
-            width: card.style.width || getComputedStyle(card).width,
-            height: card.style.height || getComputedStyle(card).height,
-            parentId: card.parentNode?.id || card.parentNode?.className || ''
-        };
-    });
 
-    const characterData = {
-        id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        nombre: personajeNombre,
-        clase: clase,
-        raza: raza,
-        nivel: this.expManager?.getData().level || 1,
-        jugador: this.getPlayerName(),
-        trasfondo: trasfondo,
-        alineamiento: alineamiento, 
-        imagen: imagenUrl,
-        colores_personalizados: {
-            background: coloresGuardados.background || null,
-            parchment: coloresGuardados.parchment || null,
-            accent: coloresGuardados.accent || null,
-            mana: coloresGuardados.mana || null,
-            hp: coloresGuardados.hp || null,
-            gems: coloresGuardados.gems || null,
-            textColors: textColorsGuardados
-        },
-        stats: {
-            hp: this.healthManager.getData(),
-            mana: this.manaManager.getData(),
-            ca: parseInt(this.$('#armor-class')?.value) || 12,
-            velocidad: parseInt(this.$('#speed')?.value) || 30,
-            iniciativa: parseInt(this.$('#initiative')?.value) || 1,
-            atributos: atributosDOM
-        },
-        spellSlots: this.spellSlotsManager.getData(),
-        spellStats: this.spellStatsManager.getData(),
-        ataques: this.getAttacks(),
-        conjuros: this.getSpells(),
-        inventario: {
-            monedas: this.currencyManager.getData(),
-            tesoros: this.treasureManager.getAll(),
-            pociones: this.potionManager.getAll(),
-            equipo: this.equipmentManager.getAll(),
-            collapsed: isInventoryCollapsed
-        },
-        deathSaves: this.deathSavesManager.getData(),
-        skills: this.skillsManager.getAll(),
-        passivePerception: this.calcularPercepcionPasiva() || 10,
-        proficiencies: this.proficiencyManager.getAll(),
-        savingThrows: this.savingThrowsManager.getAll(),
-        notas: notas,
-        layout: layout,
-        fecha_creacion: new Date().toISOString(),
-        version: '3.2',
-        tabId: this.tabId
-    };
-    
-    // Guardar en storage aislado
-    this.storage.save('characterData', characterData);
-    this.storage.save('personajeNombre', personajeNombre);
-    
-    // También guardar imagen en storage aislado si existe
-    if (imagenUrl) {
-        this.storage.save('imagenUrl', imagenUrl);
-    }
-    
-    this.storage.save('basicInfo', {
-        name: personajeNombre,
-        class: clase,
-        race: raza,
-        background: trasfondo,
-        alignment: alineamiento
-    });
-    
-    if (personajeNombre === 'Sin nombre' && !this.$('#char-name')?.value.trim()) {
-        return;
-    }
+        // Debounce: 1 segundo entre guardados
+        const now = Date.now();
+        if (now - this._lastSaveTime < 1000) {
+            if (this._saveDebounceTimer) {
+                clearTimeout(this._saveDebounceTimer);
+            }
+            this._saveDebounceTimer = setTimeout(() => {
+                this._saveDebounceTimer = null;
+                this.saveCharacter();
+            }, 500);
+            return;
+        }
 
-    this.storage.save('traits', {
-        personality: notas.personalidad,
-        ideals: notas.ideales,
-        bonds: notas.vinculos,
-        flaws: notas.defectos,
-        features: notas.rasgos
-    });
-    this.storage.save('passivePerception', this.passivePerception);
-        // Sincronizar con WebSocket
-        if (window.wsClient && window.wsClient.isConectado()) {
-            const notificacionCompleta = {
-                id: characterData.id,
+        this._isSaving = true;
+        this._lastSaveTime = now;
+
+        try {
+            const personajeNombre = this.$('#char-name')?.value?.trim() || 'Sin nombre';
+            
+            if (personajeNombre === 'Sin nombre' || personajeNombre === '') {
+                this._isSaving = false;
+                return;
+            }
+            
+            const clase = this.$('#char-class')?.value || '';
+            const raza = this.$('#char-race')?.value || '';
+            const trasfondo = this.$('#char-bg')?.value || '';
+            const alineamiento = this.$('#char-align')?.value || '';
+            const jugadorNombre = this.getPlayerName();
+            
+            if (jugadorNombre === 'Aventurero' || jugadorNombre === 'Anónimo') {
+                await this.userManager.showUserPrompt();
+                const nuevoNombre = this.getPlayerName();
+                if (nuevoNombre === 'Aventurero' || nuevoNombre === 'Anónimo') {
+                    Helpers.showMessage('Por favor ingresa tu nombre para guardar el personaje', 'warning');
+                    this._isSaving = false;
+                    return;
+                }
+            }
+
+            const inventoryCard = this.$('#card-inventory');
+            const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
+            
+            const imagenUrl = this.storage.load('imagenUrl') || null;
+            
+            const atributosDOM = [];
+            this.$$('.attribute-item').forEach(item => {
+                const nameInput = item.querySelector('.attribute-name');
+                const valueInput = item.querySelector('.ability-value');
+                const modifierElement = item.querySelector('.ability-modifier');
+                
+                if (nameInput && valueInput) {
+                    const nombre = nameInput.value.trim() || 'ATRIBUTO';
+                    const valor = parseInt(valueInput.value) || 10;
+                    let modifier = 0;
+                    
+                    if (modifierElement) {
+                        const modifierText = modifierElement.textContent;
+                        modifier = parseInt(modifierText) || 0;
+                    } else {
+                        modifier = Helpers.calculateModifier(valor);
+                    }
+                    
+                    atributosDOM.push({
+                        nombre: nombre,
+                        valor: valor,
+                        modificador: modifier
+                    });
+                }
+            });
+            
+            const notas = {
+                personalidad: this.$('#personality')?.value || '',
+                ideales: this.$('#ideals')?.value || '',
+                vinculos: this.$('#bonds')?.value || '',
+                defectos: this.$('#flaws')?.value || '',
+                rasgos: this.$('#features')?.value || ''
+            };
+            
+            const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
+            const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
+            
+            const layout = {};
+            this.$$('.card').forEach((card, index) => {
+                const id = card.id || `card-${index}`;
+                layout[id] = {
+                    width: card.style.width || getComputedStyle(card).width,
+                    height: card.style.height || getComputedStyle(card).height,
+                    parentId: card.parentNode?.id || card.parentNode?.className || ''
+                };
+            });
+
+            const characterData = {
+                id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 nombre: personajeNombre,
-                jugador: characterData.jugador,
                 clase: clase,
-                nivel: characterData.nivel,
                 raza: raza,
+                nivel: this.expManager?.getData().level || 1,
+                jugador: this.getPlayerName(),
                 trasfondo: trasfondo,
-                alineamiento: alineamiento,
-                stats: characterData.stats,
-                spellSlots: characterData.spellSlots,
-                spellStats: characterData.spellStats,
-                inventario: characterData.inventario,
-                ataques: characterData.ataques,
-                conjuros: characterData.conjuros,
-                notas: characterData.notas,
-                skills: characterData.skills,
-                savingThrows: characterData.savingThrows,
-                passivePerception: characterData.passivePerception,
-                deathSaves: characterData.deathSaves,
-                proficiencies: characterData.proficiencies,
-                imagen: characterData.imagen,
-                colores_personalizados: characterData.colores_personalizados,
-                timestamp: new Date().toISOString(),
+                alineamiento: alineamiento, 
+                imagen: imagenUrl,
+                colores_personalizados: {
+                    background: coloresGuardados.background || null,
+                    parchment: coloresGuardados.parchment || null,
+                    accent: coloresGuardados.accent || null,
+                    mana: coloresGuardados.mana || null,
+                    hp: coloresGuardados.hp || null,
+                    gems: coloresGuardados.gems || null,
+                    tabBar: coloresGuardados.tabBar || null,
+                    textColors: textColorsGuardados
+                },
+                stats: {
+                    hp: this.healthManager.getData(),
+                    mana: this.manaManager.getData(),
+                    ca: parseInt(this.$('#armor-class')?.value) || 12,
+                    velocidad: parseInt(this.$('#speed')?.value) || 30,
+                    iniciativa: parseInt(this.$('#initiative')?.value) || 1,
+                    atributos: atributosDOM
+                },
+                spellSlots: this.spellSlotsManager.getData(),
+                spellStats: this.spellStatsManager.getData(),
+                ataques: this.getAttacks(),
+                conjuros: this.getSpells(),
+                inventario: {
+                    monedas: this.currencyManager.getData(),
+                    tesoros: this.treasureManager.getAll(),
+                    pociones: this.potionManager.getAll(),
+                    equipo: this.equipmentManager.getAll(),
+                    collapsed: isInventoryCollapsed
+                },
+                deathSaves: this.deathSavesManager.getData(),
+                skills: this.skillsManager.getAll(),
+                passivePerception: this.calcularPercepcionPasiva() || 10,
+                passivePerceptionAttribute: this.getPassivePerceptionAttribute(),
+                proficiencies: this.proficiencyManager.getAll(),
+                savingThrows: this.savingThrowsManager.getAll(),
+                notas: notas,
+                layout: layout,
+                fecha_creacion: new Date().toISOString(),
+                version: '3.2',
                 tabId: this.tabId
             };
             
-            window.wsClient.emit('personaje-guardado', {
-                personaje: notificacionCompleta
+            // Guardar en storage COMPARTIDO
+            this.storage.save('characterData', characterData);
+            this.storage.save('personajeNombre', personajeNombre);
+            this.storage.save('basicInfo', {
+                name: personajeNombre,
+                class: clase,
+                race: raza,
+                background: trasfondo,
+                alignment: alineamiento
             });
+            this.storage.save('traits', notas);
+            this.storage.save('passivePerception', this.passivePerception);
             
-            window.wsClient.actualizarPersonaje(notificacionCompleta);
-        }
-        
-        try {
-            const result = await this.api.saveCharacter(characterData);
-            
-            if (result.success) {
-                console.log(`✅ Personaje "${personajeNombre}" guardado (${this.tabId})`);
-                this.showSaveConfirmation();
-            } else {
-                console.error('❌ Error guardando personaje:', result.error);
-                Helpers.showMessage('Error al guardar en servidor: ' + result.error, 'error');
+            if (imagenUrl) {
+                this.storage.save('imagenUrl', imagenUrl);
             }
-        } catch (error) {
-            console.error('❌ Error inesperado:', error);
-            Helpers.showMessage('Error de conexión con el servidor', 'error');
+            
+            // Guardar en el servidor
+            try {
+                const result = await this.api.saveCharacter(characterData);
+                
+                if (result.success) {
+                    console.log(`✅ Personaje "${personajeNombre}" guardado (${this.tabId})`);
+                    this.showSaveConfirmation();
+                    
+                    if (result.data && result.data.id) {
+                        localStorage.setItem('lastCharacterId', result.data.id);
+                    }
+                    localStorage.setItem('lastCharacterName', personajeNombre);
+                } else {
+                    console.error('❌ Error guardando personaje:', result.error);
+                }
+            } catch (error) {
+                console.error('❌ Error inesperado:', error);
+            }
+            
+            // Sincronizar con WebSocket
+            if (window.wsClient && window.wsClient.isConectado()) {
+                const notificacionCompleta = {
+                    id: characterData.id,
+                    nombre: personajeNombre,
+                    jugador: characterData.jugador,
+                    clase: clase,
+                    nivel: characterData.nivel,
+                    raza: raza,
+                    trasfondo: trasfondo,
+                    alineamiento: alineamiento,
+                    stats: characterData.stats,
+                    spellSlots: characterData.spellSlots,
+                    spellStats: characterData.spellStats,
+                    inventario: characterData.inventario,
+                    ataques: characterData.ataques,
+                    conjuros: characterData.conjuros,
+                    notas: characterData.notas,
+                    skills: characterData.skills,
+                    savingThrows: characterData.savingThrows,
+                    passivePerception: characterData.passivePerception,
+                    deathSaves: characterData.deathSaves,
+                    proficiencies: characterData.proficiencies,
+                    imagen: characterData.imagen,
+                    colores_personalizados: characterData.colores_personalizados,
+                    timestamp: new Date().toISOString(),
+                    tabId: this.tabId
+                };
+                
+                window.wsClient.emit('personaje-guardado', {
+                    personaje: notificacionCompleta
+                });
+                
+                window.wsClient.actualizarPersonaje(notificacionCompleta);
+            }
+            
+        } finally {
+            this._isSaving = false;
+            
+            while (this._saveQueue.length > 0) {
+                const resolve = this._saveQueue.shift();
+                resolve();
+            }
         }
     }
 
@@ -950,21 +1540,82 @@ initUI() {
 
     // ===== INICIALIZAR RICH TEXT EDITOR =====
     initRichTextEditor() {
-        this.richTextEditor = new RichTextEditor();
-        this.richTextEditor.initRichTextAreas();
-        
+    // Solo crear el editor si los textareas existen y no han sido convertidos
+    const textareaIds = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
+    let hasContent = false;
+    
+    textareaIds.forEach(id => {
+        const textarea = document.getElementById(id);
+        if (textarea && textarea.value && textarea.value.trim() !== '') {
+            hasContent = true;
+        }
+    });
+    
+    // Si hay contenido, no convertir inmediatamente (se convertirá después de cargar)
+    if (hasContent) {
+        console.log('⏳ Los textareas tienen contenido, esperando carga para convertir...');
+        // Guardar referencia para convertir después
+        this._pendingRichTextConversion = true;
+        return;
+    }
+    
+    this.richTextEditor = new RichTextEditor();
+    this.richTextEditor.initRichTextAreas();
+    
+    const textareaIds2 = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
+    textareaIds2.forEach(id => {
+        const textarea = this.$(`#${id}`);
+        if (textarea) {
+            textarea.addEventListener('change', () => {
+                if (this.hasValidCharacterName()) {
+                    this.saveCharacter();
+                }
+            });
+        }
+    });
+    
+    console.log('✅ Rich Text Editor inicializado sin contenido previo');
+}
+
+convertRichTextAfterLoad() {
+    // Si ya hay un editor, actualizar su contenido
+    if (this.richTextEditor) {
         const textareaIds = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
         textareaIds.forEach(id => {
-            const textarea = this.$(`#${id}`);
-            if (textarea) {
-                textarea.addEventListener('change', () => {
-                    if (this.hasValidCharacterName()) {
-                        this.saveCharacter();
-                    }
-                });
+            const textarea = document.getElementById(id);
+            if (textarea && textarea.value) {
+                // El editor ya existe, solo actualizar el contenido
+                const editorData = this.richTextEditor.textareas.get(id);
+                if (editorData) {
+                    editorData.editor.innerHTML = textarea.value;
+                    editorData.textarea.value = textarea.value;
+                }
             }
         });
+        console.log('✅ Rich Text Editor actualizado con datos cargados');
+        return;
     }
+    
+    // Crear nuevo editor
+    this.richTextEditor = new RichTextEditor();
+    this.richTextEditor.initRichTextAreas();
+    this._pendingRichTextConversion = false;
+    
+    // Agregar event listeners para auto-guardado
+    const textareaIds = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
+    textareaIds.forEach(id => {
+        const textarea = this.$(`#${id}`);
+        if (textarea) {
+            textarea.addEventListener('change', () => {
+                if (this.hasValidCharacterName()) {
+                    this.saveCharacter();
+                }
+            });
+        }
+    });
+    
+    console.log('✅ Rich Text Editor creado después de cargar datos');
+}
 
     // ===== CONFIGURAR AUTOCOMPLETADO DE RAZAS =====
     async setupRaceAutocomplete() {
@@ -1029,7 +1680,8 @@ initUI() {
                     const li = document.createElement('li');
                     
                     let highlightedText = item.text;
-                    const regex = new RegExp(`(${searchTerm})`, 'gi');
+                    const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`(${escapedSearch})`, 'gi');
                     highlightedText = item.text.replace(regex, '<span class="highlight">$1</span>');
                     
                     li.innerHTML = `
@@ -1100,78 +1752,221 @@ initUI() {
 
     // ===== CARGAR DATOS DE RAZA =====
     cargarDatosRaza(speciesItem) {
-        const raceInput = this.$('#char-race');
-        if (raceInput) raceInput.value = speciesItem.text || speciesItem.name;
-        
-        let especieCompleta = speciesItem;
-        if (!speciesItem.description && speciesItem.text) {
-            especieCompleta = this.speciesService.getSpeciesByName(speciesItem.text);
+    const raceInput = this.$('#char-race');
+    if (raceInput) raceInput.value = speciesItem.text || speciesItem.name;
+    
+    let especieCompleta = speciesItem;
+    if (!speciesItem.description && speciesItem.text) {
+        especieCompleta = this.speciesService.getSpeciesByName(speciesItem.text);
+    }
+    
+    const nombreRaza = especieCompleta?.name || especieCompleta?.text;
+    if (this.razaActual === nombreRaza) {
+        console.log('Misma raza seleccionada, omitiendo cambios');
+        return;
+    }
+    
+    if (this.razaActual && this.atributosBaseGuardados) {
+        this.restaurarAtributosBase();
+    }
+    
+    this.razaActual = nombreRaza;
+    
+    // ✅ ACTUALIZAR VELOCIDAD (speed)
+    if (especieCompleta) {
+        const speedInput = this.$('#speed');
+        if (speedInput && especieCompleta.speed !== undefined && especieCompleta.speed !== null) {
+            const newSpeed = parseInt(especieCompleta.speed) || 30;
+            speedInput.value = newSpeed;
+            console.log(`🏃 Velocidad actualizada: ${newSpeed} pies`);
         }
         
-        const nombreRaza = especieCompleta?.name || especieCompleta?.text;
-        if (this.razaActual === nombreRaza) {
-            console.log('Misma raza seleccionada, omitiendo cambios');
-            return;
-        }
-        
-        if (this.razaActual && this.atributosBaseGuardados) {
-            this.restaurarAtributosBase();
-        }
-        
-        this.razaActual = nombreRaza;
-        
-        if (especieCompleta && especieCompleta.description) {
-            const featuresTextarea = this.$('#features');
-            if (featuresTextarea) {
-                const descripcion = `🧬 ${especieCompleta.name || especieCompleta.text}\n\n${especieCompleta.description}`;
-                featuresTextarea.value = descripcion;
-                featuresTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+        // ✅ ACTUALIZAR RASGOS ESPECIALES (features)
+        const featuresTextarea = this.$('#features');
+        if (featuresTextarea) {
+            let descripcion = '';
+            
+            // Nombre de la especie
+            const nombreEspecie = especieCompleta.name || especieCompleta.text || 'Especie sin nombre';
+            descripcion += `🧬 ${nombreEspecie}\n`;
+            
+            // Descripción completa
+            if (especieCompleta.description) {
+                descripcion += `\n${especieCompleta.description}\n`;
             }
             
+            // Rasgos raciales (properties)
+            if (especieCompleta.properties) {
+                descripcion += `\n--- 📋 RASGOS RACIALES ---\n`;
+                for (const [key, value] of Object.entries(especieCompleta.properties)) {
+                    if (key !== 'Category') {
+                        descripcion += `• ${key}: ${value}\n`;
+                    }
+                }
+            }
+            
+            // Atributos (mostrar como +X al modificador)
             if (especieCompleta.atributos) {
-                this.aplicarAtributosDeEspecie(especieCompleta.atributos);
+                descripcion += `\n--- 📊 INCREMENTOS DE ATRIBUTOS ---\n`;
+                for (const [attr, valor] of Object.entries(especieCompleta.atributos)) {
+                    if (typeof valor === 'number' && valor > 0) {
+                        descripcion += `• ${attr}: +${valor} al modificador (${valor * 2} puntos)\n`;
+                    }
+                }
             }
             
-            if (especieCompleta.properties && especieCompleta.properties['Ability Score Increase']) {
-                this.aplicarAtributosDeEspecie(especieCompleta.properties['Ability Score Increase']);
+            // Velocidad
+            if (especieCompleta.speed !== undefined && especieCompleta.speed !== null) {
+                descripcion += `\n--- 🏃 VELOCIDAD ---\n`;
+                descripcion += `• ${especieCompleta.speed} pies\n`;
             }
             
-            this.verificarAtributosPersonalizables(especieCompleta);
+            // Libro y editorial
+            if (especieCompleta.book || especieCompleta.publisher) {
+                descripcion += `\n--- 📖 FUENTE ---\n`;
+                if (especieCompleta.book) descripcion += `• Libro: ${especieCompleta.book}\n`;
+                if (especieCompleta.publisher) descripcion += `• Editorial: ${especieCompleta.publisher}\n`;
+            }
+            
+            // ✅ ACTUALIZAR TANTO textarea COMO editor rich text
+            const descripcionTrimmed = descripcion.trim();
+            
+            // 1. Actualizar textarea (siempre existe)
+            featuresTextarea.value = descripcionTrimmed;
+            
+            // 2. Si hay un editor rich text, actualizar su contenido
+            if (this.richTextEditor) {
+                // Buscar el editor para 'features'
+                const editorData = this.richTextEditor.textareas.get('features');
+                if (editorData && editorData.editor) {
+                    // Convertir saltos de línea a <br> para el editor
+                    const htmlContent = descripcionTrimmed.replace(/\n/g, '<br>');
+                    editorData.editor.innerHTML = htmlContent;
+                    console.log('✅ Rich Text Editor actualizado con la descripción');
+                } else {
+                    // Si no hay editor en el mapa, intentar buscarlo por el contenedor
+                    const container = document.querySelector('.rich-editor-container[data-id="features"]');
+                    if (container) {
+                        const editorDiv = container.querySelector('.rich-editor-content');
+                        if (editorDiv) {
+                            const htmlContent = descripcionTrimmed.replace(/\n/g, '<br>');
+                            editorDiv.innerHTML = htmlContent;
+                            console.log('✅ Rich Text Editor encontrado por selector y actualizado');
+                        }
+                    }
+                }
+            }
+            
+            // 3. Disparar evento change para guardar
+            featuresTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            console.log(`📝 Información de ${nombreEspecie} cargada en Rasgos Especiales`);
+        }
+        
+        // Aplicar atributos
+        if (especieCompleta.atributos) {
+            this.aplicarAtributosDeEspecie(especieCompleta.atributos);
+        }
+        
+        if (especieCompleta.properties && especieCompleta.properties['Ability Score Increase']) {
+            this.aplicarAtributosDeEspecie(especieCompleta.properties['Ability Score Increase']);
+        }
+        
+        this.verificarAtributosPersonalizables(especieCompleta);
+        
+        // ✅ Guardar después de actualizar
+        if (this.hasValidCharacterName()) {
+            setTimeout(() => {
+                this.saveCharacter();
+            }, 300);
         }
     }
+}
 
     // ===== VERIFICAR ATRIBUTOS PERSONALIZABLES =====
     verificarAtributosPersonalizables(especieCompleta) {
-        const atributos = especieCompleta.atributos || 
-                          especieCompleta.properties?.['Ability Score Increase'];
-        
-        if (!atributos) return;
-        
-        const atributosParaElegir = [];
-        let tieneIncrementoFijo = false;
-        
-        for (const [attr, valor] of Object.entries(atributos)) {
-            if (typeof valor === 'number' && valor > 0 && valor <= 3) {
-                const nombreNormalizado = attr.toLowerCase();
-                if (nombreNormalizado === 'cualquier' || 
-                    nombreNormalizado === 'elige' || 
-                    nombreNormalizado === 'personalizable') {
-                    atributosParaElegir.push({ atributo: null, valor });
-                } else {
-                    tieneIncrementoFijo = true;
-                }
+    const atributos = especieCompleta.atributos || 
+                      especieCompleta.properties?.['Ability Score Increase'];
+    
+    if (!atributos) return;
+    
+    const atributosParaElegir = [];
+    let tieneIncrementoFijo = false;
+    let mensajeAtributos = [];
+    
+    for (const [attr, valor] of Object.entries(atributos)) {
+        if (typeof valor === 'number' && valor > 0 && valor <= 3) {
+            const nombreNormalizado = attr.toLowerCase();
+            // ✅ DETECTAR ATRIBUTOS PERSONALIZABLES
+            const esPersonalizable = 
+                nombreNormalizado === 'cualquier' || 
+                nombreNormalizado === 'elige' || 
+                nombreNormalizado === 'personalizable' ||
+                nombreNormalizado === 'any' ||
+                nombreNormalizado === 'choose' ||
+                nombreNormalizado === 'custom' ||
+                // También si el nombre es "Dos atributos +1" o similar
+                attr.includes('cualquier') ||
+                attr.includes('elige') ||
+                attr.includes('personalizable') ||
+                attr.includes('any') ||
+                attr.includes('choose');
+            
+            if (esPersonalizable) {
+                // ✅ Es personalizable → mostrar modal
+                atributosParaElegir.push({ atributo: null, valor });
+            } else {
+                // ✅ Es fijo → aplicar automáticamente
+                tieneIncrementoFijo = true;
+                const nombreAttr = this.normalizarNombreAtributo(attr);
+                mensajeAtributos.push(`${nombreAttr} +${valor} al modificador`);
             }
         }
-        
-        if (atributosParaElegir.length > 0) {
-            this.mostrarModalSeleccionAtributos(atributosParaElegir);
-        } else if (tieneIncrementoFijo) {
-            const cambios = Object.entries(atributos)
-                .map(([attr, val]) => `${attr} +${val}`)
-                .join(', ');
-            Helpers.showMessage(`✨ Atributos aplicados: ${cambios}`, 'success');
-        }
     }
+    
+    // ✅ SI HAY ATRIBUTOS PERSONALIZABLES → mostrar modal
+    if (atributosParaElegir.length > 0) {
+        this.mostrarModalSeleccionAtributos(atributosParaElegir);
+        return;
+    }
+    
+    // ✅ SI SOLO HAY ATRIBUTOS FIJOS → mensaje informativo
+    if (tieneIncrementoFijo && mensajeAtributos.length > 0) {
+        const mensaje = `✨ Atributos aplicados: ${mensajeAtributos.join(', ')}`;
+        Helpers.showMessage(mensaje, 'success');
+        console.log(`📊 ${mensaje}`);
+    }
+}
+
+// ✅ MÉTODO AUXILIAR para normalizar nombres de atributos
+normalizarNombreAtributo(nombre) {
+    const mapa = {
+        'fuerza': 'Fuerza',
+        'str': 'Fuerza',
+        'strength': 'Fuerza',
+        'destreza': 'DESTREZA',
+        'dex': 'DESTREZA',
+        'dexterity': 'DESTREZA',
+        'agilidad': 'AGILIDAD',
+        'constitución': 'CONSTITUCIÓN',
+        'con': 'CONSTITUCIÓN',
+        'constitution': 'CONSTITUCIÓN',
+        'aguante': 'AGUANTE',
+        'inteligencia': 'INTELIGENCIA',
+        'int': 'INTELIGENCIA',
+        'intelligence': 'INTELIGENCIA',
+        'sabiduría': 'SABIDURÍA',
+        'wis': 'SABIDURÍA',
+        'wisdom': 'SABIDURÍA',
+        'espíritu': 'ESPÍRITU',
+        'carisma': 'CARISMA',
+        'cha': 'CARISMA',
+        'charisma': 'CARISMA'
+    };
+    
+    const lower = nombre.toLowerCase();
+    return mapa[lower] || nombre;
+}
 
     // ===== MOSTRAR MODAL DE SELECCIÓN DE ATRIBUTOS =====
     mostrarModalSeleccionAtributos(atributosParaElegir) {
@@ -1251,38 +2046,43 @@ initUI() {
         });
         
         document.getElementById('confirmAtributosBtn')?.addEventListener('click', () => {
-            const selects = modal.querySelectorAll('.atributo-choice-select');
-            let seleccionesValidas = true;
-            const atributosAAplicar = [];
-            
-            selects.forEach(select => {
-                const valor = parseInt(select.dataset.valor);
-                const attrId = select.value;
-                const attrName = select.options[select.selectedIndex]?.dataset?.name;
-                
-                if (!attrId) {
-                    seleccionesValidas = false;
-                    select.style.borderColor = '#ff4444';
-                    return;
-                }
-                select.style.borderColor = 'var(--accent-gold)';
-                atributosAAplicar.push({ id: parseInt(attrId), name: attrName, incremento: valor });
-            });
-            
-            if (!seleccionesValidas) {
-                Helpers.showMessage('Por favor, selecciona todos los atributos', 'warning');
-                return;
-            }
-            
-            for (const item of atributosAAplicar) {
-                const attr = this.attributeManager.getById(item.id);
-                if (attr) {
-                    const nuevoValor = (attr.value || 10) + item.incremento;
-                    const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-                    console.log(`📈 Aplicando +${item.incremento} a ${item.name}: ${attr.value} -> ${valorLimitado}`);
-                    this.attributeManager.update(item.id, { value: valorLimitado });
-                }
-            }
+    const selects = modal.querySelectorAll('.atributo-choice-select');
+    let seleccionesValidas = true;
+    const atributosAAplicar = [];
+    
+    selects.forEach(select => {
+        const valorModificador = parseInt(select.dataset.valor); // +1 o +2 al modificador
+        const attrId = select.value;
+        const attrName = select.options[select.selectedIndex]?.dataset?.name;
+        
+        if (!attrId) {
+            seleccionesValidas = false;
+            select.style.borderColor = '#ff4444';
+            return;
+        }
+        select.style.borderColor = 'var(--accent-gold)';
+        atributosAAplicar.push({ 
+            id: parseInt(attrId), 
+            name: attrName, 
+            // ✅ Multiplicamos por 2 para obtener el incremento en valor
+            incrementoValor: valorModificador * 2 
+        });
+    });
+    
+    if (!seleccionesValidas) {
+        Helpers.showMessage('Por favor, selecciona todos los atributos', 'warning');
+        return;
+    }
+    
+    for (const item of atributosAAplicar) {
+        const attr = this.attributeManager.getById(item.id);
+        if (attr) {
+            const nuevoValor = (attr.value || 10) + item.incrementoValor;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            console.log(`📈 Aplicando +${item.incrementoValor} a ${item.name}: ${attr.value} → ${valorLimitado}`);
+            this.attributeManager.update(item.id, { value: valorLimitado });
+        }
+    }
             
             this.attributeUI?.render(this.attributeManager.getAll());
             this.savingThrowsManager?.updateFromAttributes();
@@ -1298,101 +2098,118 @@ initUI() {
     }
 
     // ===== APLICAR ATRIBUTOS DE ESPECIE =====
-    aplicarAtributosDeEspecie(atributos) {
-        if (!atributos || typeof atributos !== 'object') return;
+aplicarAtributosDeEspecie(atributos) {
+    if (!atributos || typeof atributos !== 'object') return;
+    
+    if (!this.atributosBaseGuardados) {
+        this.guardarAtributosBase();
+    }
+    
+    console.log('📊 Aplicando atributos de especie:', atributos);
+    
+    // ✅ MAPA COMPLETO DE ATRIBUTOS
+    const nombreMap = {
+        'fuerza': 'Fuerza',
+        'str': 'Fuerza',
+        'strength': 'Fuerza',
+        'destreza': 'DESTREZA',
+        'dex': 'DESTREZA',
+        'dexterity': 'DESTREZA',
+        'agilidad': 'AGILIDAD',
+        'constitución': 'CONSTITUCIÓN',
+        'con': 'CONSTITUCIÓN',
+        'constitution': 'CONSTITUCIÓN',
+        'aguante': 'AGUANTE',
+        'inteligencia': 'INTELIGENCIA',
+        'int': 'INTELIGENCIA',
+        'intelligence': 'INTELIGENCIA',
+        'sabiduría': 'SABIDURÍA',
+        'wis': 'SABIDURÍA',
+        'wisdom': 'SABIDURÍA',
+        'espíritu': 'ESPÍRITU',
+        'carisma': 'CARISMA',
+        'cha': 'CARISMA',
+        'charisma': 'CARISMA'
+    };
+    
+    const atributosFijos = {};
+    const atributosPersonalizables = [];
+    
+    for (const [nombreAttr, incremento] of Object.entries(atributos)) {
+        if (typeof incremento !== 'number') continue;
         
-        if (!this.atributosBaseGuardados) {
-            this.guardarAtributosBase();
-        }
+        const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
+        const nombreLower = nombreAttr.toLowerCase();
         
-        console.log('📊 Aplicando atributos de especie (reemplazando):', atributos);
+        // ✅ DETECTAR si es personalizable
+        const esPersonalizable = 
+            nombreLower === 'cualquier' || 
+            nombreLower === 'elige' || 
+            nombreLower === 'personalizable' ||
+            nombreLower === 'any' ||
+            nombreLower === 'choose' ||
+            nombreLower === 'custom' ||
+            nombreAttr.includes('cualquier') ||
+            nombreAttr.includes('elige') ||
+            nombreAttr.includes('personalizable') ||
+            nombreAttr.includes('any') ||
+            nombreAttr.includes('choose');
         
-        const nombreMap = {
-            'fuerza': 'Fuerza',
-            'str': 'Fuerza',
-            'strength': 'Fuerza',
-            'destreza': 'DESTREZA',
-            'dex': 'DESTREZA',
-            'dexterity': 'DESTREZA',
-            'constitución': 'CONSTITUCIÓN',
-            'con': 'CONSTITUCIÓN',
-            'constitution': 'CONSTITUCIÓN',
-            'inteligencia': 'INTELIGENCIA',
-            'int': 'INTELIGENCIA',
-            'intelligence': 'INTELIGENCIA',
-            'sabiduría': 'SABIDURÍA',
-            'wis': 'SABIDURÍA',
-            'wisdom': 'SABIDURÍA',
-            'carisma': 'CARISMA',
-            'cha': 'CARISMA',
-            'charisma': 'CARISMA'
-        };
-        
-        const atributosFijos = {};
-        const atributosPersonalizables = [];
-        
-        for (const [nombreAttr, incremento] of Object.entries(atributos)) {
-            if (typeof incremento !== 'number') continue;
-            
-            const nombreNormalizado = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
-            const nombreLower = nombreAttr.toLowerCase();
-            
-            const esAtributoEstandar = Object.keys(nombreMap).some(key => 
-                key === nombreLower || nombreMap[key]?.toLowerCase() === nombreLower
-            );
-            
-            if (!esAtributoEstandar && (incremento === 1 || incremento === 2)) {
-                atributosPersonalizables.push({ originalName: nombreAttr, incremento });
-            } else {
-                atributosFijos[nombreNormalizado] = incremento;
-            }
-        }
-        
-        this.restaurarAtributosBase();
-        
-        const atributosActuales = this.attributeManager.getAll();
-        
-        for (const [nombreAttr, incremento] of Object.entries(atributosFijos)) {
-            const attrExistente = atributosActuales.find(attr => 
-                attr.name === nombreAttr || 
-                attr.name.toUpperCase() === nombreAttr.toUpperCase()
-            );
-            
-            if (attrExistente) {
-                let valorBase = 10;
-                if (this.atributosBaseGuardados) {
-                    const baseGuardado = this.atributosBaseGuardados.find(a => a.id === attrExistente.id);
-                    if (baseGuardado) {
-                        valorBase = baseGuardado.value;
-                    }
-                }
-                
-                const nuevoValor = valorBase + incremento;
-                const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-                
-                console.log(`📈 Aplicando ${nombreAttr}: base ${valorBase} +${incremento} = ${valorLimitado}`);
-                this.attributeManager.update(attrExistente.id, { value: valorLimitado });
-            } else {
-                const nuevoValor = 10 + incremento;
-                const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
-                console.log(`➕ Creando nuevo atributo: ${nombreAttr} con valor ${valorLimitado}`);
-                this.attributeManager.add(nombreAttr, valorLimitado);
-            }
-        }
-        
-        if (atributosPersonalizables.length > 0) {
-            this.atributosPersonalizablesPendientes = atributosPersonalizables;
-            this.mostrarModalSeleccionAtributos(atributosPersonalizables);
-        }
-        
-        this.attributeUI?.render(this.attributeManager.getAll());
-        this.savingThrowsManager?.updateFromAttributes();
-        this.calcularPercepcionPasiva();
-        
-        if (this.hasValidCharacterName()) {
-            this.saveCharacter();
+        // Si es personalizable, guardar para el modal
+        if (esPersonalizable) {
+            atributosPersonalizables.push({ 
+                originalName: nombreAttr, 
+                incremento, 
+                esPersonalizable: true 
+            });
+        } else {
+            // Es un atributo fijo
+            const attrName = nombreMap[nombreAttr.toLowerCase()] || nombreAttr;
+            atributosFijos[attrName] = incremento;
         }
     }
+    
+    // APLICAR ATRIBUTOS FIJOS
+    const atributosActuales = this.attributeManager.getAll();
+    
+    for (const [nombreAttr, incrementoModificador] of Object.entries(atributosFijos)) {
+        // Buscar el atributo existente o crearlo
+        let attrExistente = atributosActuales.find(attr => 
+            attr.name === nombreAttr || 
+            attr.name.toUpperCase() === nombreAttr.toUpperCase()
+        );
+        
+        const incrementoValor = incrementoModificador * 2;
+        
+        if (attrExistente) {
+            const valorActual = attrExistente.value || 10;
+            const nuevoValor = valorActual + incrementoValor;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            
+            console.log(`📈 Aplicando ${nombreAttr}: +${incrementoModificador} al modificador → +${incrementoValor} al valor (${valorActual} → ${valorLimitado})`);
+            this.attributeManager.update(attrExistente.id, { value: valorLimitado });
+        } else {
+            // Si no existe, crear con valor base 10 + incremento * 2
+            const nuevoValor = 10 + incrementoValor;
+            const valorLimitado = Math.min(30, Math.max(1, nuevoValor));
+            console.log(`➕ Creando nuevo atributo: ${nombreAttr} con valor ${valorLimitado} (modificador +${incrementoModificador})`);
+            this.attributeManager.add(nombreAttr, valorLimitado);
+        }
+    }
+    
+    // Si hay personalizables, se mostrará el modal desde verificarAtributosPersonalizables
+    if (atributosPersonalizables.length > 0) {
+        this.atributosPersonalizablesPendientes = atributosPersonalizables;
+    }
+    
+    this.attributeUI?.render(this.attributeManager.getAll());
+    this.savingThrowsManager?.updateFromAttributes();
+    this.calcularPercepcionPasiva();
+    
+    if (this.hasValidCharacterName()) {
+        this.saveCharacter();
+    }
+}
 
     // ===== GUARDAR ATRIBUTOS BASE =====
     guardarAtributosBase() {
@@ -1699,16 +2516,24 @@ initUI() {
         }
     }
 
-    // ===== CONFIGURAR EVENTOS DE CONJUROS =====
+    // ===== CONFIGURAR EVENTOS DE CONJUROS - CON DEDUPLICACIÓN =====
     setupSpellEvents() {
         const spellsList = this.$('#spellsList');
         if (spellsList) {
+            // Usar un Set para rastrear IDs ya procesados
+            const processedIds = new Set();
+            
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                         mutation.addedNodes.forEach(node => {
                             if (node.classList && node.classList.contains('spell-item')) {
-                                this.setupSpellItemEvents(node);
+                                const id = node.dataset.id;
+                                // Evitar procesar el mismo nodo múltiples veces
+                                if (id && !processedIds.has(id)) {
+                                    processedIds.add(id);
+                                    this.setupSpellItemEvents(node);
+                                }
                             }
                         });
                     }
@@ -1723,7 +2548,9 @@ initUI() {
         });
         
         this.eventBus.on('spellsChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) {
+                this.saveCharacter();
+            }
         });
     }
 
@@ -1745,15 +2572,42 @@ initUI() {
         }
     }
 
-    // ===== CONFIGURAR AUTO-GUARDADO =====
+    // ===== LIMPIAR CONJUROS DUPLICADOS =====
+    cleanupDuplicateSpells() {
+        if (!this.spellManager) return;
+        
+        const uniqueSpells = new Map();
+        const duplicates = [];
+        
+        this.spellManager.spells.forEach(spell => {
+            const key = `${spell.name.toLowerCase()}|${spell.level}`;
+            if (!uniqueSpells.has(key)) {
+                uniqueSpells.set(key, spell);
+            } else {
+                duplicates.push(spell.id);
+            }
+        });
+        
+        if (duplicates.length > 0) {
+            console.log(`🧹 Eliminando ${duplicates.length} conjuros duplicados`);
+            duplicates.forEach(id => {
+                this.spellManager.remove(id);
+            });
+            this.spellManager.save();
+        }
+    }
+
+    // ===== CONFIGURAR AUTO-GUARDADO - CON DEBOUNCE =====
     setupAutoSave() {
         let saveTimeout;
         const debouncedSave = () => {
             if (!this.hasValidCharacterName()) return;
+            if (this._isSaving) return;
+            
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 this.saveCharacter();
-            }, 300); 
+            }, 500);
         };
         
         this.eventBus.on('attributeChanged', () => {
@@ -1765,47 +2619,48 @@ initUI() {
         });
 
         this.eventBus.on('healthChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('manaChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('skillsChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('proficienciesChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('savingThrowsChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('expChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('deathSavesChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('currencyChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('treasuresChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('potionsChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('equipmentChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('spellSlotsChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('spellStatsChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
         this.eventBus.on('imageChanged', () => {
-            if (this.hasValidCharacterName()) this.saveCharacter();
+            if (this.hasValidCharacterName()) debouncedSave();
         });
+        
         this.setupCombatStatsAutoSave();
         this.setupTraitsAutoSave();
     }
@@ -1888,96 +2743,95 @@ initUI() {
     }
 
     // ===== CONFIGURAR SUSCRIPCIONES =====
-setupSubscriptions() {
-    this.healthManager.subscribe((data) => {
-        this.updateHealthDisplay(data);
-    });
-    
-    this.manaManager.subscribe((data) => {
-        this.updateManaDisplay(data);
-    });
-    
-    this.deathSavesManager.subscribe((data) => {
-        this.updateDeathSavesDisplay(data);
-    });
-    
-    this.skillsManager.subscribe((skills) => {
-        this.renderSkills(skills);
-    });
-    
-    this.proficiencyManager.subscribe((allProficiencies) => {
-        const activeTab = this.container.querySelector('.proficiency-tab.active');
-        const filterType = activeTab ? activeTab.dataset.type : 'all';
+    setupSubscriptions() {
+        this.healthManager.subscribe((data) => {
+            this.updateHealthDisplay(data);
+        });
         
-        if (filterType === 'all') {
-            this.renderProficiencies(allProficiencies);
-        } else {
-            const filtered = this.proficiencyManager.getByType(filterType);
-            this.renderProficiencies(filtered);
-        }
-    });
-    
-    this.savingThrowsManager.subscribe((savingThrows) => {
-        this.renderSavingThrows(savingThrows);
-    });
-    
-    this.expManager.subscribe((data) => {
-        this.updateExpDisplay(data);
-        this.calcularPercepcionPasiva();
-        if (this.hasValidCharacterName()) this.saveCharacter();
-    });
-    
-    this.currencyManager.subscribe((data) => {
-        this.updateCurrencyDisplay(data);
-    });
-    
-    this.treasureManager.subscribe((treasures) => {
-        this.renderTreasures(treasures);
-    });
-    
-    this.potionManager.subscribe((potions) => {
-        this.renderPotions(potions);
-    });
-    
-    this.equipmentManager.subscribe((equipment) => {
-        this.renderEquipment(equipment);
-    });
-    
-    this.spellSlotsManager.subscribe((slots) => {});
-    
-    this.eventBus.on('levelChanged', (level) => {
-        this.updateSavingThrows();
-        const levelDisplay = this.$('#level-display');
-        const characterLevel = this.$('#character-level');
-        if (levelDisplay) levelDisplay.textContent = level;
-        if (characterLevel) characterLevel.value = level;
-    });
-    
-    this.eventBus.on('deathSavesSuccess', (message) => {
-        Helpers.showMessage(message, 'info');
-    });
-    
-    this.eventBus.on('deathSavesFail', (message) => {
-        Helpers.showMessage(message, 'error');
-    });
-    
-    this.eventBus.on('requestProficiencyBonus', () => {
-        const bonus = this.expManager.getProficiencyBonus();
-        this.eventBus.emit('proficiencyBonusResponse', bonus);
-    });
+        this.manaManager.subscribe((data) => {
+            this.updateManaDisplay(data);
+        });
+        
+        this.deathSavesManager.subscribe((data) => {
+            this.updateDeathSavesDisplay(data);
+        });
+        
+        this.skillsManager.subscribe((skills) => {
+            this.renderSkills(skills);
+        });
+        
+        this.proficiencyManager.subscribe((allProficiencies) => {
+            const activeTab = this.container.querySelector('.proficiency-tab.active');
+            const filterType = activeTab ? activeTab.dataset.type : 'all';
+            
+            if (filterType === 'all') {
+                this.renderProficiencies(allProficiencies);
+            } else {
+                const filtered = this.proficiencyManager.getByType(filterType);
+                this.renderProficiencies(filtered);
+            }
+        });
+        
+        this.savingThrowsManager.subscribe((savingThrows) => {
+            this.renderSavingThrows(savingThrows);
+        });
+        
+        this.expManager.subscribe((data) => {
+            this.updateExpDisplay(data);
+            this.calcularPercepcionPasiva();
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        
+        this.currencyManager.subscribe((data) => {
+            this.updateCurrencyDisplay(data);
+        });
+        
+        this.treasureManager.subscribe((treasures) => {
+            this.renderTreasures(treasures);
+        });
+        
+        this.potionManager.subscribe((potions) => {
+            this.renderPotions(potions);
+        });
+        
+        this.equipmentManager.subscribe((equipment) => {
+            this.renderEquipment(equipment);
+        });
+        
+        this.spellSlotsManager.subscribe((slots) => {});
+        
+        this.eventBus.on('levelChanged', (level) => {
+            this.updateSavingThrows();
+            const levelDisplay = this.$('#level-display');
+            const characterLevel = this.$('#character-level');
+            if (levelDisplay) levelDisplay.textContent = level;
+            if (characterLevel) characterLevel.value = level;
+        });
+        
+        this.eventBus.on('deathSavesSuccess', (message) => {
+            Helpers.showMessage(message, 'info');
+        });
+        
+        this.eventBus.on('deathSavesFail', (message) => {
+            Helpers.showMessage(message, 'error');
+        });
+        
+        this.eventBus.on('requestProficiencyBonus', () => {
+            const bonus = this.expManager.getProficiencyBonus();
+            this.eventBus.emit('proficiencyBonusResponse', bonus);
+        });
 
-    this.eventBus.on('attributeChanged', () => {
-        this.calcularPercepcionPasiva();
-        if (this.hasValidCharacterName()) this.saveCharacter();
-    });
-    
-    // Escuchar cambios de imagen
-    this.eventBus.on('imageChanged', (imageUrl) => {
-        if (this.hasValidCharacterName()) {
-            this.saveCharacter();
-        }
-    });
-}
+        this.eventBus.on('attributeChanged', () => {
+            this.calcularPercepcionPasiva();
+            if (this.hasValidCharacterName()) this.saveCharacter();
+        });
+        
+        this.eventBus.on('imageChanged', (imageUrl) => {
+            if (this.hasValidCharacterName()) {
+                this.saveCharacter();
+            }
+        });
+    }
 
     // ===== CONFIGURAR BOTONES DE AÑADIR =====
     setupAddButtons() {
@@ -2044,211 +2898,274 @@ setupSubscriptions() {
     }
 
     // ===== CONFIGURAR EVENTOS GLOBALES =====
-    setupGlobalEvents() {
-        this.$$('.proficiency-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                this.$$('.proficiency-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                const type = tab.dataset.type;
-                const proficiencies = this.proficiencyManager.getByType(type);
-                this.renderProficiencies(proficiencies);
-            });
+setupGlobalEvents() {
+    // Tabs de competencias
+    this.$$('.proficiency-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            this.$$('.proficiency-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            const type = tab.dataset.type;
+            const proficiencies = this.proficiencyManager.getByType(type);
+            this.renderProficiencies(proficiencies);
         });
-        
-        const exportBtn = this.$('#exportBtn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => {
-                this.exportCharacter();
-            });
-        }
-        
-        const importBtn = this.$('#importBtn');
-        if (importBtn) {
-            importBtn.addEventListener('click', () => {
-                this.importCharacter();
-            });
-        }
-
-        const saveBtn = this.$('#saveBtn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                this.saveCharacter();
-            });
-        }
-        
-        const resetBtn = this.$('#resetBtn');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                if (confirm('¿Restablecer toda la hoja? Se perderán los cambios no guardados.')) {
-                    this.resetAll();
-                }
-            });
-        }
-        
-        const colorCustomizerBtn = this.$('#colorCustomizerBtn');
-        if (colorCustomizerBtn) {
-            colorCustomizerBtn.addEventListener('click', () => {
-                this.showColorCustomizer();
-            });
-        }
-        
-        const textCustomizerBtn = this.$('#textCustomizerBtn');
-        if (textCustomizerBtn) {
-            textCustomizerBtn.addEventListener('click', () => {
-                this.showTextColorCustomizer();
-            });
-        }
-        
-        const configManaBtn = this.$('#configManaBtn');
-        if (configManaBtn) {
-            configManaBtn.addEventListener('click', () => {
-                this.showManaConfig();
-            });
-        }
-        
-        const configExpBtn = this.$('#configExpBtn');
-        if (configExpBtn) {
-            configExpBtn.addEventListener('click', () => {
-                this.showExpConfig();
-            });
-        }
-        
-        const configSlotsBtn = this.$('#configSlotsBtn');
-        if (configSlotsBtn) {
-            configSlotsBtn.addEventListener('click', () => {
-                this.showSpellSlotsConfig();
-            });
-        }
-        
-        const configCurrencyBtn = this.$('#configCurrencyBtn');
-        if (configCurrencyBtn) {
-            configCurrencyBtn.addEventListener('click', () => {
-                this.showCurrencyConfig();
-            });
-        }
-        
-        const levelUpBtn = this.$('#level-up-btn');
-        if (levelUpBtn) {
-            levelUpBtn.addEventListener('click', () => {
-                this.expManager.changeLevel(1);
-            });
-        }
-        
-        const levelDownBtn = this.$('#level-down-btn');
-        if (levelDownBtn) {
-            levelDownBtn.addEventListener('click', () => {
-                this.expManager.changeLevel(-1);
-            });
-        }
-
-        const currentExpInput = this.$('#current-exp');
-        const maxExpInput = this.$('#max-exp');
-        if (currentExpInput) {
-            const newCurrentExp = currentExpInput.cloneNode(true);
-            currentExpInput.parentNode.replaceChild(newCurrentExp, currentExpInput);
-            
-            newCurrentExp.addEventListener('change', (e) => {
-                const value = parseInt(e.target.value) || 0;
-                this.expManager.setCurrent(value);
-            });
-        }
-
-        if (maxExpInput) {
-            const newMaxExp = maxExpInput.cloneNode(true);
-            maxExpInput.parentNode.replaceChild(newMaxExp, maxExpInput);
-            
-            newMaxExp.addEventListener('change', (e) => {
-                const value = parseInt(e.target.value) || 1;
-                this.expManager.setMax(value);
-            });
-        }
-        
-        const manaPlusBtn = this.$('#manaPlusBtn');
-        if (manaPlusBtn) {
-            manaPlusBtn.addEventListener('click', () => {
-                this.manaManager.modify(1);
-            });
-        }
-        
-        const manaMinusBtn = this.$('#manaMinusBtn');
-        if (manaMinusBtn) {
-            manaMinusBtn.addEventListener('click', () => {
-                this.manaManager.modify(-1);
-            });
-        }
-        
-        const manaInput = this.$('#manaInput');
-        if (manaInput) {
-            manaInput.addEventListener('change', (e) => {
-                this.manaManager.setCurrent(parseInt(e.target.value) || 0);
-            });
-        }
-        
-        const currentHp = this.$('#current-hp');
-        if (currentHp) {
-            currentHp.addEventListener('change', (e) => {
-                this.healthManager.setCurrent(parseInt(e.target.value) || 0);
-            });
-        }
-        
-        const maxHp = this.$('#max-hp');
-        if (maxHp) {
-            maxHp.addEventListener('change', (e) => {
-                this.healthManager.setMax(parseInt(e.target.value) || 1);
-            });
-        }
-        
-        const tempHp = this.$('#temp-hp');
-        if (tempHp) {
-            tempHp.addEventListener('change', (e) => {
-                this.healthManager.setTemp(parseInt(e.target.value) || 0);
-            });
-        }
-        
-        const closeModalBtn = this.$('#closeModalBtn');
-        if (closeModalBtn) {
-            closeModalBtn.addEventListener('click', () => {
-                const configModal = document.getElementById('configModal');
-                if (configModal) configModal.style.display = 'none';
-            });
-        }
-        
-        const closeTextColorModalBtn = this.$('#closeTextColorModalBtn');
-        if (closeTextColorModalBtn) {
-            closeTextColorModalBtn.addEventListener('click', () => {
-                const textColorModal = document.getElementById('textColorModal');
-                if (textColorModal) textColorModal.style.display = 'none';
-            });
-        }
-        
-        const configModal = document.getElementById('configModal');
-        if (configModal) {
-            configModal.addEventListener('click', (e) => {
-                if (e.target === configModal) {
-                    configModal.style.display = 'none';
-                }
-            });
-        }
-        
-        const textColorModal = document.getElementById('textColorModal');
-        if (textColorModal) {
-            textColorModal.addEventListener('click', (e) => {
-                if (e.target === textColorModal) {
-                    textColorModal.style.display = 'none';
-                }
-            });
-        }
-        
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const configModal = document.getElementById('configModal');
-                const textColorModal = document.getElementById('textColorModal');
-                if (configModal) configModal.style.display = 'none';
-                if (textColorModal) textColorModal.style.display = 'none';
+    });
+    
+    // ===== BOTONES DEL FOOTER =====
+    const exportBtn = document.querySelector('#exportBtn');
+    const importBtn = document.querySelector('#importBtn');
+    const saveBtn = document.querySelector('#saveBtn');
+    const resetBtn = document.querySelector('#resetBtn');
+    
+    if (exportBtn) {
+        const newExport = exportBtn.cloneNode(true);
+        exportBtn.parentNode.replaceChild(newExport, exportBtn);
+        newExport.addEventListener('click', () => {
+            this.exportCharacter();
+        });
+    }
+    
+    if (importBtn) {
+        const newImport = importBtn.cloneNode(true);
+        importBtn.parentNode.replaceChild(newImport, importBtn);
+        newImport.addEventListener('click', () => {
+            this.importCharacter();
+        });
+    }
+    
+    if (saveBtn) {
+        const newSave = saveBtn.cloneNode(true);
+        saveBtn.parentNode.replaceChild(newSave, saveBtn);
+        newSave.addEventListener('click', () => {
+            this.saveCharacter();
+        });
+    }
+    
+    if (resetBtn) {
+        const newReset = resetBtn.cloneNode(true);
+        resetBtn.parentNode.replaceChild(newReset, resetBtn);
+        newReset.addEventListener('click', () => {
+            if (confirm('¿Restablecer toda la hoja? Se perderán los cambios no guardados.')) {
+                this.resetAll();
             }
         });
     }
+    
+    // ===== BOTONES DE CONFIGURACIÓN =====
+    const configManaBtn = this.$('#configManaBtn');
+    if (configManaBtn) {
+        const newBtn = configManaBtn.cloneNode(true);
+        configManaBtn.parentNode.replaceChild(newBtn, configManaBtn);
+        newBtn.addEventListener('click', () => {
+            this.showManaConfig();
+        });
+    }
+
+    const setupACConfigBtn = () => {
+    // Buscar si ya existe un botón de configuración de CA
+    let acConfigBtn = document.getElementById('acConfigBtn');
+    if (!acConfigBtn) {
+        // Buscar el contenedor de estadísticas de combate
+        const combatStats = document.querySelector('.combat-grid');
+        if (combatStats) {
+            const statDiv = combatStats.querySelector('.combat-stat:first-child');
+            if (statDiv) {
+                const statDisplay = statDiv.querySelector('.stat-display');
+                if (statDisplay) {
+                    // Añadir botón de configuración
+                    const configBtn = document.createElement('button');
+                    configBtn.id = 'acConfigBtn';
+                    configBtn.type = 'button';
+                    configBtn.className = 'btn-config-resource';
+                    configBtn.style.cssText = 'position: absolute; right: 5px; top: 5px; background: none; border: none; color: var(--accent-gold, #d4af37); cursor: pointer; font-size: 0.8rem; padding: 2px 6px;';
+                    configBtn.innerHTML = '<i class="fas fa-cog"></i>';
+                    configBtn.title = 'Configurar Clase de Armadura';
+                    
+                    statDisplay.style.position = 'relative';
+                    statDisplay.appendChild(configBtn);
+                    
+                    configBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.showACConfig();
+                    });
+                }
+            }
+        }
+    }
+};
+
+// Llamar después de que la UI esté cargada
+setTimeout(setupACConfigBtn, 500);
+    
+    const configExpBtn = this.$('#configExpBtn');
+    if (configExpBtn) {
+        const newBtn = configExpBtn.cloneNode(true);
+        configExpBtn.parentNode.replaceChild(newBtn, configExpBtn);
+        newBtn.addEventListener('click', () => {
+            this.showExpConfig();
+        });
+    }
+    
+    const configSlotsBtn = this.$('#configSlotsBtn');
+    if (configSlotsBtn) {
+        const newBtn = configSlotsBtn.cloneNode(true);
+        configSlotsBtn.parentNode.replaceChild(newBtn, configSlotsBtn);
+        newBtn.addEventListener('click', () => {
+            this.showSpellSlotsConfig();
+        });
+    }
+    
+    const configCurrencyBtn = this.$('#configCurrencyBtn');
+    if (configCurrencyBtn) {
+        const newBtn = configCurrencyBtn.cloneNode(true);
+        configCurrencyBtn.parentNode.replaceChild(newBtn, configCurrencyBtn);
+        newBtn.addEventListener('click', () => {
+            this.showCurrencyConfig();
+        });
+    }
+    
+    // ===== BOTONES DE NIVEL =====
+    const levelUpBtn = this.$('#level-up-btn');
+    if (levelUpBtn) {
+        const newBtn = levelUpBtn.cloneNode(true);
+        levelUpBtn.parentNode.replaceChild(newBtn, levelUpBtn);
+        newBtn.addEventListener('click', () => {
+            this.expManager.changeLevel(1);
+        });
+    }
+    
+    const levelDownBtn = this.$('#level-down-btn');
+    if (levelDownBtn) {
+        const newBtn = levelDownBtn.cloneNode(true);
+        levelDownBtn.parentNode.replaceChild(newBtn, levelDownBtn);
+        newBtn.addEventListener('click', () => {
+            this.expManager.changeLevel(-1);
+        });
+    }
+
+    // ===== INPUTS DE EXPERIENCIA =====
+    const currentExpInput = this.$('#current-exp');
+    const maxExpInput = this.$('#max-exp');
+    if (currentExpInput) {
+        const newCurrentExp = currentExpInput.cloneNode(true);
+        currentExpInput.parentNode.replaceChild(newCurrentExp, currentExpInput);
+        
+        newCurrentExp.addEventListener('change', (e) => {
+            const value = parseInt(e.target.value) || 0;
+            this.expManager.setCurrent(value);
+        });
+    }
+
+    if (maxExpInput) {
+        const newMaxExp = maxExpInput.cloneNode(true);
+        maxExpInput.parentNode.replaceChild(newMaxExp, maxExpInput);
+        
+        newMaxExp.addEventListener('change', (e) => {
+            const value = parseInt(e.target.value) || 1;
+            this.expManager.setMax(value);
+        });
+    }
+    
+    // ===== CONTROLES DE MANÁ =====
+    const manaPlusBtn = this.$('#manaPlusBtn');
+    if (manaPlusBtn) {
+        const newBtn = manaPlusBtn.cloneNode(true);
+        manaPlusBtn.parentNode.replaceChild(newBtn, manaPlusBtn);
+        newBtn.addEventListener('click', () => {
+            this.manaManager.modify(1);
+        });
+    }
+    
+    const manaMinusBtn = this.$('#manaMinusBtn');
+    if (manaMinusBtn) {
+        const newBtn = manaMinusBtn.cloneNode(true);
+        manaMinusBtn.parentNode.replaceChild(newBtn, manaMinusBtn);
+        newBtn.addEventListener('click', () => {
+            this.manaManager.modify(-1);
+        });
+    }
+    
+    const manaInput = this.$('#manaInput');
+    if (manaInput) {
+        const newInput = manaInput.cloneNode(true);
+        manaInput.parentNode.replaceChild(newInput, manaInput);
+        newInput.addEventListener('change', (e) => {
+            this.manaManager.setCurrent(parseInt(e.target.value) || 0);
+        });
+    }
+    
+    // ===== INPUTS DE HP =====
+    const currentHp = this.$('#current-hp');
+    if (currentHp) {
+        const newInput = currentHp.cloneNode(true);
+        currentHp.parentNode.replaceChild(newInput, currentHp);
+        newInput.addEventListener('change', (e) => {
+            this.healthManager.setCurrent(parseInt(e.target.value) || 0);
+        });
+    }
+    
+    const maxHp = this.$('#max-hp');
+    if (maxHp) {
+        const newInput = maxHp.cloneNode(true);
+        maxHp.parentNode.replaceChild(newInput, maxHp);
+        newInput.addEventListener('change', (e) => {
+            this.healthManager.setMax(parseInt(e.target.value) || 1);
+        });
+    }
+    
+    const tempHp = this.$('#temp-hp');
+    if (tempHp) {
+        const newInput = tempHp.cloneNode(true);
+        tempHp.parentNode.replaceChild(newInput, tempHp);
+        newInput.addEventListener('change', (e) => {
+            this.healthManager.setTemp(parseInt(e.target.value) || 0);
+        });
+    }
+    
+    // ============================================================
+    // ===== MODALES - CONFIGURACIÓN CON EVENT DELEGATION =====
+    // ============================================================
+    
+    // 1. Cerrar modales con botón X (usando event delegation en el documento)
+    document.addEventListener('click', (e) => {
+        const closeBtn = e.target.closest('.modal-close');
+        if (closeBtn) {
+            const modal = closeBtn.closest('.modal');
+            if (modal) {
+                modal.style.display = 'none';
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }
+    });
+    
+    // 2. Cerrar modales haciendo clic en el fondo (overlay)
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+        }
+    });
+    
+    // 3. Cerrar modales con tecla ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (modal.style.display === 'flex') {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+    });
+}
+
+    closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        return true;
+    }
+    return false;
+}
 
     // ===== ACTUALIZAR DISPLAY DE VIDA =====
     updateHealthDisplay(data) {
@@ -2837,52 +3754,188 @@ setupSubscriptions() {
     }
 
     // ===== CONFIGURAR INFORMACIÓN BÁSICA =====
-setupBasicInfo() {
-    const basicInfo = this.storage.load('basicInfo');
-    
-    const charName = this.$('#char-name');
-    const charClass = this.$('#char-class');
-    const charRace = this.$('#char-race');
-    const charBg = this.$('#char-bg');
-    const charAlign = this.$('#char-align');
-    
-    if (basicInfo) {
-        if (charName) charName.value = basicInfo.name || '';
-        if (charClass) charClass.value = basicInfo.class || '';
-        if (charRace) charRace.value = basicInfo.race || '';
-        if (charBg) charBg.value = basicInfo.background || '';
-        if (charAlign) charAlign.value = basicInfo.alignment || '';
-    }
-    
-    // Cargar imagen del storage aislado
-    const savedImage = this.storage.load('imagenUrl');
-    if (savedImage && this.imageManager) {
-        this.imageManager.currentImageUrl = savedImage;
-        this.imageManager.displayImage(savedImage);
-    }
-    
-    if (charName) {
-        charName.addEventListener('change', () => {
-            this.saveBasicInfo();
-            this.saveCharacter();
-            const newName = charName.value.trim();
-            if (newName && window.tabManager) {
-                window.tabManager.renameTab(this.tabId, newName);
-            }
-        });
-    }
-    
-    ['#char-class', '#char-race', '#char-bg', '#char-align'].forEach(selector => {
-        const input = this.$(selector);
-        if (input) {
-            input.addEventListener('change', () => {
+    setupBasicInfo() {
+        const basicInfo = this.storage.load('basicInfo');
+        
+        const charName = this.$('#char-name');
+        const charClass = this.$('#char-class');
+        const charRace = this.$('#char-race');
+        const charBg = this.$('#char-bg');
+        const charAlign = this.$('#char-align');
+        
+        if (basicInfo) {
+            if (charName) charName.value = basicInfo.name || '';
+            if (charClass) charClass.value = basicInfo.class || '';
+            if (charRace) charRace.value = basicInfo.race || '';
+            if (charBg) charBg.value = basicInfo.background || '';
+            if (charAlign) charAlign.value = basicInfo.alignment || '';
+        }
+        
+        const savedImage = this.storage.load('imagenUrl');
+        if (savedImage && this.imageManager) {
+            this.imageManager.currentImageUrl = savedImage;
+            this.imageManager.displayImage(savedImage);
+        }
+        
+        if (charName) {
+            charName.addEventListener('change', () => {
                 this.saveBasicInfo();
-                const currentName = this.$('#char-name')?.value?.trim();
-                if (currentName && currentName !== '') {
-                    this.saveCharacter();
+                this.saveCharacter();
+                const newName = charName.value.trim();
+                if (newName && window.tabManager) {
+                    window.tabManager.renameTab(this.tabId, newName);
                 }
             });
         }
+        
+        ['#char-class', '#char-race', '#char-bg', '#char-align'].forEach(selector => {
+            const input = this.$(selector);
+            if (input) {
+                input.addEventListener('change', () => {
+                    this.saveBasicInfo();
+                    const currentName = this.$('#char-name')?.value?.trim();
+                    if (currentName && currentName !== '') {
+                        this.saveCharacter();
+                    }
+                });
+            }
+        });
+    }
+
+ setupProficiencyBonusDisplay() {
+    this.eventBus.on('levelChanged', () => {
+        this.updateProficiencyBonusDisplay();
+    });
+    
+    this.eventBus.on('proficiencyBonusChanged', () => {
+        this.updateProficiencyBonusDisplay();
+    });
+    
+    const editBtn = this.$('#editProficiencyBtn');
+    if (editBtn) {
+        const newBtn = editBtn.cloneNode(true);
+        editBtn.parentNode.replaceChild(newBtn, editBtn);
+        newBtn.addEventListener('click', () => {
+            this.showExpConfig();  // ✅ AHORA USA showExpConfig
+        });
+    }
+    
+    setTimeout(() => {
+        this.updateProficiencyBonusDisplay();
+    }, 300);
+}
+
+updateProficiencyBonusDisplay() {
+    const display = this.$('#proficiencyBonusDisplay');
+    if (!display) return;
+    
+    const bonus = this.expManager?.getProficiencyBonus() || 2;
+    const sign = bonus >= 0 ? '+' : '';
+    display.textContent = `${sign}${bonus}`;
+}
+
+showProficiencyConfig() {
+    // Usamos el mismo modal que los recursos
+    const modal = document.getElementById('configModal');
+    const modalBody = document.getElementById('modalBody');
+    if (!modal || !modalBody) return;
+    
+    const currentSystem = this.expManager?.system || 'custom';
+    const currentBonus = this.expManager?.customProficiencyBonus || 2;
+    const isCustom = currentSystem === 'custom';
+    
+    modalBody.innerHTML = `
+        <h4><i class="fas fa-medal"></i> Bonificador por Competencia</h4>
+        <p style="font-size:0.85rem;color:var(--ink-light);margin-bottom:15px;">
+            Sistema actual: <strong>${currentSystem.toUpperCase()}</strong>
+            ${currentSystem === 'dnd5e' ? '📖 (según nivel)' : 
+              currentSystem === 'pathfinder' ? '⚔️ (nivel/2+1)' : '🎲 (personalizado)'}
+        </p>
+        
+        <div class="form-group">
+            <label>Valor actual: <strong id="bonusPreview">${currentBonus}</strong></label>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:5px;">
+                <button type="button" class="btn-secondary btn-small" id="bonusMinus" ${!isCustom ? 'disabled style="opacity:0.5;"' : ''}>-</button>
+                <input type="number" id="customBonusInput" value="${currentBonus}" min="0" max="20" 
+                       ${!isCustom ? 'disabled' : ''} 
+                       style="width:80px;text-align:center;padding:6px;border-radius:4px;border:2px solid var(--accent-gold);">
+                <button type="button" class="btn-secondary btn-small" id="bonusPlus" ${!isCustom ? 'disabled style="opacity:0.5;"' : ''}>+</button>
+            </div>
+            <small style="color:var(--ink-light);font-size:0.7rem;">
+                ${isCustom ? 'Ajusta el valor manualmente' : 'Cambia a "Personalizado" para editar'}
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label>Cambiar sistema:</label>
+            <select id="systemSelect" style="width:100%;padding:8px;border-radius:6px;border:2px solid var(--accent-gold);">
+                <option value="custom" ${currentSystem === 'custom' ? 'selected' : ''}>🎲 Personalizado</option>
+                <option value="dnd5e" ${currentSystem === 'dnd5e' ? 'selected' : ''}>📖 D&D 5e</option>
+                <option value="pathfinder" ${currentSystem === 'pathfinder' ? 'selected' : ''}>⚔️ Pathfinder</option>
+            </select>
+        </div>
+        
+        <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid var(--parchment-dark);">
+            <button type="button" class="btn-secondary btn-cancel" id="cancelProfConfig">Cancelar</button>
+            <button type="button" class="btn-secondary" id="saveProfConfig" style="background:#4CAF50;">Guardar</button>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    const bonusInput = document.getElementById('customBonusInput');
+    const bonusPreview = document.getElementById('bonusPreview');
+    const systemSelect = document.getElementById('systemSelect');
+    
+    document.getElementById('bonusMinus').addEventListener('click', () => {
+        if (bonusInput.disabled) return;
+        let val = parseInt(bonusInput.value) || 0;
+        val = Math.max(0, val - 1);
+        bonusInput.value = val;
+        if (bonusPreview) bonusPreview.textContent = val;
+    });
+    
+    document.getElementById('bonusPlus').addEventListener('click', () => {
+        if (bonusInput.disabled) return;
+        let val = parseInt(bonusInput.value) || 0;
+        val = Math.min(20, val + 1);
+        bonusInput.value = val;
+        if (bonusPreview) bonusPreview.textContent = val;
+    });
+    
+    bonusInput?.addEventListener('input', () => {
+        const val = parseInt(bonusInput.value) || 0;
+        if (bonusPreview) bonusPreview.textContent = Math.min(20, Math.max(0, val));
+    });
+    
+    systemSelect.addEventListener('change', (e) => {
+        const system = e.target.value;
+        const isCustomSelected = system === 'custom';
+        bonusInput.disabled = !isCustomSelected;
+        document.getElementById('bonusMinus').disabled = !isCustomSelected;
+        document.getElementById('bonusPlus').disabled = !isCustomSelected;
+        if (!isCustomSelected) {
+            bonusInput.value = 2;
+            if (bonusPreview) bonusPreview.textContent = 2;
+        }
+    });
+    
+    document.getElementById('saveProfConfig').addEventListener('click', () => {
+        const system = systemSelect.value;
+        const bonus = parseInt(bonusInput.value) || 2;
+        
+        this.expManager.setSystem(system);
+        if (system === 'custom') {
+            this.expManager.setCustomProficiencyBonus(bonus);
+        }
+        
+        this.updateProficiencyBonusDisplay();
+        modal.style.display = 'none';
+        Helpers.showMessage('Bonificador actualizado', 'info');
+    });
+    
+    document.getElementById('cancelProfConfig').addEventListener('click', () => {
+        modal.style.display = 'none';
     });
 }
 
@@ -3240,6 +4293,159 @@ setupBasicInfo() {
         });
     }
 
+    // ===== CONFIGURAR PERCEPCIÓN PASIVA EDITABLE =====
+setupPassivePerceptionConfig() {
+    const attributeSelect = this.$('#passivePerceptionAttribute');
+    if (!attributeSelect) return;
+    
+    // Poblar el selector con los atributos disponibles
+    this.populatePassivePerceptionSelect();
+    
+    // Escuchar cambios en el atributo
+    attributeSelect.addEventListener('change', () => {
+        this.calcularPercepcionPasiva();
+        if (this.hasValidCharacterName()) {
+            this.saveCharacter();
+        }
+    });
+    
+    // Botón de actualizar
+    const refreshBtn = this.$('#refreshPassivePerception');
+    if (refreshBtn) {
+        const newBtn = refreshBtn.cloneNode(true);
+        refreshBtn.parentNode.replaceChild(newBtn, refreshBtn);
+        newBtn.addEventListener('click', () => {
+            this.calcularPercepcionPasiva();
+            Helpers.showMessage('Percepción pasiva actualizada', 'info');
+        });
+    }
+    
+    // Escuchar cambios en atributos y nivel
+    this.eventBus.on('attributeChanged', () => {
+        this.populatePassivePerceptionSelect();
+        this.calcularPercepcionPasiva();
+    });
+    
+    this.eventBus.on('attributeNameChanged', () => {
+        this.populatePassivePerceptionSelect();
+        this.calcularPercepcionPasiva();
+    });
+    
+    this.eventBus.on('attributeRemoved', () => {
+        this.populatePassivePerceptionSelect();
+        this.calcularPercepcionPasiva();
+    });
+    
+    this.eventBus.on('levelChanged', () => {
+        this.calcularPercepcionPasiva();
+    });
+    
+    this.eventBus.on('proficiencyBonusChanged', () => {
+        this.calcularPercepcionPasiva();
+    });
+    
+    // Inicializar
+    setTimeout(() => {
+        this.calcularPercepcionPasiva();
+    }, 300);
+}
+
+populatePassivePerceptionSelect() {
+    const select = this.$('#passivePerceptionAttribute');
+    if (!select) return;
+    
+    const attributes = this.attributeManager.getAll();
+    const currentValue = this.storage.load('passivePerceptionAttribute') || 'SABIDURÍA';
+    
+    select.innerHTML = '';
+    
+    if (attributes.length === 0) {
+        select.innerHTML = '<option value="">No hay atributos</option>';
+        return;
+    }
+    
+    // Verificar si el atributo guardado existe
+    const attributeExists = attributes.some(attr => 
+        attr.name === currentValue || attr.name.toUpperCase() === currentValue.toUpperCase()
+    );
+    
+    let selectedValue = attributeExists ? currentValue : (attributes[0]?.name || '');
+    
+    attributes.forEach(attr => {
+        const option = document.createElement('option');
+        option.value = attr.name;
+        option.textContent = attr.name;
+        if (attr.name === selectedValue || attr.name.toUpperCase() === selectedValue.toUpperCase()) {
+            option.selected = true;
+            selectedValue = attr.name;
+        }
+        select.appendChild(option);
+    });
+    
+    // Guardar el valor seleccionado
+    if (selectedValue) {
+        this.storage.save('passivePerceptionAttribute', selectedValue);
+    }
+}
+
+getPassivePerceptionAttribute() {
+    const select = this.$('#passivePerceptionAttribute');
+    if (select && select.value) {
+        return select.value;
+    }
+    return this.storage.load('passivePerceptionAttribute') || 'SABIDURÍA';
+}
+
+// ===== CALCULAR PERCEPCIÓN PASIVA (MODIFICADO) =====
+calcularPercepcionPasiva() {
+    let atributoMod = 0;
+    const atributos = this.attributeManager.getAll();
+    
+    // Obtener el atributo seleccionado
+    const atributoSeleccionado = this.getPassivePerceptionAttribute();
+    
+    // Buscar el atributo por nombre (case insensitive)
+    const attrEncontrado = atributos.find(attr => 
+        attr.name === atributoSeleccionado || 
+        attr.name.toUpperCase() === atributoSeleccionado.toUpperCase()
+    );
+    
+    if (attrEncontrado) {
+        atributoMod = attrEncontrado.modifier || 0;
+    } else {
+        // Si no se encuentra, intentar con Sabiduría como fallback
+        const sabiduriaAttr = atributos.find(attr => 
+            attr.name.toUpperCase() === 'SABIDURÍA' || 
+            attr.name.toUpperCase() === 'SABIDURIA' ||
+            attr.name.toUpperCase() === 'WISDOM' ||
+            attr.name.toUpperCase() === 'WIS'
+        );
+        if (sabiduriaAttr) {
+            atributoMod = sabiduriaAttr.modifier || 0;
+        }
+    }
+    
+    const proficiencyBonus = this.expManager?.getProficiencyBonus() || 2;
+    const passivePerception = 10 + atributoMod + proficiencyBonus;
+    
+    const perceptionInput = this.$('#passivePerception');
+    if (perceptionInput && perceptionInput.value != passivePerception) {
+        perceptionInput.value = passivePerception;
+    }
+    
+    // Actualizar la fórmula mostrada
+    const formulaSpan = this.$('#passivePerceptionFormula');
+    if (formulaSpan) {
+        const attrName = attrEncontrado ? attrEncontrado.name : 'SABIDURÍA';
+        const modDisplay = atributoMod >= 0 ? `+${atributoMod}` : `${atributoMod}`;
+        const profDisplay = proficiencyBonus >= 0 ? `+${proficiencyBonus}` : `${proficiencyBonus}`;
+        formulaSpan.textContent = `10 + Mod. ${attrName} (${modDisplay}) + Bonif. Competencia (${profDisplay}) = ${passivePerception}`;
+    }
+    
+    this.passivePerception = passivePerception;
+    return passivePerception;
+}
+
     // ===== MOSTRAR CONFIGURACIÓN DE MANÁ =====
     showManaConfig() {
         const modal = document.getElementById('configModal');
@@ -3272,48 +4478,154 @@ setupBasicInfo() {
     }
 
     // ===== MOSTRAR CONFIGURACIÓN DE EXPERIENCIA =====
-    showExpConfig() {
-        const modal = document.getElementById('configModal');
-        const modalBody = document.getElementById('modalBody');
-        if (!modal || !modalBody) return;
+showExpConfig() {
+    const modal = document.getElementById('configModal');
+    const modalBody = document.getElementById('modalBody');
+    if (!modal || !modalBody) return;
+    
+    const currentSystem = this.expManager?.system || 'custom';
+    const currentBonus = this.expManager?.customProficiencyBonus || 2;
+    const currentDisplayBonus = this.expManager?.getProficiencyBonus() || 2;
+    const isCustom = currentSystem === 'custom';
+    
+    modalBody.innerHTML = `
+        <h4><i class="fas fa-chart-line"></i> Configurar Experiencia</h4>
         
-        modalBody.innerHTML = `
-            <h4><i class="fas fa-chart-line"></i> Configurar Experiencia</h4>
-            <div class="form-group">
-                <label>Color de barra:</label>
-                <input type="color" id="configExpColor" value="${localStorage.getItem('expColor') || '#4a90e2'}">
+        <div class="form-group">
+            <label><i class="fas fa-palette"></i> Color de barra:</label>
+            <input type="color" id="configExpColor" value="${localStorage.getItem('expColor') || '#4a90e2'}">
+        </div>
+        
+        <div class="form-group">
+            <label><i class="fas fa-cog"></i> Sistema de experiencia:</label>
+            <select id="configExpSystem">
+                <option value="custom" ${currentSystem === 'custom' ? 'selected' : ''}>🎲 Personalizado</option>
+                <option value="dnd5e" ${currentSystem === 'dnd5e' ? 'selected' : ''}>📖 D&D 5e</option>
+                <option value="pathfinder" ${currentSystem === 'pathfinder' ? 'selected' : ''}>⚔️ Pathfinder</option>
+            </select>
+            <small style="color:var(--ink-light);font-size:0.7rem;">
+                ${currentSystem === 'dnd5e' ? '📖 Bonificador según nivel (2-6)' : 
+                  currentSystem === 'pathfinder' ? '⚔️ Bonificador = (Nivel/2) + 1' : 
+                  '🎲 Bonificador personalizado ajustable'}
+            </small>
+        </div>
+        
+        <div class="form-group" style="border-top:1px solid var(--parchment-dark);padding-top:15px;margin-top:5px;">
+            <label><i class="fas fa-medal"></i> Bonificador por Competencia</label>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:5px;">
+                <button type="button" class="btn-secondary btn-small" id="configBonusMinus" ${!isCustom ? 'disabled style="opacity:0.5;"' : ''}>-</button>
+                <input type="number" id="configCustomBonus" value="${currentBonus}" min="0" max="20" 
+                       ${!isCustom ? 'disabled' : ''} 
+                       style="width:80px;text-align:center;padding:6px;border-radius:4px;border:2px solid var(--accent-gold);">
+                <button type="button" class="btn-secondary btn-small" id="configBonusPlus" ${!isCustom ? 'disabled style="opacity:0.5;"' : ''}>+</button>
+                <span style="font-weight:bold;margin-left:10px;font-size:1.1rem;color:var(--accent-gold);">
+                    → <span id="configBonusPreview">+${currentDisplayBonus}</span>
+                </span>
             </div>
-            <div class="form-group">
-                <label>Sistema:</label>
-                <select id="configExpSystem">
-                    <option value="custom" ${this.expManager.system === 'custom' ? 'selected' : ''}>Personalizado</option>
-                    <option value="dnd5e" ${this.expManager.system === 'dnd5e' ? 'selected' : ''}>D&D 5e</option>
-                    <option value="pathfinder" ${this.expManager.system === 'pathfinder' ? 'selected' : ''}>Pathfinder</option>
-                </select>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn-secondary" id="saveExpConfig">Guardar</button>
-                <button type="button" class="btn-secondary btn-cancel" id="cancelExpConfig">Cancelar</button>
-            </div>
-        `;
+            <small style="color:var(--ink-light);font-size:0.7rem;" id="configBonusHint">
+                ${isCustom ? 'Ajusta el valor manualmente' : 'Cambia a "Personalizado" para editar'}
+            </small>
+        </div>
         
-        modal.style.display = 'flex';
+        <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid var(--parchment-dark);">
+            <button type="button" class="btn-secondary btn-cancel" id="cancelExpConfig">Cancelar</button>
+            <button type="button" class="btn-secondary" id="saveExpConfig" style="background:#4CAF50;">Guardar</button>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    // Referencias
+    const bonusInput = document.getElementById('configCustomBonus');
+    const systemSelect = document.getElementById('configExpSystem');
+    const bonusPreview = document.getElementById('configBonusPreview');
+    const bonusHint = document.getElementById('configBonusHint');
+    
+    // Actualizar preview del bonificador
+    const updateBonusPreview = () => {
+        const system = systemSelect.value;
+        const isCustomSelected = system === 'custom';
+        const bonus = isCustomSelected ? (parseInt(bonusInput.value) || 2) : 
+                      (system === 'dnd5e' ? this.expManager?.getProficiencyBonus() || 2 : 
+                       Math.floor((this.expManager?.level || 1 + 1) / 2) + 1);
+        if (bonusPreview) {
+            bonusPreview.textContent = `+${bonus}`;
+        }
+    };
+    
+    // Botón -
+    document.getElementById('configBonusMinus').addEventListener('click', () => {
+        if (bonusInput.disabled) return;
+        let val = parseInt(bonusInput.value) || 0;
+        val = Math.max(0, val - 1);
+        bonusInput.value = val;
+        updateBonusPreview();
+    });
+    
+    // Botón +
+    document.getElementById('configBonusPlus').addEventListener('click', () => {
+        if (bonusInput.disabled) return;
+        let val = parseInt(bonusInput.value) || 0;
+        val = Math.min(20, val + 1);
+        bonusInput.value = val;
+        updateBonusPreview();
+    });
+    
+    // Input manual
+    bonusInput?.addEventListener('input', () => {
+        const val = parseInt(bonusInput.value) || 0;
+        if (val < 0) bonusInput.value = 0;
+        if (val > 20) bonusInput.value = 20;
+        updateBonusPreview();
+    });
+    
+    // Cambio de sistema
+    systemSelect.addEventListener('change', (e) => {
+        const system = e.target.value;
+        const isCustomSelected = system === 'custom';
         
-        document.getElementById('saveExpConfig').addEventListener('click', () => {
-            const color = document.getElementById('configExpColor').value;
-            const system = document.getElementById('configExpSystem').value;
-            
-            document.documentElement.style.setProperty('--exp-color', color);
-            localStorage.setItem('expColor', color);
-            this.expManager.setSystem(system);
-            
-            modal.style.display = 'none';
-        });
+        bonusInput.disabled = !isCustomSelected;
+        document.getElementById('configBonusMinus').disabled = !isCustomSelected;
+        document.getElementById('configBonusPlus').disabled = !isCustomSelected;
         
-        document.getElementById('cancelExpConfig').addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-    }
+        if (isCustomSelected) {
+            bonusInput.value = this.expManager?.customProficiencyBonus || 2;
+            bonusHint.textContent = 'Ajusta el valor manualmente';
+        } else if (system === 'dnd5e') {
+            bonusInput.value = 2;
+            bonusHint.textContent = '📖 Bonificador según nivel (2-6)';
+        } else if (system === 'pathfinder') {
+            bonusInput.value = 2;
+            bonusHint.textContent = '⚔️ Bonificador = (Nivel/2) + 1';
+        }
+        
+        updateBonusPreview();
+    });
+    
+    // Guardar
+    document.getElementById('saveExpConfig').addEventListener('click', () => {
+        const color = document.getElementById('configExpColor').value;
+        const system = systemSelect.value;
+        const customBonus = parseInt(bonusInput.value) || 2;
+        
+        document.documentElement.style.setProperty('--exp-color', color);
+        localStorage.setItem('expColor', color);
+        
+        this.expManager.setSystem(system);
+        if (system === 'custom') {
+            this.expManager.setCustomProficiencyBonus(customBonus);
+        }
+        
+        this.updateProficiencyBonusDisplay();
+        modal.style.display = 'none';
+        Helpers.showMessage('Configuración actualizada', 'info');
+    });
+    
+    // Cancelar
+    document.getElementById('cancelExpConfig').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+}
 
     // ===== MOSTRAR CONFIGURACIÓN DE SLOTS DE CONJUROS =====
     showSpellSlotsConfig() {
@@ -3527,82 +4839,453 @@ setupBasicInfo() {
 
     // ===== MOSTRAR MODAL PARA AÑADIR EQUIPO =====
     showAddEquipmentModal() {
-        const modal = document.getElementById('configModal');
-        const modalBody = document.getElementById('modalBody');
-        const currencyData = this.currencyManager.getData();
-        const attributes = this.attributeManager.getAll();
+    const modal = document.getElementById('configModal');
+    const modalBody = document.getElementById('modalBody');
+    const currencyData = this.currencyManager.getData();
+    const attributes = this.attributeManager.getAll();
+    
+    if (!modal || !modalBody) return;
+    
+    let attributeOptions = '<option value="">Ninguno</option>';
+    attributes.forEach(attr => {
+        attributeOptions += `<option value="${attr.name}">${attr.name}</option>`;
+    });
+    
+    modalBody.innerHTML = `
+        <h4><i class="fas fa-chess-board"></i> Añadir Equipo</h4>
         
-        if (!modal || !modalBody) return;
+        <div class="form-group">
+            <label>Nombre:</label>
+            <input type="text" id="equipmentName">
+        </div>
         
-        let attributeOptions = '<option value="">Ninguno</option>';
-        attributes.forEach(attr => {
-            attributeOptions += `<option value="${attr.name}">${attr.name}</option>`;
-        });
-        
-        modalBody.innerHTML = `
-            <h4><i class="fas fa-chess-board"></i> Añadir Equipo</h4>
+        <div class="form-row">
             <div class="form-group">
-                <label>Nombre:</label>
-                <input type="text" id="equipmentName">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Costo:</label>
-                    <input type="number" id="equipmentCost" min="0" value="0">
-                </div>
-                <div class="form-group">
-                    <label>Peso:</label>
-                    <input type="number" id="equipmentWeight" min="0" value="1" step="0.1">
-                </div>
+                <label>Costo:</label>
+                <input type="number" id="equipmentCost" min="0" value="0">
             </div>
             <div class="form-group">
-                <label>Descripción:</label>
-                <textarea id="equipmentDesc" rows="2"></textarea>
+                <label>Peso:</label>
+                <input type="number" id="equipmentWeight" min="0" value="1" step="0.1">
             </div>
+        </div>
+        
+        <div class="form-group">
+            <label>Descripción:</label>
+            <textarea id="equipmentDesc" rows="2"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Tipo de equipo:</label>
+            <select id="equipmentType">
+                <option value="standard">Equipo estándar</option>
+                <option value="armor">Armadura (modifica CA)</option>
+            </select>
+        </div>
+        
+        <!-- Campos para armadura (ocultos por defecto) -->
+        <div id="armorFields" style="display: none; border-top: 2px solid var(--accent-gold); padding-top: 15px; margin-top: 10px;">
+            <h5 style="color: var(--accent-gold);"><i class="fas fa-shield-alt"></i> Configuración de Armadura</h5>
+            
             <div class="form-group">
-                <label>Sigilo:</label>
-                <select id="equipmentStealth">
-                    <option value="none">Sin efecto</option>
-                    <option value="disadvantage">Desventaja</option>
-                    <option value="advantage">Ventaja</option>
+                <label>CA Base (ej: 10, 11, 12):</label>
+                <input type="number" id="armorBase" value="10" min="1" max="30">
+                <small style="color: var(--ink-light); font-size: 0.7rem;">Base para el cálculo de CA (por defecto 10)</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Atributo para CA:</label>
+                <select id="armorAttribute">
+                    <option value="DESTREZA">Destreza</option>
+                    <option value="CONSTITUCIÓN">Constitución</option>
+                    <option value="FUERZA">Fuerza</option>
+                    <option value="INTELIGENCIA">Inteligencia</option>
+                    <option value="SABIDURÍA">Sabiduría</option>
+                    <option value="CARISMA">Carisma</option>
                 </select>
+                <small style="color: var(--ink-light); font-size: 0.7rem;">Atributo cuyo modificador se sumará a la CA</small>
             </div>
+            
             <div class="form-group">
-                <label>Bonificador:</label>
-                <div class="form-row">
-                    <select id="equipmentAttribute" style="flex: 2;">${attributeOptions}</select>
-                    <input type="number" id="equipmentBonus" min="-5" max="5" value="1" style="flex: 1;">
-                </div>
+                <label>Bonificador adicional de la armadura:</label>
+                <input type="number" id="armorModifier" value="0" min="0" max="10">
+                <small style="color: var(--ink-light); font-size: 0.7rem;">Bonificador fijo de la armadura (ej: +1, +2)</small>
             </div>
-            <div class="modal-actions">
-                <button type="button" class="btn-secondary" id="addEquipmentConfirm">Añadir</button>
-                <button type="button" class="btn-secondary btn-cancel" id="cancelEquipment">Cancelar</button>
+            
+            <div class="form-group">
+                <label>Bonificador extra de CA (ej: escudo +2):</label>
+                <input type="number" id="armorBonus" value="0" min="0" max="10">
+                <small style="color: var(--ink-light); font-size: 0.7rem;">Bonificador adicional de este item</small>
             </div>
-        `;
+        </div>
         
-        modal.style.display = 'flex';
+        <div class="form-group">
+            <label>Sigilo:</label>
+            <select id="equipmentStealth">
+                <option value="none">Sin efecto</option>
+                <option value="disadvantage">Desventaja</option>
+                <option value="advantage">Ventaja</option>
+            </select>
+        </div>
         
-        document.getElementById('addEquipmentConfirm').addEventListener('click', () => {
-            const name = document.getElementById('equipmentName').value.trim();
-            const cost = parseInt(document.getElementById('equipmentCost').value) || 0;
-            const weight = parseFloat(document.getElementById('equipmentWeight').value) || 0;
-            const description = document.getElementById('equipmentDesc').value.trim();
-            const stealth = document.getElementById('equipmentStealth').value;
+        <div class="form-group" id="standardBonusFields">
+            <label>Bonificador de atributo:</label>
+            <div class="form-row">
+                <select id="equipmentAttribute" style="flex: 2;">${attributeOptions}</select>
+                <input type="number" id="equipmentBonus" min="-5" max="5" value="1" style="flex: 1;">
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="addEquipmentConfirm">Añadir</button>
+            <button type="button" class="btn-secondary btn-cancel" id="cancelEquipment">Cancelar</button>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    // Mostrar/ocultar campos de armadura según el tipo seleccionado
+    const typeSelect = document.getElementById('equipmentType');
+    const armorFields = document.getElementById('armorFields');
+    const standardFields = document.getElementById('standardBonusFields');
+    
+    typeSelect.addEventListener('change', () => {
+        if (typeSelect.value === 'armor') {
+            armorFields.style.display = 'block';
+            standardFields.style.display = 'none';
+        } else {
+            armorFields.style.display = 'none';
+            standardFields.style.display = 'block';
+        }
+    });
+    
+    document.getElementById('addEquipmentConfirm').addEventListener('click', () => {
+        const name = document.getElementById('equipmentName').value.trim();
+        const cost = parseInt(document.getElementById('equipmentCost').value) || 0;
+        const weight = parseFloat(document.getElementById('equipmentWeight').value) || 0;
+        const description = document.getElementById('equipmentDesc').value.trim();
+        const stealth = document.getElementById('equipmentStealth').value;
+        const type = document.getElementById('equipmentType').value;
+        
+        if (!name) {
+            Helpers.showMessage('Ingresa un nombre', 'warning');
+            return;
+        }
+        
+        if (type === 'armor') {
+            // Añadir armadura
+            const acBase = parseInt(document.getElementById('armorBase').value) || 10;
+            const acAttribute = document.getElementById('armorAttribute').value;
+            const acModifier = parseInt(document.getElementById('armorModifier').value) || 0;
+            const acBonus = parseInt(document.getElementById('armorBonus').value) || 0;
+            
+            this.equipmentManager.addArmorItem(
+                name, cost, weight, description,
+                acBase, acAttribute, acModifier, acBonus, stealth
+            );
+            
+            Helpers.showMessage(`Armadura "${name}" añadida (CA: ${acBase} + ${acModifier})`, 'success');
+        } else {
+            // Añadir equipo estándar
             const attribute = document.getElementById('equipmentAttribute').value;
             const bonus = parseInt(document.getElementById('equipmentBonus').value) || 0;
             
-            if (name) {
-                this.equipmentManager.add(name, cost, weight, description, stealth, attribute, bonus);
-                modal.style.display = 'none';
-            } else {
-                Helpers.showMessage('Ingresa un nombre', 'warning');
-            }
-        });
+            this.equipmentManager.add(name, cost, weight, description, stealth, attribute, bonus);
+            Helpers.showMessage(`Equipo "${name}" añadido`, 'success');
+        }
         
-        document.getElementById('cancelEquipment').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    
+    document.getElementById('cancelEquipment').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+}
+
+// ===== MOSTRAR CONFIGURACIÓN DE CLASE DE ARMADURA =====
+// ===== MOSTRAR CONFIGURACIÓN DE CLASE DE ARMADURA =====
+showACConfig() {
+    const modal = document.getElementById('configModal');
+    const modalBody = document.getElementById('modalBody');
+    if (!modal || !modalBody) return;
+    
+    const attributes = this.attributeManager.getAll();
+    const acConfig = this.equipmentManager.getACConfig();
+    
+    let attributeOptions = '';
+    attributes.forEach(attr => {
+        const selected = attr.name === acConfig.attribute ? 'selected' : '';
+        const modDisplay = attr.modifier >= 0 ? `+${attr.modifier}` : `${attr.modifier}`;
+        attributeOptions += `<option value="${attr.name}" ${selected}>${attr.name} (Mod: ${modDisplay})</option>`;
+    });
+    
+    // Si no hay atributos, mostrar opción por defecto
+    if (attributes.length === 0) {
+        attributeOptions = '<option value="DESTREZA">Destreza (Mod: +0)</option>';
+    }
+    
+    // Calcular CA actual para mostrar
+    const currentAC = this.equipmentManager.recalculateAC() || 10;
+    const formulaDisplay = this.getACFormulaDisplay();
+    
+    modalBody.innerHTML = `
+        <h4><i class="fas fa-shield-alt"></i> Configurar Clase de Armadura</h4>
+        
+        <div style="background: var(--parchment-light, #f5e6d3); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid var(--accent-gold, #d4af37);">
+            <div style="text-align: center; font-size: 1.5rem; font-weight: bold; color: var(--accent-gold, #d4af37);">
+                CA Actual: <span id="acPreviewTotal">${currentAC}</span>
+            </div>
+            <div style="text-align: center; font-size: 0.8rem; color: var(--ink-light, #5c4033);" id="acFormulaPreview">
+                ${formulaDisplay}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label><i class="fas fa-dice-d20"></i> Atributo para CA</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="acAttributeSelect" style="flex: 1;">
+                    ${attributeOptions}
+                </select>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; white-space: nowrap; cursor: pointer;">
+                    <input type="checkbox" id="acUseAttribute" ${acConfig.useAttribute !== false ? 'checked' : ''}>
+                    <i class="fas fa-check-circle"></i> Usar atributo
+                </label>
+            </div>
+            <small style="color: var(--ink-light, #5c4033); font-size: 0.7rem;">
+                El modificador del atributo seleccionado se sumará a la CA. Desmarca para ignorarlo.
+            </small>
+        </div>
+        
+        <div style="background: var(--parchment-light, #f5e6d3); padding: 12px; border-radius: 8px; margin-top: 15px; border: 1px solid var(--parchment-dark, #e6d0b5);">
+            <h5 style="margin: 0 0 5px 0; color: var(--accent-gold, #d4af37); font-size: 0.9rem;">
+                <i class="fas fa-info-circle"></i> ¿Cómo funciona?
+            </h5>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--ink-light, #5c4033); line-height: 1.5;">
+                CA = <strong>Base (10)</strong> + <strong>Modificador del Atributo</strong> + <strong>Bonificadores de Armadura</strong> + <strong>Bonificadores de Equipo</strong>
+            </p>
+            <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: var(--ink-light, #5c4033); font-style: italic;">
+                💡 Para modificar la base o añadir bonificadores de armadura, usa el <strong>Equipo</strong> con tipo "Armadura".
+            </p>
+        </div>
+        
+        <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid var(--parchment-dark, #e6d0b5); margin-top: 15px;">
+            <button type="button" class="btn-secondary btn-cancel" id="cancelACConfig">Cancelar</button>
+            <button type="button" class="btn-secondary" id="saveACConfig" style="background: #4CAF50;">
+                <i class="fas fa-check"></i> Guardar
+            </button>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    // Función para actualizar la vista previa
+    const updatePreview = () => {
+        const attrSelect = document.getElementById('acAttributeSelect');
+        const useAttrCheck = document.getElementById('acUseAttribute');
+        const previewTotal = document.getElementById('acPreviewTotal');
+        const formulaPreview = document.getElementById('acFormulaPreview');
+        
+        // Verificar que los elementos existen
+        if (!attrSelect || !useAttrCheck) {
+            console.warn('Elementos del modal no encontrados para actualizar preview');
+            return;
+        }
+        
+        const attributeName = attrSelect.value;
+        const useAttribute = useAttrCheck.checked;
+        
+        let attrMod = 0;
+        
+        if (useAttribute) {
+            const attr = this.attributeManager.getByName(attributeName);
+            if (attr) {
+                attrMod = attr.modifier || 0;
+            }
+        }
+        
+        // Obtener base y bonificadores desde equipmentManager
+        const acConfigData = this.equipmentManager.getACConfig();
+        const base = acConfigData.base || 10;
+        const armorMod = acConfigData.armorMod || 0;
+        
+        // Sumar bonificadores de equipo
+        let bonusTotal = 0;
+        if (this.equipmentManager) {
+            this.equipmentManager.getAll().forEach(item => {
+                if (item.acBonus && item.acBonus > 0) {
+                    bonusTotal += item.acBonus;
+                }
+            });
+        }
+        
+        const totalAC = Math.max(1, Math.min(30, base + attrMod + armorMod + bonusTotal));
+        
+        if (previewTotal) previewTotal.textContent = totalAC;
+        
+        // Actualizar fórmula
+        const formulaParts = [`${base}`];
+        if (useAttribute && attrMod !== 0) {
+            formulaParts.push(`${attrMod >= 0 ? '+' : ''}${attrMod} (${attributeName})`);
+        }
+        if (armorMod > 0) {
+            formulaParts.push(`+${armorMod} (armadura)`);
+        }
+        if (bonusTotal > 0) {
+            formulaParts.push(`+${bonusTotal} (equipo)`);
+        }
+        
+        if (formulaPreview) {
+            formulaPreview.textContent = `Fórmula: ${formulaParts.join(' + ')} = ${totalAC}`;
+        }
+    };
+    
+    // Asignar eventos SOLO DESPUÉS de verificar que los elementos existen
+    const attrSelect = document.getElementById('acAttributeSelect');
+    const useAttrCheck = document.getElementById('acUseAttribute');
+    
+    if (attrSelect) {
+        attrSelect.addEventListener('change', updatePreview);
+    }
+    if (useAttrCheck) {
+        useAttrCheck.addEventListener('change', updatePreview);
+    }
+    
+    // Guardar referencia a los eventos para limpiarlos después
+    const eventHandlers = {
+        updatePreview: updatePreview,
+        onAttributeChanged: () => updatePreview(),
+        onAttributeNameChanged: () => updatePreview(),
+        onAttributeAdded: () => updatePreview(),
+        onAttributeRemoved: () => updatePreview()
+    };
+    
+    // Escuchar cambios en atributos
+    this.eventBus.on('attributeChanged', eventHandlers.onAttributeChanged);
+    this.eventBus.on('attributeNameChanged', eventHandlers.onAttributeNameChanged);
+    this.eventBus.on('attributeAdded', eventHandlers.onAttributeAdded);
+    this.eventBus.on('attributeRemoved', eventHandlers.onAttributeRemoved);
+    
+    // Guardar configuración
+    const saveBtn = document.getElementById('saveACConfig');
+    const cancelBtn = document.getElementById('cancelACConfig');
+    
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const attribute = document.getElementById('acAttributeSelect')?.value || 'DESTREZA';
+            const useAttribute = document.getElementById('acUseAttribute')?.checked || false;
+            
+            // Solo guardar el atributo y el toggle
+            this.equipmentManager.setACAttribute(attribute);
+            this.equipmentManager.setACUseAttribute(useAttribute);
+            
+            // Recalcular y actualizar
+            this.equipmentManager.recalculateAC();
+            
             modal.style.display = 'none';
+            Helpers.showMessage('Configuración de CA guardada', 'success');
+            
+            // Limpiar listeners
+            this.eventBus.off('attributeChanged', eventHandlers.onAttributeChanged);
+            this.eventBus.off('attributeNameChanged', eventHandlers.onAttributeNameChanged);
+            this.eventBus.off('attributeAdded', eventHandlers.onAttributeAdded);
+            this.eventBus.off('attributeRemoved', eventHandlers.onAttributeRemoved);
         });
     }
+    
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+            // Limpiar listeners
+            this.eventBus.off('attributeChanged', eventHandlers.onAttributeChanged);
+            this.eventBus.off('attributeNameChanged', eventHandlers.onAttributeNameChanged);
+            this.eventBus.off('attributeAdded', eventHandlers.onAttributeAdded);
+            this.eventBus.off('attributeRemoved', eventHandlers.onAttributeRemoved);
+        });
+    }
+    
+    // Actualizar vista previa inicial
+    setTimeout(updatePreview, 100);
+}
+
+// ===== OBTENER FÓRMULA DE CA PARA MOSTRAR =====
+getACFormulaDisplay() {
+    if (!this.equipmentManager) return '10 + Destreza';
+    
+    const acConfig = this.equipmentManager.getACConfig();
+    const base = acConfig.base || 10;
+    let attrMod = 0;
+    let attrName = acConfig.attribute || 'DESTREZA';
+    
+    if (acConfig.useAttribute !== false) {
+        const attr = this.attributeManager.getByName(attrName);
+        if (attr) {
+            attrMod = attr.modifier || 0;
+        }
+    }
+    
+    const armorMod = acConfig.armorMod || 0;
+    let bonusTotal = 0;
+    if (this.equipmentManager) {
+        this.equipmentManager.getAll().forEach(item => {
+            if (item.acBonus && item.acBonus > 0) {
+                bonusTotal += item.acBonus;
+            }
+        });
+    }
+    
+    const totalAC = Math.max(1, Math.min(30, base + attrMod + armorMod + bonusTotal));
+    
+    const parts = [`${base}`];
+    if (acConfig.useAttribute !== false && attrMod !== 0) {
+        parts.push(`${attrMod >= 0 ? '+' : ''}${attrMod} (${attrName})`);
+    }
+    if (armorMod > 0) {
+        parts.push(`+${armorMod} (armadura)`);
+    }
+    if (bonusTotal > 0) {
+        parts.push(`+${bonusTotal} (equipo)`);
+    }
+    
+    return `${parts.join(' + ')} = ${totalAC}`;
+}
+
+// ===== OBTENER FÓRMULA DE CA PARA MOSTRAR =====
+getACFormulaDisplay() {
+    const acConfig = this.equipmentManager.getACConfig();
+    const base = acConfig.base || 10;
+    let attrMod = 0;
+    let attrName = acConfig.attribute || 'DESTREZA';
+    
+    if (acConfig.useAttribute) {
+        const attr = this.attributeManager.getByName(attrName);
+        if (attr) {
+            attrMod = attr.modifier || 0;
+        }
+    }
+    
+    const armorMod = acConfig.armorMod || 0;
+    let bonusTotal = 0;
+    this.equipmentManager.getAll().forEach(item => {
+        if (item.acBonus && item.acBonus > 0) {
+            bonusTotal += item.acBonus;
+        }
+    });
+    
+    const totalAC = Math.max(1, Math.min(30, base + attrMod + armorMod + bonusTotal));
+    
+    const parts = [`${base}`];
+    if (acConfig.useAttribute && attrMod !== 0) {
+        parts.push(`${attrMod >= 0 ? '+' : ''}${attrMod} (${attrName})`);
+    }
+    if (armorMod > 0) {
+        parts.push(`+${armorMod} (armadura)`);
+    }
+    if (bonusTotal > 0) {
+        parts.push(`+${bonusTotal} (equipo)`);
+    }
+    
+    return `${parts.join(' + ')} = ${totalAC}`;
+}
 
     // ===== MOSTRAR PERSONALIZADOR DE COLORES =====
     showColorCustomizer() {
@@ -3617,7 +5300,8 @@ setupBasicInfo() {
             accent: this.colorManager.themeColors.accent || '#d4af37',
             background: this.colorManager.themeColors.background || '#1a0f0a',
             parchment: this.colorManager.themeColors.parchment || '#f5e6d3',
-            gems: this.colorManager.themeColors.gems || '#9370db'
+            gems: this.colorManager.themeColors.gems || '#9370db',
+            tabBar: this.colorManager.themeColors.tabBar || this.colorManager.themeColors.parchment || '#e6d0b5'
         };
         
         modalBody.innerHTML = `
@@ -3651,6 +5335,10 @@ setupBasicInfo() {
                     <label>Gemas</label>
                     <input type="color" id="colorGems" value="${currentColors.gems}">
                 </div>
+                <div class="color-group">
+                <label>Barra de Pestañas</label>
+                <input type="color" id="colorTabBar" value="${currentColors.tabBar}">
+            </div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" id="saveColorsBtn">Aplicar</button>
@@ -3669,7 +5357,8 @@ setupBasicInfo() {
                 accent: document.getElementById('colorAccent').value,
                 background: document.getElementById('colorBackground').value,
                 parchment: document.getElementById('colorParchment').value,
-                gems: document.getElementById('colorGems').value
+                gems: document.getElementById('colorGems').value,
+                tabBar: document.getElementById('colorTabBar').value
             };
             
             Object.entries(colors).forEach(([key, value]) => {
@@ -3792,7 +5481,7 @@ setupBasicInfo() {
 
     // ===== MOSTRAR CONFIRMACIÓN DE GUARDADO =====
     showSaveConfirmation() {
-        const saveBtn = this.$('#saveBtn');
+        const saveBtn = document.querySelector('#saveBtn');
         if (!saveBtn) return;
         
         const originalHTML = saveBtn.innerHTML;
@@ -3806,122 +5495,145 @@ setupBasicInfo() {
     }
 
     // ===== EXPORTAR PERSONAJE =====
-    exportCharacter() {
-        const personajeNombre = this.$('#char-name')?.value?.trim() || 'Sin nombre';
-        const clase = this.$('#char-class')?.value || '';
-        const raza = this.$('#char-race')?.value || '';
-        const trasfondo = this.$('#char-bg')?.value || '';
-        const alineamiento = this.$('#char-align')?.value || '';
+exportCharacter() {
+    const personajeNombre = this.$('#char-name')?.value?.trim() || 'Sin nombre';
+    const clase = this.$('#char-class')?.value || '';
+    const raza = this.$('#char-race')?.value || '';
+    const trasfondo = this.$('#char-bg')?.value || '';
+    const alineamiento = this.$('#char-align')?.value || '';
+    
+    const inventoryCard = this.$('#card-inventory');
+    const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
+    
+    // ===== IMPORTANTE: Obtener imagen del storage correctamente =====
+    const imagenUrl = this.storage.load('imagenUrl') || null;
+    
+    const atributosDOM = [];
+    this.$$('.attribute-item').forEach(item => {
+        const nameInput = item.querySelector('.attribute-name');
+        const valueInput = item.querySelector('.ability-value');
+        const modifierElement = item.querySelector('.ability-modifier');
         
-        const inventoryCard = this.$('#card-inventory');
-        const isInventoryCollapsed = inventoryCard ? inventoryCard.classList.contains('collapsed') : false;
-        
-        const imagenUrl = localStorage.getItem('imagenUrl') || null;
-        
-        const atributosDOM = [];
-        this.$$('.attribute-item').forEach(item => {
-            const nameInput = item.querySelector('.attribute-name');
-            const valueInput = item.querySelector('.ability-value');
-            const modifierElement = item.querySelector('.ability-modifier');
+        if (nameInput && valueInput) {
+            const nombre = nameInput.value.trim() || 'ATRIBUTO';
+            const valor = parseInt(valueInput.value) || 10;
+            let modifier = 0;
             
-            if (nameInput && valueInput) {
-                const nombre = nameInput.value.trim() || 'ATRIBUTO';
-                const valor = parseInt(valueInput.value) || 10;
-                let modifier = 0;
-                
-                if (modifierElement) {
-                    const modifierText = modifierElement.textContent;
-                    modifier = parseInt(modifierText) || 0;
-                } else {
-                    modifier = Helpers.calculateModifier(valor);
-                }
-                
-                atributosDOM.push({
-                    nombre: nombre,
-                    valor: valor,
-                    modificador: modifier
-                });
+            if (modifierElement) {
+                const modifierText = modifierElement.textContent;
+                modifier = parseInt(modifierText) || 0;
+            } else {
+                modifier = Helpers.calculateModifier(valor);
             }
-        });
-        
-        const notas = {
-            personalidad: this.$('#personality')?.value || '',
-            ideales: this.$('#ideals')?.value || '',
-            vinculos: this.$('#bonds')?.value || '',
-            defectos: this.$('#flaws')?.value || '',
-            rasgos: this.$('#features')?.value || ''
+            
+            atributosDOM.push({
+                nombre: nombre,
+                valor: valor,
+                modificador: modifier
+            });
+        }
+    });
+    
+    const notas = {
+        personalidad: this.$('#personality')?.value || '',
+        ideales: this.$('#ideals')?.value || '',
+        vinculos: this.$('#bonds')?.value || '',
+        defectos: this.$('#flaws')?.value || '',
+        rasgos: this.$('#features')?.value || ''  // <-- Asegurar que se guarda
+    };
+    
+    // ===== IMPORTANTE: Obtener colores del ColorManager =====
+    const coloresGuardados = this.storage.load('characterColors') || {};
+    const textColorsGuardados = this.storage.load('characterTextColors') || {};
+    
+    // Obtener TODOS los colores del tema actual
+    const themeColors = this.colorManager.themeColors || {};
+    const textColors = this.colorManager.textColors || {};
+    
+    // Construir colores finales (priorizar colores actuales sobre guardados)
+    const coloresFinales = {
+        background: themeColors.background || coloresGuardados.background || null,
+        parchment: themeColors.parchment || coloresGuardados.parchment || null,
+        accent: themeColors.accent || coloresGuardados.accent || '#d4af37',
+        mana: themeColors.mana || coloresGuardados.mana || '#4169e1',
+        hp: themeColors.hp || coloresGuardados.hp || '#dc143c',
+        exp: themeColors.exp || coloresGuardados.exp || '#4a90e2',
+        gems: themeColors.gems || coloresGuardados.gems || '#9370db',
+        tabBar: themeColors.tabBar || coloresGuardados.tabBar || null,
+        textColors: {
+            title: textColors.title || '#2c1810',
+            subtitle: textColors.subtitle || '#4a3728',
+            label: textColors.label || '#5c4033',
+            input: textColors.input || '#2c1810',
+            number: textColors.number || '#1e3a5f',
+            modifier: textColors.modifier || '#6a0dad'
+        }
+    };
+    
+    const layout = {};
+    this.$$('.card').forEach((card, index) => {
+        const id = card.id || `card-${index}`;
+        layout[id] = {
+            width: card.style.width || getComputedStyle(card).width,
+            height: card.style.height || getComputedStyle(card).height,
+            parentId: card.parentNode?.id || card.parentNode?.className || ''
         };
-        
-        const coloresGuardados = JSON.parse(localStorage.getItem('characterColors') || '{}');
-        const textColorsGuardados = JSON.parse(localStorage.getItem('characterTextColors') || '{}');
-        
-        const layout = {};
-        this.$$('.card').forEach((card, index) => {
-            const id = card.id || `card-${index}`;
-            layout[id] = {
-                width: card.style.width || getComputedStyle(card).width,
-                height: card.style.height || getComputedStyle(card).height,
-                parentId: card.parentNode?.id || card.parentNode?.className || ''
-            };
-        });
-        
-        const characterData = {
-            id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            nombre: personajeNombre,
-            clase: clase,
-            raza: raza,
-            nivel: this.expManager?.getData().level || 1,
-            jugador: localStorage.getItem('jugadorNombre') || 'Aventurero',
-            imagen: imagenUrl,
-            colores_personalizados: {
-                background: coloresGuardados.background || null,
-                parchment: coloresGuardados.parchment || null,
-                accent: coloresGuardados.accent || null,
-                mana: coloresGuardados.mana || null,
-                hp: coloresGuardados.hp || null,
-                gems: coloresGuardados.gems || null,
-                textColors: textColorsGuardados
-            },
-            stats: {
-                hp: this.healthManager.getData(),
-                mana: this.manaManager.getData(),
-                ca: parseInt(this.$('#armor-class')?.value) || 12,
-                velocidad: parseInt(this.$('#speed')?.value) || 30,
-                iniciativa: parseInt(this.$('#initiative')?.value) || 1,
-                atributos: atributosDOM
-            },
-            ataques: this.getAttacks(),
-            conjuros: this.getSpells(),
-            inventario: {
-                monedas: this.currencyManager.getData(),
-                tesoros: this.treasureManager.getAll(),
-                pociones: this.potionManager.getAll(),
-                equipo: this.equipmentManager.getAll(),
-                collapsed: isInventoryCollapsed
-            },
-            deathSaves: this.deathSavesManager.getData(),
-            skills: this.skillsManager.getAll(),
-            passivePerception: this.passivePerception || 10,
-            proficiencies: this.proficiencyManager.getAll(),
-            savingThrows: this.savingThrowsManager.getAll(),
-            notas: notas,
-            layout: layout,
-            fecha_creacion: new Date().toISOString(),
-            version: '3.2'
-        };
-        
-        const dataStr = JSON.stringify(characterData, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `personaje-${personajeNombre.replace(/\s+/g, '-').toLowerCase() || 'sin-nombre'}.json`;
-        a.click();
-        
-        URL.revokeObjectURL(url);
-        Helpers.showMessage('Personaje exportado correctamente', 'info');
-    }
+    });
+    
+    const characterData = {
+        id: `pj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        nombre: personajeNombre,
+        clase: clase,
+        raza: raza,
+        nivel: this.expManager?.getData().level || 1,
+        jugador: this.getPlayerName(),
+        trasfondo: trasfondo,
+        alineamiento: alineamiento,
+        imagen: imagenUrl,
+        colores_personalizados: coloresFinales,
+        stats: {
+            hp: this.healthManager.getData(),
+            mana: this.manaManager.getData(),
+            ca: parseInt(this.$('#armor-class')?.value) || 12,
+            velocidad: parseInt(this.$('#speed')?.value) || 30,
+            iniciativa: parseInt(this.$('#initiative')?.value) || 1,
+            atributos: atributosDOM
+        },
+        spellSlots: this.spellSlotsManager.getData(),
+        spellStats: this.spellStatsManager.getData(),
+        ataques: this.getAttacks(),
+        conjuros: this.getSpells(),
+        inventario: {
+            monedas: this.currencyManager.getData(),
+            tesoros: this.treasureManager.getAll(),
+            pociones: this.potionManager.getAll(),
+            equipo: this.equipmentManager.getAll(),
+            collapsed: isInventoryCollapsed
+        },
+        deathSaves: this.deathSavesManager.getData(),
+        skills: this.skillsManager.getAll(),
+        passivePerception: this.passivePerception || 10,
+        proficiencies: this.proficiencyManager.getAll(),
+        savingThrows: this.savingThrowsManager.getAll(),
+        notas: notas,
+        layout: layout,
+        fecha_creacion: new Date().toISOString(),
+        version: '3.2',
+        tabId: this.tabId
+    };
+    
+    const dataStr = JSON.stringify(characterData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `personaje-${personajeNombre.replace(/\s+/g, '-').toLowerCase() || 'sin-nombre'}.json`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+    Helpers.showMessage('Personaje exportado correctamente', 'info');
+}
 
     // ===== IMPORTAR PERSONAJE =====
     importCharacter() {
@@ -3966,324 +5678,6 @@ setupBasicInfo() {
         }
     }
 
-    // ===== CARGAR PERSONAJE DESDE DATOS =====
-    loadCharacterFromData(data) {
-    this.clearAllData();
-    
-    if (data.basicInfo) {
-        const charName = this.$('#char-name');
-        const charClass = this.$('#char-class');
-        const charRace = this.$('#char-race');
-        const charBg = this.$('#char-bg');
-        const charAlign = this.$('#char-align');
-        
-        if (charName) charName.value = data.basicInfo.name || '';
-        if (charClass) charClass.value = data.basicInfo.class || '';
-        if (charRace) charRace.value = data.basicInfo.race || '';
-        if (charBg) charBg.value = data.basicInfo.background || '';
-        if (charAlign) charAlign.value = data.basicInfo.alignment || '';
-        this.saveBasicInfo();
-    } else if (data.nombre) {
-        const charName = this.$('#char-name');
-        const charClass = this.$('#char-class');
-        const charRace = this.$('#char-race');
-        
-        if (charName) charName.value = data.nombre || '';
-        if (charClass) charClass.value = data.clase || '';
-        if (charRace) charRace.value = data.raza || '';
-    }
-    
-    // Cargar imagen en storage aislado
-    if (data.imagen) {
-        this.storage.save('imagenUrl', data.imagen);
-        if (this.imageManager) {
-            this.imageManager.currentImageUrl = data.imagen;
-            this.imageManager.displayImage(data.imagen);
-        }
-    }
-        
-        if (data.attributes && data.attributes.length > 0) {
-            this.attributeManager.attributes = [];
-            data.attributes.forEach(attr => {
-                const nombre = attr.name || attr.nombre || 'ATRIBUTO';
-                const valor = attr.value || attr.valor || 10;
-                this.attributeManager.add(nombre, valor);
-            });
-            setTimeout(() => {
-                this.savingThrowsManager.updateFromAttributes();
-            }, 100);
-        } else if (data.stats?.atributos && data.stats.atributos.length > 0) {
-            this.attributeManager.attributes = [];
-            data.stats.atributos.forEach(attr => {
-                this.attributeManager.add(attr.nombre, attr.valor);
-            });
-        }
-        
-        if (data.hp) {
-            this.healthManager.setCurrent(data.hp.current || 26);
-            this.healthManager.setMax(data.hp.max || 26);
-            this.healthManager.setTemp(data.hp.temp || 0);
-        } else if (data.stats?.hp) {
-            this.healthManager.setCurrent(data.stats.hp.current || 26);
-            this.healthManager.setMax(data.stats.hp.max || 26);
-            this.healthManager.setTemp(data.stats.hp.temp || 0);
-        }
-        
-        if (data.mana) {
-            this.manaManager.setCurrent(data.mana.current || 2);
-            this.manaManager.setMax(data.mana.max || 15);
-        } else if (data.stats?.mana) {
-            this.manaManager.setCurrent(data.stats.mana.current || 2);
-            this.manaManager.setMax(data.stats.mana.max || 15);
-        }
-        
-        if (data.spellSlots) {
-            this.spellSlotsManager.setLevel(data.spellSlots.level || 1);
-            this.spellSlotsManager.setTotal(data.spellSlots.total || 4);
-            this.spellSlotsManager.setUsed(data.spellSlots.used || 0);
-        }
-        
-        if (data.spellStats) {
-            this.spellStatsManager.spellStats = { ...this.spellStatsManager.spellStats, ...data.spellStats };
-            this.spellStatsManager.calculateStats();
-        }
-        
-        if (data.stats) {
-            const armorClass = this.$('#armor-class');
-            const speed = this.$('#speed');
-            const initiative = this.$('#initiative');
-            
-            if (armorClass) armorClass.value = data.stats.ca || 12;
-            if (speed) speed.value = data.stats.velocidad || 30;
-            if (initiative) initiative.value = data.stats.iniciativa || 1;
-        }
-        
-        const attacksList = this.$('.attacks-list');
-        if (attacksList) {
-            const attackItems = attacksList.querySelectorAll('.attack-item');
-            attackItems.forEach(item => item.remove());
-            
-            const attacks = data.attacks || data.ataques || [];
-            attacks.forEach(attack => {
-                this.addAttack(attack.name, attack.bonus, attack.damage, false);
-            });
-        }
-
-        if (data.attacks && data.attacks.length > 0) {
-            const attacksList = this.$('.attacks-list');
-            if (attacksList) {
-                const attackItems = attacksList.querySelectorAll('.attack-item');
-                attackItems.forEach(item => item.remove());
-                
-                data.attacks.forEach(attack => {
-                    this.addAttack(attack.name, attack.bonus, attack.damage, false);
-                });
-                
-                this.saveAttacksToStorage();
-            }
-        } else if (data.ataques && data.ataques.length > 0) {
-            const attacksList = this.$('.attacks-list');
-            if (attacksList) {
-                const attackItems = attacksList.querySelectorAll('.attack-item');
-                attackItems.forEach(item => item.remove());
-                
-                data.ataques.forEach(attack => {
-                    this.addAttack(attack.name, attack.bonus, attack.damage, false);
-                });
-                
-                this.saveAttacksToStorage();
-            }
-        }
-        
-        const spellsList = this.$('#spellsList');
-        if (spellsList) {
-            spellsList.innerHTML = '';
-            const spells = data.spells || data.conjuros || [];
-            spells.forEach(spell => {
-                this.spellManager.add(spell.name, spell.level, spell.description);
-            });
-        }
-        
-        if (data.exp) {
-            this.expManager.setCurrent(data.exp.current || 0);
-            this.expManager.setMax(data.exp.max || 300);
-            this.expManager.setLevel(data.exp.level || 1);
-        } else if (data.nivel) {
-            this.expManager.setLevel(data.nivel || 1);
-        }
-        
-        const inventory = data.inventario || data;
-        
-        if (inventory.currency || inventory.monedas) {
-            const currency = inventory.currency || inventory.monedas || {};
-            this.currencyManager.setGold(currency.gold || 0);
-            this.currencyManager.setSilver(currency.silver || 0);
-            this.currencyManager.setCopper(currency.copper || 0);
-            
-            if (currency.name) this.currencyManager.updateNames({
-                name: currency.name,
-                goldName: currency.goldName || 'Oro',
-                silverName: currency.silverName || 'Plata',
-                copperName: currency.copperName || 'Cobre'
-            });
-        }
-        
-        if (inventory.treasures || inventory.tesoros) {
-            const treasures = inventory.treasures || inventory.tesoros || [];
-            this.treasureManager.treasures = [];
-            treasures.forEach(t => {
-                this.treasureManager.add(t.name, t.value, t.type);
-            });
-        }
-        
-        if (inventory.potions || inventory.pociones) {
-            const potions = inventory.potions || inventory.pociones || [];
-            this.potionManager.potions = [];
-            potions.forEach(p => {
-                this.potionManager.add(p.name, p.type, p.value, p.amount);
-            });
-        }
-        
-        if (inventory.equipment || inventory.equipo) {
-            const equipment = inventory.equipment || inventory.equipo || [];
-            this.equipmentManager.equipment = [];
-            equipment.forEach(e => {
-                this.equipmentManager.add(
-                    e.name, 
-                    e.cost || 0, 
-                    e.weight || 0, 
-                    e.description || '', 
-                    e.stealth || 'none', 
-                    e.attribute || '', 
-                    e.bonus || 0
-                );
-            });
-        }
-        
-        if (data.deathSaves) {
-            this.deathSavesManager.successes = data.deathSaves.successes || [false, false, false];
-            this.deathSavesManager.fails = data.deathSaves.fails || [false, false, false];
-            this.deathSavesManager.notify();
-        }
-        
-        if (data.skills && data.skills.length > 0) {
-            const currentAttributes = this.attributeManager.getAll();
-            const attributeMap = {};
-            currentAttributes.forEach(attr => {
-                attributeMap[attr.name] = attr;
-                attributeMap[attr.name.toUpperCase()] = attr;
-            });
-            
-            this.skillsManager.skills = [];
-            data.skills.forEach(skill => {
-                let attribute = skill.attribute || '';
-                if (!attribute) {
-                    const skillNameLower = skill.name.toLowerCase();
-                    const SKILL_ATTRIBUTE_MAP = {
-                        'acrobacias': 'DESTREZA',
-                        'arcano': 'INTELIGENCIA',
-                        'atletismo': 'FUERZA',
-                        'engaño': 'CARISMA',
-                        'historia': 'INTELIGENCIA',
-                        'interpretación': 'CARISMA',
-                        'intimidación': 'CARISMA',
-                        'investigación': 'INTELIGENCIA',
-                        'juego de manos': 'DESTREZA',
-                        'medicina': 'SABIDURÍA',
-                        'naturaleza': 'INTELIGENCIA',
-                        'percepción': 'SABIDURÍA',
-                        'perspicacia': 'SABIDURÍA',
-                        'persuasión': 'CARISMA',
-                        'religión': 'INTELIGENCIA',
-                        'sigilo': 'DESTREZA',
-                        'supervivencia': 'SABIDURÍA',
-                        'trato con animales': 'SABIDURÍA'
-                    };
-                    attribute = SKILL_ATTRIBUTE_MAP[skillNameLower] || '';
-                }
-                
-                this.skillsManager.add(skill.name, attribute);
-                
-                const lastSkill = this.skillsManager.skills[this.skillsManager.skills.length - 1];
-                if (lastSkill) {
-                    lastSkill.bonus = skill.bonus || 0;
-                    lastSkill.proficient = skill.proficient || false;
-                    lastSkill.expertise = skill.expertise || false;
-                    lastSkill.misc = skill.misc || 0;
-                }
-            });
-            this.skillsManager.updateAllBonuses();
-            this.skillsManager.notify();
-        }
-        
-        if (data.passivePerception !== undefined) {
-            this.passivePerception = data.passivePerception;
-            const perceptionInput = this.$('#passivePerception');
-            if (perceptionInput) perceptionInput.value = data.passivePerception;
-        }
-        
-        if (data.proficiencies && data.proficiencies.length > 0) {
-            this.proficiencyManager.proficiencies = [];
-            data.proficiencies.forEach(prof => {
-                this.proficiencyManager.add(prof.name, prof.type || 'language');
-            });
-        }
-        
-        if (data.savingThrows && data.savingThrows.length > 0) {
-            this.savingThrowsManager.savingThrows = data.savingThrows.map(st => ({
-                name: st.name,
-                value: st.value || 0,
-                proficient: st.proficient || false,
-                basedOn: st.basedOn || st.name,
-                modifier: st.modifier || 0
-            }));
-            this.savingThrowsManager.updateAllValues();
-            this.savingThrowsManager.notify();
-        }
-        
-        const notas = data.notas || data;
-        
-        const personality = this.$('#personality');
-        const ideals = this.$('#ideals');
-        const bonds = this.$('#bonds');
-        const flaws = this.$('#flaws');
-        const features = this.$('#features');
-        
-        if (notas.personalidad !== undefined) {
-            if (personality) personality.value = notas.personalidad || '';
-            if (ideals) ideals.value = notas.ideales || '';
-            if (bonds) bonds.value = notas.vinculos || '';
-            if (flaws) flaws.value = notas.defectos || '';
-            if (features) features.value = notas.rasgos || '';
-        } else if (notas.personality) {
-            if (personality) personality.value = notas.personality || '';
-            if (ideals) ideals.value = notas.ideals || '';
-            if (bonds) bonds.value = notas.bonds || '';
-            if (flaws) flaws.value = notas.flaws || '';
-            if (features) features.value = notas.features || '';
-        }
-        
-        if (data.layout) {
-            Object.entries(data.layout).forEach(([cardId, cardLayout]) => {
-                const card = document.getElementById(cardId);
-                if (card) {
-                    if (cardLayout.width) card.style.width = cardLayout.width;
-                    if (cardLayout.height) card.style.height = cardLayout.height;
-                }
-            });
-        }
-        
-        setTimeout(() => {
-            this.skillsManager.updateAllBonuses();
-            this.savingThrowsManager.updateFromAttributes();
-            this.calcularPercepcionPasiva();
-            this.updateSpellStatsDisplay();
-            this.syncCharacterWithWebSocket();
-        }, 500);
-        
-        this.saveCharacter();
-    }
-
     // ===== LIMPIAR TODOS LOS DATOS =====
     clearAllData() {
         if (this.attributeManager) {
@@ -4324,9 +5718,53 @@ setupBasicInfo() {
     // ===== REINICIAR TODO =====
     resetAll() {
         if (confirm('¿Estás seguro? Esta acción no se puede deshacer.')) {
+            this.cleanupAutoSave();
+            
             this.storage.clear();
-            localStorage.clear();
-            location.reload();
+            
+            this.attributeManager.loadDefaults();
+            this.healthManager.setCurrent(26);
+            this.healthManager.setMax(26);
+            this.healthManager.setTemp(0);
+            this.manaManager.setCurrent(0);
+            this.manaManager.setMax(15);
+            this.deathSavesManager.reset();
+            this.currencyManager.reset();
+            
+            this.treasureManager.treasures = [];
+            this.potionManager.potions = [];
+            this.equipmentManager.equipment = [];
+            this.spellManager.spells = [];
+            this.skillsManager.skills = [];
+            this.proficiencyManager.proficiencies = [];
+            
+            const attacksList = this.$('.attacks-list');
+            if (attacksList) {
+                const attackItems = attacksList.querySelectorAll('.attack-item');
+                attackItems.forEach(item => item.remove());
+            }
+            
+            this.refresh();
+            
+            const textareas = ['personality', 'ideals', 'bonds', 'flaws', 'features'];
+            textareas.forEach(id => {
+                const el = this.$(`#${id}`);
+                if (el) el.value = '';
+            });
+            
+            const nameInput = this.$('#char-name');
+            if (nameInput) nameInput.value = '';
+            
+            const armorClass = this.$('#armor-class');
+            const speed = this.$('#speed');
+            const initiative = this.$('#initiative');
+            if (armorClass) armorClass.value = 10;
+            if (speed) speed.value = 30;
+            if (initiative) initiative.value = 1;
+            
+            this._dataLoaded = false;
+            
+            Helpers.showMessage('Hoja restablecida correctamente', 'info');
         }
     }
 
@@ -4377,5 +5815,28 @@ setupBasicInfo() {
                 // Si el usuario borra la raza, no hacemos nada con la descripción
             }
         });
+    }
+
+    // ===== CONFIGURAR AUTO-GUARDADO PERIÓDICO =====
+    setupPeriodicAutoSave() {
+        if (this._autoSaveInterval) {
+            clearInterval(this._autoSaveInterval);
+        }
+        
+        this._autoSaveInterval = setInterval(() => {
+            const charName = this.$('#char-name')?.value?.trim();
+            if (charName && charName !== '' && charName !== 'Sin nombre' && this._dataLoaded && !this._isSaving) {
+                this.saveCharacter();
+                console.log(`⏰ Auto-guardado periódico (${this.tabId})`);
+            }
+        }, 30000);
+    }
+
+    // ===== LIMPIAR AUTO-GUARDADO =====
+    cleanupAutoSave() {
+        if (this._autoSaveInterval) {
+            clearInterval(this._autoSaveInterval);
+            this._autoSaveInterval = null;
+        }
     }
 }

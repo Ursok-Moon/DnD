@@ -491,6 +491,51 @@ app.get('/api/json/export-all', (req, res) => {
     });
 });
 
+// Guardar múltiples personajes
+app.post('/api/personajes/guardar-multiples', async (req, res) => {
+    try {
+        const { personajes, fecha } = req.body;
+        
+        if (!Array.isArray(personajes)) {
+            return res.status(400).json({ error: 'Se requiere un array de personajes' });
+        }
+        
+        const hoy = fecha || new Date().toISOString().split('T')[0];
+        const personajesPath = path.join(DATA_PATH, 'personajes');
+        await fs.mkdir(personajesPath, { recursive: true });
+        
+        const rutaPersonajes = path.join(personajesPath, `${hoy}.json`);
+        
+        let personajesHoy = { fecha: hoy, personajes: [] };
+        try {
+            const data = await fs.readFile(rutaPersonajes, 'utf8');
+            personajesHoy = JSON.parse(data);
+        } catch (e) {}
+        
+        for (const personaje of personajes) {
+            if (!personaje.nombre) continue;
+            const index = personajesHoy.personajes.findIndex(p => 
+                p.id === personaje.id || p.nombre === personaje.nombre
+            );
+            if (index !== -1) {
+                personajesHoy.personajes[index] = personaje;
+            } else {
+                personajesHoy.personajes.push(personaje);
+            }
+        }
+        
+        await fs.writeFile(rutaPersonajes, JSON.stringify(personajesHoy, null, 2));
+        
+        const rutaHoy = path.join(DATA_PATH, 'personajes_hoy.json');
+        await fs.writeFile(rutaHoy, JSON.stringify(personajesHoy, null, 2));
+        
+        res.json({ success: true, mensaje: `${personajes.length} personajes guardados` });
+    } catch (error) {
+        console.error('❌ Error guardando múltiples personajes:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/json/stats', async (req, res) => {
     try {
         const dataDir = path.join(__dirname, 'data');
@@ -715,6 +760,7 @@ app.post('/api/personajes/guardar', async (req, res) => {
         res.json({ 
             success: true, 
             personaje: personajeData,
+            id: personajeData.id || `pj_${Date.now()}`,
             mensaje: 'Personaje guardado correctamente'
         });
         
@@ -833,6 +879,180 @@ app.get('/api/sesion/actual', async (req, res) => {
         res.json(sesionInfo);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ===== OBTENER ÚLTIMO PERSONAJE GUARDADO =====
+app.get('/api/personajes/ultimo', async (req, res) => {
+    try {
+        console.log('🔍 Buscando último personaje...');
+        
+        const personajesPath = path.join(DATA_PATH, 'personajes');
+        const rutaHoy = path.join(DATA_PATH, 'personajes_hoy.json');
+        
+        let personajesHoy = { fecha: new Date().toISOString().split('T')[0], personajes: [] };
+        let found = false;
+        
+        // 1. INTENTAR LEER personajes_hoy.json
+        try {
+            await fs.access(rutaHoy);
+            const data = await fs.readFile(rutaHoy, 'utf8');
+            personajesHoy = JSON.parse(data);
+            if (personajesHoy.personajes && personajesHoy.personajes.length > 0) {
+                console.log(`📂 personajes_hoy.json tiene ${personajesHoy.personajes.length} personajes`);
+                found = true;
+            }
+        } catch (e) {
+            console.log('📁 No existe personajes_hoy.json o está vacío');
+        }
+        
+        // 2. SI NO HAY PERSONAJES, BUSCAR EN personajes/
+        if (!found || personajesHoy.personajes.length === 0) {
+            try {
+                const files = await fs.readdir(personajesPath);
+                const jsonFiles = files
+                    .filter(f => f.match(/^\d{4}-\d{2}-\d{2}\.json$/))
+                    .sort();
+                
+                if (jsonFiles.length > 0) {
+                    // Tomar el archivo más reciente
+                    const latestFile = jsonFiles[jsonFiles.length - 1];
+                    const latestPath = path.join(personajesPath, latestFile);
+                    const data = await fs.readFile(latestPath, 'utf8');
+                    const personajesData = JSON.parse(data);
+                    
+                    if (personajesData.personajes && personajesData.personajes.length > 0) {
+                        personajesHoy = personajesData;
+                        console.log(`📂 Cargado desde ${latestFile} con ${personajesHoy.personajes.length} personajes`);
+                        found = true;
+                    }
+                }
+            } catch (e2) {
+                console.log('📁 No se encontraron archivos en personajes/');
+            }
+        }
+        
+        // 3. SI AÚN NO HAY PERSONAJES, BUSCAR EN IMAGENES (fallback)
+        if (!found || personajesHoy.personajes.length === 0) {
+            // Intentar cargar desde localStorage del usuario (vía API)
+            console.log('📁 No hay personajes en archivos, buscando en localStorage...');
+            // Devolver vacío, el frontend cargará de localStorage
+            return res.json({ 
+                success: false, 
+                error: 'No hay personajes guardados en el servidor',
+                personajes: []
+            });
+        }
+        
+        // 4. ENCONTRAR EL ÚLTIMO PERSONAJE
+        if (personajesHoy.personajes.length === 0) {
+            return res.json({ 
+                success: false, 
+                error: 'No hay personajes guardados',
+                personajes: []
+            });
+        }
+        
+        // Buscar por ID o tomar el último
+        const lastId = req.query.id || null;
+        let personaje = null;
+        
+        if (lastId) {
+            personaje = personajesHoy.personajes.find(p => p.id === lastId);
+            if (personaje) console.log(`🔍 Encontrado por ID: ${personaje.nombre}`);
+        }
+        
+        if (!personaje) {
+            personaje = personajesHoy.personajes[personajesHoy.personajes.length - 1];
+            console.log(`📂 Tomando último: ${personaje.nombre}`);
+        }
+        
+        // Asegurar campos necesarios
+        if (!personaje.colores_personalizados) {
+            personaje.colores_personalizados = {};
+        }
+        
+        console.log(`✅ Personaje servido: ${personaje.nombre}`);
+        res.json({ 
+            success: true, 
+            personaje: personaje,
+            total: personajesHoy.personajes.length,
+            source: found ? 'archivo' : 'fallback'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error al obtener último personaje:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+// ===== OBTENER PERSONAJE POR ID =====
+app.get('/api/personajes/id/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const rutaHoy = path.join(DATA_PATH, 'personajes_hoy.json');
+        
+        try {
+            await fs.access(rutaHoy);
+        } catch {
+            return res.status(404).json({ success: false, error: 'No hay personajes guardados' });
+        }
+        
+        const data = await fs.readFile(rutaHoy, 'utf8');
+        const personajesHoy = JSON.parse(data);
+        
+        const personaje = personajesHoy.personajes.find(p => p.id === id);
+        
+        if (!personaje) {
+            return res.status(404).json({ success: false, error: 'Personaje no encontrado' });
+        }
+        
+        if (!personaje.colores_personalizados) {
+            personaje.colores_personalizados = {};
+        }
+        
+        res.json({ success: true, personaje });
+        
+    } catch (error) {
+        console.error('❌ Error al obtener personaje por ID:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ===== OBTENER TODOS LOS PERSONAJES DEL DÍA =====
+app.get('/api/personajes/todos', async (req, res) => {
+    try {
+        const rutaHoy = path.join(DATA_PATH, 'personajes_hoy.json');
+        
+        let personajesHoy = { 
+            fecha: new Date().toISOString().split('T')[0], 
+            personajes: [] 
+        };
+        
+        try {
+            const data = await fs.readFile(rutaHoy, 'utf8');
+            personajesHoy = JSON.parse(data);
+        } catch (e) {
+            console.log('📁 No hay personajes guardados');
+        }
+        
+        // Asegurar que todos tengan colores_personalizados
+        personajesHoy.personajes = personajesHoy.personajes.map(p => {
+            if (!p.colores_personalizados) {
+                p.colores_personalizados = {};
+            }
+            return p;
+        });
+        
+        console.log(`📊 ${personajesHoy.personajes.length} personajes servidos (todos)`);
+        res.json(personajesHoy);
+        
+    } catch (error) {
+        console.error('❌ Error al leer personajes:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

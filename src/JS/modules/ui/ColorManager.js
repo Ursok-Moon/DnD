@@ -9,18 +9,27 @@ export class ColorManager {
     }
 
     load() {
-        const savedTheme = this.storage.load('themeColors');
-        if (savedTheme) {
-            this.themeColors = savedTheme;
+    const savedTheme = this.storage.load('themeColors');
+    if (savedTheme) {
+        this.themeColors = savedTheme;
+        // Si no hay tabBar, usar parchment como fallback
+        if (!this.themeColors.tabBar && this.themeColors.parchment) {
+            this.themeColors.tabBar = this.themeColors.parchment;
         }
-        
-        const savedText = this.storage.load('textColors');
-        if (savedText) {
-            this.textColors = { ...this.textColors, ...savedText };
-        }
-        
-        this.applyToCSS();
+    } else {
+        // Valores por defecto
+        this.themeColors = {
+            mana: '#4169e1',
+            hp: '#dc143c',
+            exp: '#4a90e2',
+            accent: '#d4af37',
+            background: '#1a0f0a',
+            parchment: '#f5e6d3',
+            gems: '#9370db',
+            tabBar: '#e6d0b5'  // NUEVO
+        };
     }
+}
 
     getColor(key) {
         return this.textColors[key] || this.themeColors[key] || DEFAULT_TEXT_COLORS[key] || '#000000';
@@ -64,10 +73,11 @@ export class ColorManager {
             'mana': '--mana-color',
             'hp': '--hp-color',
             'exp': '--exp-color',
-            'accent': '--accent-gold',      // Mapeo correcto
+            'accent': '--accent-gold',      
             'background': '--body-bg',
-            'parchment': '--parchment-light', // Mapeo correcto
-            'gems': '--slot-color'           // Mapeo correcto
+            'parchment': '--parchment-light', 
+            'gems': '--slot-color',
+            'tabBar': '--tab-bar-bg'           
         };
         
         // Aplicar colores del tema usando el mapeo

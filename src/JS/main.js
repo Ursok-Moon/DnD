@@ -1,5 +1,3 @@
-// src/JS/main.js
-
 import './config.js';
 
 // Importar clases principales
@@ -21,7 +19,7 @@ tabStyles.textContent = `
     .tab-bar {
         display: flex;
         align-items: center;
-        background: var(--parchment-dark, #e6d0b5);
+        background: var(--tab-bar-bg, var(--parchment-dark, #e6d0b5));
         border-bottom: 3px solid var(--accent-gold, #d4af37);
         padding: 5px 10px 0 10px;
         flex-shrink: 0;
@@ -29,6 +27,7 @@ tabStyles.textContent = `
         gap: 5px;
         flex-wrap: wrap;
         border-radius: 8px 8px 0 0;
+        transition: background 0.3s ease;
     }
 
     .tab-list {
@@ -259,6 +258,172 @@ function waitForElement(selector, timeout = 5000) {
     });
 }
 
+// ============================================================
+// FUNCIÓN PARA OBTENER EL CHARACTERSHEET ACTIVO
+// ============================================================
+function getActiveCharacterSheet() {
+    // 1. Intentar desde window.characterSheet
+    if (window.characterSheet && typeof window.characterSheet.saveCharacter === 'function') {
+        return window.characterSheet;
+    }
+    
+    // 2. Intentar desde tabManager
+    if (window.tabManager) {
+        const activeTab = window.tabManager.getActiveTabData();
+        if (activeTab && activeTab.characterSheet) {
+            return activeTab.characterSheet;
+        }
+    }
+    
+    // 3. Buscar en todas las pestañas
+    if (window.tabManager && window.tabManager.tabs) {
+        for (const tab of window.tabManager.tabs) {
+            if (tab.characterSheet && typeof tab.characterSheet.saveCharacter === 'function') {
+                return tab.characterSheet;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// ============================================================
+// FUNCIÓN PARA ESPERAR CHARACTERSHEET CON VERIFICACIÓN PERIÓDICA
+// ============================================================
+function waitForCharacterSheet(maxAttempts = 30, interval = 300) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+            attempts++;
+            
+            // Verificar si hay un CharacterSheet disponible
+            const sheet = getActiveCharacterSheet();
+            if (sheet) {
+                clearInterval(checkInterval);
+                console.log(`✅ CharacterSheet disponible después de ${attempts} intentos`);
+                resolve(sheet);
+                return;
+            }
+            
+            if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                reject(new Error(`CharacterSheet no disponible después de ${maxAttempts} intentos`));
+            }
+        }, interval);
+    });
+}
+
+// ============================================================
+// FUNCIÓN PARA INICIALIZAR BOTONES DEL FOOTER
+// ============================================================
+async function setupFooterButtons() {
+    try {
+        // Esperar a que CharacterSheet esté disponible
+        const sheet = await waitForCharacterSheet();
+        console.log('🔧 Configurando botones del footer...');
+
+        // Botón Guardar
+        const saveBtn = document.querySelector('#saveBtn');
+        if (saveBtn) {
+            const newSave = saveBtn.cloneNode(true);
+            saveBtn.parentNode.replaceChild(newSave, saveBtn);
+            newSave.addEventListener('click', () => {
+                console.log('💾 Guardando desde footer...');
+                sheet.saveCharacter();
+            });
+        }
+
+        // Botón Exportar
+        const exportBtn = document.querySelector('#exportBtn');
+        if (exportBtn) {
+            const newExport = exportBtn.cloneNode(true);
+            exportBtn.parentNode.replaceChild(newExport, exportBtn);
+            newExport.addEventListener('click', () => {
+                console.log('📤 Exportando desde footer...');
+                sheet.exportCharacter();
+            });
+        }
+
+        // Botón Importar
+        const importBtn = document.querySelector('#importBtn');
+        if (importBtn) {
+            const newImport = importBtn.cloneNode(true);
+            importBtn.parentNode.replaceChild(newImport, importBtn);
+            newImport.addEventListener('click', () => {
+                console.log('📥 Importando desde footer...');
+                sheet.importCharacter();
+            });
+        }
+
+        // Botón Restablecer
+        const resetBtn = document.querySelector('#resetBtn');
+        if (resetBtn) {
+            const newReset = resetBtn.cloneNode(true);
+            resetBtn.parentNode.replaceChild(newReset, resetBtn);
+            newReset.addEventListener('click', () => {
+                console.log('🔄 Restableciendo desde footer...');
+                if (confirm('¿Restablecer toda la hoja? Se perderán los cambios no guardados.')) {
+                    sheet.resetAll();
+                }
+            });
+        }
+
+        // Botón Personalizar Colores
+        const colorBtn = document.querySelector('#colorCustomizerBtn');
+        if (colorBtn) {
+            const newColor = colorBtn.cloneNode(true);
+            colorBtn.parentNode.replaceChild(newColor, colorBtn);
+            newColor.addEventListener('click', () => {
+                console.log('🎨 Abriendo personalizador de colores...');
+                sheet.showColorCustomizer();
+            });
+        }
+
+        // Botón Personalizar Colores de Texto
+        const textBtn = document.querySelector('#textCustomizerBtn');
+        if (textBtn) {
+            const newText = textBtn.cloneNode(true);
+            textBtn.parentNode.replaceChild(newText, textBtn);
+            newText.addEventListener('click', () => {
+                console.log('🔤 Abriendo personalizador de colores de texto...');
+                sheet.showTextColorCustomizer();
+            });
+        }
+
+        console.log('✅ Botones del footer configurados correctamente');
+    } catch (error) {
+        console.error('❌ Error configurando botones del footer:', error);
+        // Reintentar después de 2 segundos
+        setTimeout(setupFooterButtons, 2000);
+    }
+}
+
+// ============================================================
+// FUNCIÓN PARA INICIALIZAR WEBSOCKET
+// ============================================================
+function setupWebSocket() {
+    // Si ya existe un WebSocket global, no hacer nada
+    if (window.wsClient) return;
+
+    // Esperar a que el script de websocket se cargue
+    if (typeof io !== 'undefined') {
+        try {
+            window.wsClient = io();
+            window.wsClient.on('connect', () => {
+                console.log('🔌 WebSocket conectado');
+            });
+            window.wsClient.on('disconnect', () => {
+                console.log('🔌 WebSocket desconectado');
+            });
+        } catch (error) {
+            console.warn('⚠️ Error conectando WebSocket:', error);
+        }
+    } else {
+        console.warn('⚠️ Socket.io no disponible, esperando...');
+        setTimeout(setupWebSocket, 1000);
+    }
+}
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -346,6 +511,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             CharacterSheetClass: CharacterSheet
         });
 
+        // Exponer tabManager globalmente para que getActiveCharacterSheet pueda usarlo
+        window.tabManager = tabManager;
+
+        // RESTAURAR ÚLTIMA PESTAÑA ACTIVA
+        const lastTabId = localStorage.getItem('lastActiveTabId');
+        if (lastTabId && tabManager.getTabData(lastTabId)) {
+            tabManager.activateTab(lastTabId);
+        } else if (tabManager.tabs.length > 0) {
+            tabManager.activateTab(tabManager.tabs[0].id);
+        }
+
+        // Guardar pestaña activa al cambiar
+        tabManager.onTabChange((tabId) => {
+            localStorage.setItem('lastActiveTabId', tabId);
+        });
+
         // Inicializar Modal de nueva hoja
         const newCharModalInstance = new NewCharacterModal(tabManager, CharacterSheet);
 
@@ -353,7 +534,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             newCharModalInstance.show();
         };
 
-        // Inicializar CharacterSheet principal
+        // ============================================================
+        // INICIALIZAR CHARACTERSHEET PRINCIPAL
+        // ============================================================
         const mainContent = document.getElementById('hojaPrincipal');
         if (mainContent) {
             try {
@@ -372,9 +555,56 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        // ============================================================
+        // CONFIGURAR BOTONES DEL FOOTER - AHORA CON ESPERA INTELIGENTE
+        // ============================================================
+        // Iniciar la configuración de botones, con reintentos automáticos
+        setTimeout(() => {
+            setupFooterButtons().catch(err => {
+                console.warn('⚠️ Error en setupFooterButtons:', err);
+            });
+        }, 500);
+
+        // También configurar cuando se crean nuevas pestañas
+        tabManager.onTabCreate(() => {
+            setTimeout(() => {
+                setupFooterButtons().catch(err => {
+                    console.warn('⚠️ Error en setupFooterButtons (tab):', err);
+                });
+            }, 500);
+        });
+
+        // ============================================================
+        // CARGAR ÚLTIMO PERSONAJE GUARDADO
+        // ============================================================
+        setTimeout(() => {
+            const sheet = getActiveCharacterSheet();
+            if (sheet && sheet.loadSavedCharacterData) {
+                console.log('📂 Cargando último personaje guardado...');
+                sheet.loadSavedCharacterData();
+            }
+        }, 500);
+
+        // ============================================================
+        // GUARDAR AL CERRAR LA PÁGINA
+        // ============================================================
+        window.addEventListener('beforeunload', () => {
+            const sheet = getActiveCharacterSheet();
+            if (sheet && sheet.saveCharacter) {
+                console.log('💾 Guardando personaje antes de cerrar...');
+                sheet.saveCharacter();
+            }
+        });
+
+        // ============================================================
+        // CONFIGURAR WEBSOCKET
+        // ============================================================
+        setupWebSocket();
+
         // Exponer para debug
-        window.tabManager = tabManager;
         window.newCharModal = newCharModalInstance;
+        window.getActiveCharacterSheet = getActiveCharacterSheet;
+        window.setupFooterButtons = setupFooterButtons;
 
         console.log('✅ Aplicación iniciada correctamente con sistema de pestañas');
         

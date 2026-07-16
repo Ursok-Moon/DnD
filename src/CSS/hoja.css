@@ -1521,6 +1521,83 @@ select:focus {
     display: flex;
     flex-direction: column;
     gap: 25px;
+    max-height: 700px; /* Altura máxima de la tarjeta */
+    min-height: 300px; /* Altura mínima */
+    overflow: hidden; /* Evita que el contenido se desborde */
+}
+
+/* El contenido del inventario con scroll */
+.inventory-section .inventory-content {
+    flex: 1;
+    overflow-y: auto; /* SCROLL VERTICAL */
+    overflow-x: hidden; /* Evita scroll horizontal */
+    padding-right: 6px; /* Espacio para el scrollbar */
+    min-height: 0; /* Importante para flex */
+    max-height: 550px; /* Altura máxima para el contenido scrollable */
+}
+
+/* Personalizar scrollbar para que se vea con estilo pergamino */
+.inventory-section .inventory-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.inventory-section .inventory-content::-webkit-scrollbar-track {
+    background: var(--parchment-dark, #e6d0b5);
+    border-radius: 4px;
+}
+
+.inventory-section .inventory-content::-webkit-scrollbar-thumb {
+    background: var(--accent-gold, #d4af37);
+    border-radius: 4px;
+    border: 1px solid var(--parchment-light, #f5e6d3);
+}
+
+.inventory-section .inventory-content::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-gold-dark, #b8960f);
+}
+
+/* Para Firefox */
+.inventory-section .inventory-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-gold, #d4af37) var(--parchment-dark, #e6d0b5);
+}
+
+/* Cuando la tarjeta está colapsada, ocultar el scroll */
+.inventory-section.collapsed .inventory-content {
+    overflow-y: hidden;
+    max-height: 0 !important;
+    padding: 0;
+}
+
+/* Ajustar las listas dentro del inventario para que no tengan scroll propio */
+.inventory-section .treasure-list,
+.inventory-section .potions-list,
+.inventory-section .equipment-list {
+    max-height: none; /* Dejar que el scroll del contenedor maneje esto */
+    overflow-y: visible;
+}
+
+/* Los elementos individuales no deben desbordar */
+.inventory-section .treasure-item,
+.inventory-section .potion-item,
+.inventory-section .equipment-item {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+/* Asegurar que el header de la tarjeta no se encoja */
+.inventory-section .card-header-with-toggle {
+    flex-shrink: 0; /* Evita que el encabezado se encoja */
+    margin-bottom: 15px;
+}
+
+/* El título dentro del nuevo contenedor ya no necesita su propio margin-bottom */
+.inventory-section .card-header-with-toggle .card-title {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 /* Sistema monetario */

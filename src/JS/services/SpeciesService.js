@@ -29,58 +29,33 @@ export class SpeciesService {
     }
 
     async loadSpecies() {
-        if (this.loaded) return this.species;
-        
-        try {
-            // Intentar cargar desde el servidor primero
-            const response = await fetch('/api/json/especies');
-            if (response.ok) {
-                const contentType = response.headers.get('content-type');
-                const text = await response.text();
-                
-                // Detectar si es JSONL o JSON normal
-                if (contentType?.includes('application/x-jsonlines') || 
-                    contentType?.includes('application/jsonl') ||
-                    (text.trim().startsWith('{') && !text.trim().startsWith('['))) {
-                    // Es JSONL
-                    this.species = this.parseJSONL(text);
-                } else {
-                    // Es JSON normal (array)
-                    const data = JSON.parse(text);
-                    this.species = Array.isArray(data) ? data : [];
-                }
-            } else {
-                throw new Error('No se pudo cargar desde el servidor');
-            }
-        } catch (error) {
-            console.warn('Cargando especies desde archivo local:', error);
-            // Fallback: cargar desde archivo local
-            try {
-                const response = await fetch('/data/especies.json');
-                const text = await response.text();
-                
-                // Detectar si es JSONL o JSON normal
-                if (text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-                    // Es JSONL
-                    this.species = this.parseJSONL(text);
-                } else {
-                    // Es JSON normal (array)
-                    this.species = JSON.parse(text);
-                }
-            } catch (localError) {
-                console.error('Error cargando especies.json:', localError);
-                this.species = [];
-            }
+    if (this.loaded) return this.species;
+    
+    try {
+        // ✅ CAMBIAR AQUÍ: usar especies-w.json directamente
+        const response = await fetch('/data/especies-w.json');
+        if (!response.ok) {
+            throw new Error('No se pudo cargar especies-w.json');
         }
         
-        // Crear mapa para búsqueda rápida
-        this.buildSpeciesMap();
+        const text = await response.text();
+        const data = JSON.parse(text);
         
-        this.loaded = true;
-        console.log(`✅ ${this.species.length} especies cargadas`);
-        return this.species;
+        // El archivo tiene { "especies": [...] }
+        this.species = data.especies || [];
+        
+    } catch (error) {
+        console.error('❌ Error cargando especies-w.json:', error);
+        this.species = [];
     }
-
+    
+    // Crear mapa para búsqueda rápida
+    this.buildSpeciesMap();
+    
+    this.loaded = true;
+    console.log(`✅ ${this.species.length} especies cargadas desde especies-w.json`);
+    return this.species;
+}
     buildSpeciesMap() {
         this.speciesMap.clear();
         this.species.forEach(esp => {

@@ -1,0 +1,242 @@
+{
+  "especies": [
+    {
+      "name": "Draenei",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Los draenei son una raza alienígena de constitución poderosa, fuertemente sintonizada con la magia. Rasgos: Aumento de Espíritu o Inteligencia +1. Visión en la oscuridad 60 pies. Competencia con espada larga, martillo de guerra, guja y ballesta pesada. Resistencia al daño vil. Presencia heroica: otorga puntos de golpe temporales a aliados. Idiomas: Común y Éredu.",
+      "speed": 30,
+      "Ability Score Increase": "Espíritu o Inteligencia +1",
+      "atributos": {
+        "Espíritu": 1,
+        "Inteligencia": 1
+      }
+    },
+    {
+      "name": "Draenei Íntegro",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Subraza de los draenei, campeones firmes de la Luz Sagrada. Rasgos adicionales: Fuerza +2. Don de los Naaru: canaliza energía sagrada para lanzar luz renovadora. Competencia con kit de joyería.",
+      "speed": 30,
+      "Ability Score Increase": "Fuerza +2",
+      "atributos": {
+        "Fuerza": 2
+      }
+    },
+    {
+      "name": "Draenei Quebrado (Krokul)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Subraza mutada y degradada de draenei que vivían en Terrallende. Rasgos adicionales: Agilidad +2. Adaptador: siempre actúa en rondas de sorpresa y tiene ventaja contra efectos climáticos. Competencia en Percepción y Sigilo.",
+      "speed": 30,
+      "Ability Score Increase": "Agilidad +2",
+      "atributos": {
+        "Agilidad": 2
+      }
+    },
+    {
+      "name": "Enano",
+      "description": "Tamaño: Mediano. Velocidad: 25 pies. Criaturas bajas y robustas que habitan en Khaz Modan, firmes y observadores. Rasgos: Aguante +2. Visión en la oscuridad 60 pies. Armadura natural: CA 12 + Agilidad. Forma pétrea: reduce daño como reacción. Competencia con herramientas artesanales. Competencia con hacha de batalla, hacha de mano, martillo ligero y martillo de guerra. Idiomas: Común y Enano.",
+      "speed": 25,
+      "Ability Score Increase": "Aguante +2",
+      "atributos": {
+        "Aguante": 2
+      }
+    },
+    {
+      "name": "Enano de las Colinas (Yunque Salvaje)",
+      "description": "Tamaño: Mediano. Velocidad: 25 pies. Clan de enanos que viven en el Pico del Nido, más altos y delgados que otros enanos. Rasgos adicionales: Espíritu +1. Valentía: ventaja contra el miedo. Competencia en Trato con Animales. Aclimatado a grandes altitudes y clima frío.",
+      "speed": 25,
+      "Ability Score Increase": "Espíritu +1",
+      "atributos": {
+        "Espíritu": 1
+      }
+    },
+    {
+      "name": "Enano de Montaña (Barba de Bronce)",
+      "description": "Tamaño: Mediano. Velocidad: 25 pies. Clan de enanos de Forja de Hierro, fornidos y poderosos. Rasgos adicionales: Fuerza +1. Competencia con armas de fuego y explosivos. Competencia con armadura ligera. Ventaja contra venenos y resistencia al daño por veneno. Astucia de la piedra: experiencia en Historia o Minería.",
+      "speed": 25,
+      "Ability Score Increase": "Fuerza +1",
+      "atributos": {
+        "Fuerza": 1
+      }
+    },
+    {
+      "name": "Enano de Tierras Oscuras (Hierro Negro)",
+      "description": "Tamaño: Mediano. Velocidad: 25 pies. Clan de enanos esclavos de Ragnaros, de piel cenicienta y ojos dorado-rojizos. Rasgos adicionales: Inteligencia +1. Competencia con armas de fuego y explosivos. Competencia con armadura ligera. Resistencia al daño por fuego. Conoce el truco llamarada.",
+      "speed": 25,
+      "Ability Score Increase": "Inteligencia +1",
+      "atributos": {
+        "Inteligencia": 1
+      }
+    },
+    {
+      "name": "Elfo",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Especie longeva conocida por su aguda percepción, gracia y habilidad mágica. Rasgos: Agilidad +2. Visión en la oscuridad 60 pies. Sentidos místicos: competencia en Arcano con doble bonificación. Competencia en Percepción. Competencia con espada larga, arco largo, estoque y arco corto. Idiomas: Común y Élfico.",
+      "speed": 30,
+      "Ability Score Increase": "Agilidad +2",
+      "atributos": {
+        "Agilidad": 2
+      }
+    },
+    {
+      "name": "Alto Elfo (Quel'dorei)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Elfos de Silvermoon o Dalaran, de tez clara y cabello blanco. Rasgos adicionales: Inteligencia +1. Alta magia: prestidigitación, detectar magia y silencio. Legado arcano: bonificación a CD de hechizos o un truco adicional o el talento flechas imbuidas.",
+      "speed": 30,
+      "Ability Score Increase": "Inteligencia +1",
+      "atributos": {
+        "Inteligencia": 1
+      }
+    },
+    {
+      "name": "Elfo de Sangre (Sin'dorei)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Altos elfos que sufren abstinencia de maná tras la destrucción del Pozo del Sol. Rasgos adicionales: Inteligencia +1. Magia de sangre: similar a Alta magia pero con taumaturgia y quemar maná. Ojos brillan verde vil.",
+      "speed": 30,
+      "Ability Score Increase": "Inteligencia +1",
+      "atributos": {
+        "Inteligencia": 1
+      }
+    },
+    {
+      "name": "Elfo Nocturno (Kaldorei)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Elfos de Darnassus en Kalimdor, de piel pálida a azulada. Rasgos adicionales: Espíritu +1. Resistencia a la naturaleza: ventaja contra venenos y resistencia a rayos y veneno. Máscara de la naturaleza: ocultarse en fenómenos naturales. Fundido con las sombras: ventaja en Sigilo en penumbra.",
+      "speed": 30,
+      "Ability Score Increase": "Espíritu +1",
+      "atributos": {
+        "Espíritu": 1
+      }
+    },
+    {
+      "name": "Nocheborn (Shal'dorei)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Elfos de Suramar protegidos por el Pozo Nocturno, de piel pálida azul-morada. Rasgos adicionales: Inteligencia +1. Afinidad arcana: +1 daño arcano por dado. Resistencia al daño arcano. Magia de los Nocheborn: mano mágica, detectar magia y explosión arcana.",
+      "speed": 30,
+      "Ability Score Increase": "Inteligencia +1",
+      "atributos": {
+        "Inteligencia": 1
+      }
+    },
+    {
+      "name": "Elfo del Vacío (Ren'dorei)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Elfos que abrazan el poder del Vacío, de piel pálida y cabello púrpura. Rasgos adicionales: Carisma o Inteligencia +1. Resistencia al daño de sombra. Ventaja en concentración. Grieta espacial: teletransporte. Magia del vacío: toque de escarcha, detectar magia y paso de parpadeo.",
+      "speed": 30,
+      "Ability Score Increase": "Carisma o Inteligencia +1",
+      "atributos": {
+        "Carisma": 1,
+        "Inteligencia": 1
+      }
+    },
+    {
+      "name": "Renegado (Forsaken)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. No-muertos liberados del control del Rey Exánime, liderados por Sylvanas Windrunner. Rasgos: Dos atributos +1. Visión en la oscuridad 60 pies. Naturaleza no-muerta: no necesita aire, comida, bebida o sueño; inmune a venenos y enfermedades no mágicos; curado por espiral de muerte. Voluntad de los Renegados: ventaja contra el miedo. Canibalizar: consumir cadáveres para curarse. Conocimiento del más allá: elige sangre élfica, humana u orca para rasgos adicionales. Idiomas: Común, Habla de los Renegados y uno adicional.",
+      "speed": 30,
+      "Ability Score Increase": "Dos atributos +1",
+      "atributos": {
+        "Carisma": 1,
+        "Espíritu": 1
+      }
+    },
+    {
+      "name": "Gnomo",
+      "description": "Tamaño: Pequeño. Velocidad: 25 pies. Pequeños humanoides muy inteligentes y curiosos, maestros de la ingeniería y la magia. Rasgos: Inteligencia +2, Aguante +1. Visión en la oscuridad 60 pies. Saber del artífice: experiencia en objetos mágicos y tecnológicos. Ventaja para escapar de agarres. Ventaja contra magia. Competencia en herramientas de ingeniero. Sigilo natural: ocultarse tras criaturas más grandes. Idiomas: Común y Gnómico.",
+      "speed": 25,
+      "Ability Score Increase": "Inteligencia +2, Aguante +1",
+      "atributos": {
+        "Inteligencia": 2,
+        "Aguante": 1
+      }
+    },
+    {
+      "name": "Duende (Goblin)",
+      "description": "Tamaño: Pequeño. Velocidad: 25 pies. Ingeniosos comerciantes y tecnólogos, famosos por su ambición y falta de escrúpulos. Rasgos: Inteligencia +2, Carisma +1. Visión en la oscuridad 60 pies. Mejores ofertas: descuento en compras y ventas. Competencia en Persuasión. Resistencia al daño por trueno. Competencia en herramientas de ingeniero o alquimista. Saber del comerciante: experiencia en objetos mágicos, alquímicos y tecnológicos. Idiomas: Común, Duende y tres adicionales.",
+      "speed": 25,
+      "Ability Score Increase": "Inteligencia +2, Carisma +1",
+      "atributos": {
+        "Inteligencia": 2,
+        "Carisma": 1
+      }
+    },
+    {
+      "name": "Humano",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. La raza más populosa de Azeroth, ambiciosa y guerrera. Rasgos: Dos atributos +1. Edad: 15 años adultez, viven hasta 80. Una hazaña adicional. Espíritu humano: ventaja en una tirada de salvación. Hábil: competencia en una habilidad o herramienta. Idiomas: Común y uno adicional.",
+      "speed": 30,
+      "Ability Score Increase": "Dos atributos +1",
+      "atributos": {
+        "Carisma": 1,
+        "Espíritu": 1
+      }
+    },
+    {
+      "name": "Orco",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Guerreros nobles y feroces que han recuperado su espíritu y honor. Rasgos: Fuerza +2, Aguante +1, y un tercer atributo +1. Visión en la oscuridad 60 pies. Competencia en Intimidación o Perspicacia. Tradición guerrera: dos talentos de guerrero. Competencia con hacha de batalla, hacha de mano, garras de ataque y arco corto. Idiomas: Común y Orco.",
+      "speed": 30,
+      "Ability Score Increase": "Fuerza +2, Aguante +1, un tercero +1",
+      "atributos": {
+        "Fuerza": 2,
+        "Aguante": 1
+      }
+    },
+    {
+      "name": "Pandaren",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Criaturas honorables y amantes de la buena comida y las peleas amistosas. Rasgos: Aguante +2, Espíritu +1. Rebote: reduce daño por caída. Paz interior: competencia en Perspicacia y Percepción, +1 CA sin armadura. Una hazaña: Tavern Brawler, Grappler o Maestría Cervecera. Idiomas: Común y Pandaren.",
+      "speed": 30,
+      "Ability Score Increase": "Aguante +2, Espíritu +1",
+      "atributos": {
+        "Aguante": 2,
+        "Espíritu": 1
+      }
+    },
+    {
+      "name": "Tauren",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Nómadas enormes y espirituales de las llanuras de Kalimdor. Rasgos: Fuerza +2, Espíritu +1. Aguante: +1 PV por nivel y resistencia a veneno. Cornada: ataque con cuernos 1d8 perforante. Llanero: velocidad +10 tras correr. Competencia en Naturaleza o Percepción y herramientas de minería o kit de herboristería. Tremor: talento de guerrero. Idiomas: Común y Táurico.",
+      "speed": 30,
+      "Ability Score Increase": "Fuerza +2, Espíritu +1",
+      "atributos": {
+        "Fuerza": 2,
+        "Espíritu": 1
+      }
+    },
+    {
+      "name": "Troll",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Humanoides altos y delgados, considerados brutales y depravados por otras razas. Rasgos: Agilidad +1, Aguante +1. Visión en la oscuridad 60 pies. Cultura ancestral: elige entre Berserker, Bendecido por Loa o Terreno favorito. Regeneración rápida: ventaja en curación. Regenera extremidades perdidas. Olfato agudo: ventaja en Percepción por olfato. Competencia con hacha de batalla, hacha de mano y armas arrojadizas. Idiomas: Común y Trol.",
+      "speed": 30,
+      "Ability Score Increase": "Agilidad +1, Aguante +1",
+      "atributos": {
+        "Agilidad": 1,
+        "Aguante": 1
+      }
+    },
+    {
+      "name": "Troll del Bosque (Darkspear)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Trolls de la tribu Darkspear o Zandalari, leales a la Horda. Rasgos adicionales: Agilidad +1. Promesa oscura: elige entre competencia en Alquimia o competencia en Intimidación y Sigilo.",
+      "speed": 30,
+      "Ability Score Increase": "Agilidad +1",
+      "atributos": {
+        "Agilidad": 1
+      }
+    },
+    {
+      "name": "Troll de Hielo (Drakkari)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Trolls de las montañas de Northrend y Khaz Modan, un pie más altos que otros trolls. Rasgos adicionales: Aguante +1, Fuerza +1. Resistencia al daño por frío.",
+      "speed": 30,
+      "Ability Score Increase": "Aguante +1, Fuerza +1",
+      "atributos": {
+        "Aguante": 1,
+        "Fuerza": 1
+      }
+    },
+    {
+      "name": "Troll de Arena (Farraki)",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Trolls adaptados a los desiertos de Tanaris. Rasgos adicionales: Aguante +1, Fuerza +1. Resistencia al daño por fuego.",
+      "speed": 30,
+      "Ability Score Increase": "Aguante +1, Fuerza +1",
+      "atributos": {
+        "Aguante": 1,
+        "Fuerza": 1
+      }
+    },
+    {
+      "name": "Worgen",
+      "description": "Tamaño: Mediano. Velocidad: 30 pies. Humanoides lobunos, originalmente humanos malditos de Gilneas. Rasgos: Agilidad +2, Fuerza +1. Visión en la oscuridad 60 pies. Ventaja contra venenos y resistencia a veneno. Forma de worgen: se transforma como acción adicional, gana PV temporales, ataque de mordisco 1d6 y garras 1d4, y puede atacar con garra y mordisco. Competencia en Sigilo y Percepción. Idiomas: Común y uno adicional.",
+      "speed": 30,
+      "Ability Score Increase": "Agilidad +2, Fuerza +1",
+      "atributos": {
+        "Agilidad": 2,
+        "Fuerza": 1
+      }
+    }
+  ]
+}

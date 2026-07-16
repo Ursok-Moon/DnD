@@ -2,7 +2,7 @@ export class ManaManager {
     constructor(storageService, eventBus) {
         this.storage = storageService;
         this.eventBus = eventBus;
-        this.current = 2;
+        this.current = 0;
         this.max = 15;
         this.listeners = [];
         this.load();
@@ -11,7 +11,7 @@ export class ManaManager {
     load() {
         const saved = this.storage.load('mana');
         if (saved) {
-            this.current = saved.current || 2;
+            this.current = saved.current || 0;
             this.max = saved.max || 15;
         }
     }

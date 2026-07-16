@@ -146,6 +146,16 @@ export class TabManager {
                                 this.renameTab(tabId, newName);
                             }
                         });
+
+                        // CARGAR DATOS GUARDADOS DE LA PESTAÑA
+                    setTimeout(() => {
+                        if (sheet.loadSavedCharacterData) {
+                            sheet.loadSavedCharacterData();
+                        }
+                        if (sheet.refresh) {
+                            sheet.refresh();
+                        }
+                    }, 200);
                     }
                     
                     // Recargar datos guardados si existen
